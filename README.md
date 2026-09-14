@@ -16,3 +16,7 @@ GitHubのPR（Pull Request）の練習用リポジトリです。
 
 - GitHubの使い方をマスターする
 - はじめてのPRをマージしてもらう
+
+## アプリ
+
+- [リズムで あいうえお（音読＋挿絵アプリ）](gojuon-app/) — `gojuon-app/index.html` をブラウザで開くと動きます。

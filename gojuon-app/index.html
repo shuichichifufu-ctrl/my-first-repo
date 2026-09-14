@@ -1,0 +1,32 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>リズムで あいうえお</title>
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+  <header class="top">
+    <h1 class="title">リズムで あいうえお</h1>
+    <nav class="rows" id="rowNav" aria-label="行をえらぶ"></nav>
+    <div class="pageinfo" id="pageInfo"></div>
+  </header>
+
+  <main class="stage" id="stage">
+    <button class="arrow left" id="prevBtn" aria-label="まえのページ">‹</button>
+
+    <section class="page" id="page" aria-live="polite"></section>
+
+    <button class="arrow right" id="nextBtn" aria-label="つぎのページ">›</button>
+  </main>
+
+  <footer class="bottom">
+    <label class="opt"><input type="checkbox" id="autoSpeak"> ページを開いたら自動でよみあげる</label>
+    <span class="hint">← → キー、画面のスワイプでもページがめくれます</span>
+  </footer>
+
+  <script src="data.js"></script>
+  <script src="app.js"></script>
+</body>
+</html>
