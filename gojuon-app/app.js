@@ -1,9 +1,5 @@
-// ページの並び：あ行「よむ」→ あ行「え」→ か行「よむ」→ か行「え」→ … の順に交互になります。
-const PAGES = [];
-GOJUON_ROWS.forEach((row, i) => {
-  PAGES.push({ type: "read", row, rowIndex: i });
-  PAGES.push({ type: "art",  row, rowIndex: i });
-});
+// 絵本のように、1ページ = 1行（挿絵と文が同じページに並びます）。
+const PAGES = GOJUON_ROWS.map((row, i) => ({ row, rowIndex: i }));
 
 let current = 0;
 const pageEl = document.getElementById("page");
@@ -18,7 +14,7 @@ GOJUON_ROWS.forEach((row, i) => {
   const b = document.createElement("button");
   b.textContent = row.kana;
   b.title = row.row;
-  b.addEventListener("click", () => go(i * 2));
+  b.addEventListener("click", () => go(i));
   rowNav.appendChild(b);
 });
 
@@ -36,55 +32,67 @@ function go(n) {
 
 function render() {
   const p = PAGES[current];
-  pageEl.className = "page " + p.type;
+  pageEl.className = "page";
   pageEl.innerHTML = "";
   // アニメーションをやり直すための小技
   void pageEl.offsetWidth;
 
-  if (p.type === "read") renderRead(p.row);
-  else renderArt(p.row);
+  renderArt(p.row);
+  renderRead(p.row);
 
   pageInfo.textContent = `${current + 1} / ${PAGES.length}`;
   prevBtn.disabled = current === 0;
   nextBtn.disabled = current === PAGES.length - 1;
   [...rowNav.children].forEach((b, i) => b.classList.toggle("active", i === p.rowIndex));
 
-  if (p.type === "read" && autoSpeak.checked) speakAll(p.row);
+  if (autoSpeak.checked) speakAll(p.row);
 }
 
 function renderRead(row) {
+  const box = document.createElement("div");
+  box.className = "text";
+  pageEl.appendChild(box);
   const badge = document.createElement("div");
   badge.className = "badge";
   badge.textContent = "こえに だして よもう";
   const name = document.createElement("h2");
   name.className = "rowname";
   name.textContent = row.row;
-  pageEl.append(badge, name);
+  box.append(badge, name);
 
   row.lines.forEach((text, i) => {
     const d = document.createElement("div");
     d.className = "line";
-    d.textContent = text;
+    // 全角スペースの区切りでだけ改行されるように、ことばごとに span で包む
+    text.split("　").forEach(word => {
+      const w = document.createElement("span");
+      w.className = "w";
+      w.textContent = word;
+      d.appendChild(w);
+    });
     d.title = "クリックすると この1行だけ よみあげます";
     d.addEventListener("click", () => speakLines(row, [i]));
-    pageEl.appendChild(d);
+    box.appendChild(d);
   });
 
   const btn = document.createElement("button");
   btn.className = "speak";
   btn.textContent = "🔊 おてほんを きく";
   btn.addEventListener("click", () => speakAll(row));
-  pageEl.appendChild(btn);
+  box.appendChild(btn);
 
   const note = document.createElement("div");
   note.className = "note";
   note.textContent = canSpeak()
-    ? "おてほんの あとに、じぶんでも よんでみよう。つぎのページに 絵が あるよ。"
-    : "このブラウザは よみあげに 対応していません。じぶんの こえで よんでみよう。";
-  pageEl.appendChild(note);
+    ? "おてほんの あとに、絵を みながら じぶんでも よんでみよう。"
+    : "このブラウザは よみあげに 対応していません。絵を みながら じぶんの こえで よんでみよう。";
+  box.appendChild(note);
 }
 
 function renderArt(row) {
+  const box = document.createElement("div");
+  box.className = "art";
+  pageEl.appendChild(box);
   const img = document.createElement("img");
   img.alt = `${row.row} の挿絵`;
   img.src = row.image;
@@ -94,12 +102,9 @@ function renderArt(row) {
     const ph = document.createElement("div");
     ph.className = "placeholder";
     ph.innerHTML = `<div class="emoji">${row.emoji}</div><div class="big">${row.kana}</div><div>${row.row}</div><small>挿絵はまだ入っていません（${row.image} を置くと表示されます）</small>`;
-    pageEl.prepend(ph);
+    box.prepend(ph);
   });
-  const cap = document.createElement("div");
-  cap.className = "caption";
-  cap.textContent = row.lines.join("　／　");
-  pageEl.append(img, cap);
+  box.append(img);
 }
 
 /* ---- よみあげ（ブラウザの音声合成を使用。ネット接続やAPIキーは不要） ---- */

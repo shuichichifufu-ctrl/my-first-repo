@@ -63,75 +63,30 @@ body {
   border: 4px solid var(--ink);
   border-radius: 24px;
   box-shadow: 8px 8px 0 var(--ink);
-  padding: 24px;
-  display: flex;
-  flex-direction: column;
+  padding: 20px;
+  display: grid;
+  grid-template-columns: minmax(0, 1.15fr) minmax(0, 1fr);
+  gap: 20px;
   align-items: center;
-  justify-content: center;
-  text-align: center;
   min-height: 60vh;
   animation: flip .35s ease-out;
-  overflow: hidden;
 }
 @keyframes flip {
   from { transform: rotateY(12deg) scale(.97); opacity: 0; }
   to   { transform: none; opacity: 1; }
 }
+@media (prefers-reduced-motion: reduce) { .page { animation: none; } }
 
-/* 音読ページ */
-.page.read .rowname {
-  font-size: clamp(2.2rem, 7vw, 4.5rem);
-  font-weight: 900;
-  color: var(--accent);
-  letter-spacing: .15em;
-  margin: 0 0 12px;
-}
-.page.read .badge {
-  font-size: 1rem;
-  background: var(--accent2);
-  color: #fff;
-  padding: 4px 14px;
-  border-radius: 999px;
-  margin-bottom: 8px;
-}
-.page.read .line {
-  font-size: clamp(1.6rem, 5vw, 3.2rem);
-  font-weight: 700;
-  line-height: 1.6;
-  margin: 6px 0;
-  cursor: pointer;
-  padding: 4px 12px;
-  border-radius: 12px;
-  transition: background .2s;
-}
-.page.read .line:hover { background: #fff1c9; }
-.page.read .line.speaking { background: #ffe08a; }
-.page.read .speak {
-  margin-top: 20px;
-  font-family: inherit;
-  font-size: 1.3rem;
-  padding: 12px 28px;
-  border-radius: 999px;
-  border: 3px solid var(--ink);
-  background: var(--accent);
-  color: #fff;
-  cursor: pointer;
-  box-shadow: 4px 4px 0 var(--ink);
-}
-.page.read .speak:active { transform: translate(2px, 2px); box-shadow: 2px 2px 0 var(--ink); }
-.page.read .note { margin-top: 12px; font-size: .9rem; opacity: .65; }
-
-/* 挿絵ページ */
-.page.art img {
+/* 挿絵（左） */
+.page .art { display: flex; align-items: center; justify-content: center; min-width: 0; }
+.page .art img {
   max-width: 100%;
   max-height: 70vh;
   border-radius: 16px;
   border: 3px solid var(--ink);
 }
-.page.art .caption { margin-top: 12px; font-size: 1.2rem; font-weight: 700; }
-.page.art .placeholder {
+.page .art .placeholder {
   width: 100%;
-  max-width: 720px;
   aspect-ratio: 4 / 3;
   border: 3px dashed var(--ink);
   border-radius: 16px;
@@ -140,11 +95,69 @@ body {
   align-items: center;
   justify-content: center;
   gap: 8px;
+  text-align: center;
+  padding: 12px;
   background: repeating-linear-gradient(45deg, #fff, #fff 12px, #fdf3d8 12px, #fdf3d8 24px);
 }
-.page.art .placeholder .emoji { font-size: 5rem; line-height: 1; }
-.page.art .placeholder .big { font-size: 4rem; font-weight: 900; color: var(--accent); line-height: 1.1; }
-.page.art .placeholder small { opacity: .7; }
+.page .art .placeholder .emoji { font-size: 5rem; line-height: 1; }
+.page .art .placeholder .big { font-size: 4rem; font-weight: 900; color: var(--accent); line-height: 1.1; }
+.page .art .placeholder small { opacity: .7; font-size: .8rem; }
+
+/* 文（右） */
+.page .text {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  text-align: center;
+  min-width: 0;
+}
+.page .text .rowname {
+  font-size: clamp(2rem, 5vw, 3.6rem);
+  font-weight: 900;
+  color: var(--accent);
+  letter-spacing: .15em;
+  margin: 0 0 12px;
+}
+.page .text .badge {
+  font-size: 1rem;
+  background: var(--accent2);
+  color: #fff;
+  padding: 4px 14px;
+  border-radius: 999px;
+  margin-bottom: 8px;
+}
+.page .text .line {
+  font-size: clamp(1.4rem, 3.2vw, 2.4rem);
+  font-weight: 700;
+  line-height: 1.7;
+  margin: 6px 0;
+  cursor: pointer;
+  padding: 4px 12px;
+  border-radius: 12px;
+  transition: background .2s;
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  column-gap: .9em;
+}
+.page .text .line .w { white-space: nowrap; }
+.page .text .line:hover { background: #fff1c9; }
+.page .text .line.speaking { background: #ffe08a; }
+.page .text .speak {
+  margin-top: 20px;
+  font-family: inherit;
+  font-size: 1.2rem;
+  padding: 12px 28px;
+  border-radius: 999px;
+  border: 3px solid var(--ink);
+  background: var(--accent);
+  color: #fff;
+  cursor: pointer;
+  box-shadow: 4px 4px 0 var(--ink);
+}
+.page .text .speak:active { transform: translate(2px, 2px); box-shadow: 2px 2px 0 var(--ink); }
+.page .text .speak:focus-visible, .rows button:focus-visible, .arrow:focus-visible { outline: 3px solid var(--accent2); outline-offset: 2px; }
+.page .text .note { margin-top: 12px; font-size: .9rem; opacity: .65; }
 
 .bottom {
   display: flex;
@@ -159,6 +172,7 @@ body {
 @media (max-width: 600px) {
   .stage { grid-template-columns: 36px 1fr 36px; gap: 4px; }
   .arrow { font-size: 2.2rem; }
-  .page { padding: 16px; min-height: 55vh; }
+  .page { padding: 14px; min-height: 55vh; grid-template-columns: 1fr; gap: 12px; }
+  .page .art img { max-height: 42vh; }
   .pageinfo { margin-left: 0; }
 }
