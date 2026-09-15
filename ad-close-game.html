@@ -245,6 +245,24 @@ textarea.json{width:100%; height:140px; font-family:ui-monospace,Menlo,monospace
 .popup .p-s{font-size:13px; color:#666; margin:4px 0 10px;}
 .popup .p-cta{display:inline-block; padding:12px 26px; border-radius:999px; background:var(--pri); color:#fff; font-weight:800;}
 
+/* 偽の警告 */
+.alert-box{position:relative; width:min(88%,320px); background:#f2f2f7; border-radius:14px; padding:18px 16px 12px; text-align:center; box-shadow:0 12px 40px rgba(0,0,0,.5); pointer-events:auto;}
+.al-title{font-weight:800; font-size:18px; color:#c0392b;}
+.al-text{font-size:14px; color:#333; margin:8px 0 10px; line-height:1.5;}
+.al-bar{height:8px; background:#ddd; border-radius:4px; overflow:hidden; margin-bottom:12px;}
+.al-bar > div{height:100%; width:0; background:#c0392b; animation:prog 4s linear forwards;}
+.al-btn{display:block; width:100%; min-height:44px; border-top:1px solid #d6d6db; font-size:16px; color:var(--pri); font-weight:600;}
+.al-btn.primary{background:var(--ng); color:#fff; border-radius:10px; font-weight:800; margin-bottom:6px; border:0;}
+/* 記事風 */
+.native-body{background:#fff; color:#222; align-items:stretch; justify-content:flex-start; text-align:left; padding:14px;}
+.nv-head{font-size:12px; color:#888; margin-bottom:6px;}
+.nv-pr{display:inline-block; background:#eee; color:#666; font-size:10px; padding:1px 5px; border-radius:3px; margin-right:4px;}
+.nv-thumb{height:120px; border-radius:10px; display:flex; align-items:center; justify-content:center; font-size:60px;}
+.nv-title{font-weight:800; font-size:17px; margin:8px 0 4px; line-height:1.35;}
+.nv-text{font-size:13px; color:#555; line-height:1.5;}
+.nv-more{color:var(--pri); font-weight:800; font-size:15px; margin-top:6px; text-align:left;}
+.nv-rel{font-size:13px; color:#333; padding:6px 0; border-top:1px solid #eee;}
+.txtbtn.back{background:transparent; color:#fff; box-shadow:none; font-size:16px; text-shadow:0 1px 3px rgba(0,0,0,.6);}
 /* 報酬型 */
 .reward-box{background:rgba(0,0,0,.35); border:2px dashed rgba(255,255,255,.7); border-radius:14px; padding:12px 18px; color:#fff; font-weight:800; margin-top:10px;}
 .reward-btn{position:absolute; z-index:5; left:50%; transform:translateX(-50%); bottom:70px; padding:12px 20px; white-space:nowrap; border-radius:999px; background:linear-gradient(#5ee07a,#1f9d4a); color:#fff; font-weight:900; font-size:17px; box-shadow:0 4px 0 #136b31;}
@@ -318,6 +336,22 @@ textarea.json{width:100%; height:140px; font-family:ui-monospace,Menlo,monospace
 details.teacher{border-top:1px solid var(--line); margin-top:10px; padding-top:8px;}
 details.teacher summary{font-weight:700; color:var(--muted); cursor:pointer; min-height:44px; display:flex; align-items:center;}
 .howto{font-size:15px; line-height:1.7;}
+/* ずかん */
+.gcat{display:flex; align-items:center; gap:10px; margin:18px 0 8px; padding:10px 12px; border-radius:12px; color:#fff; font-weight:800; font-size:18px;}
+.gcat small{font-weight:600; font-size:13px; opacity:.95;}
+.gentry{background:#fff; border:1px solid var(--line); border-radius:14px; padding:12px 14px; margin-bottom:10px;}
+.gentry .g-head{display:flex; align-items:center; gap:10px; margin-bottom:6px;}
+.gentry .g-ico{font-size:30px; width:44px; text-align:center; flex:none;}
+.gentry .g-name{font-weight:800; font-size:17px;}
+.gentry .g-row{display:flex; gap:8px; font-size:15px; line-height:1.55; margin:4px 0;}
+.gentry .g-row b{flex:none; width:6.5em; color:var(--muted); font-size:13px; padding-top:2px;}
+.gentry .g-todo{background:#e8f6ec; border-radius:10px; padding:8px 10px; font-weight:700;}
+.gentry details{margin-top:6px;} .gentry summary{font-size:13px; color:var(--muted); min-height:36px; display:flex; align-items:center; cursor:pointer;}
+.gentry .g-try{margin-top:8px;}
+.g-rule{background:#fff8e1; border:1px solid #ffe08a; border-radius:12px; padding:10px 12px; font-size:15px; line-height:1.6; margin-bottom:10px;}
+.g-tabs{display:flex; gap:6px; flex-wrap:wrap; justify-content:center; margin-bottom:6px;}
+.g-tabs button{min-height:40px; padding:6px 12px; border-radius:999px; background:#e9edf2; font-weight:700; font-size:14px;}
+.g-tabs button.selected{background:var(--ink); color:#fff;}
 </style>
 </head>
 <body>
@@ -347,6 +381,7 @@ details.teacher summary{font-weight:700; color:var(--muted); cursor:pointer; min
   <div class="card stack">
     <button id="btn-start" class="btn primary big">▶ あそぶ</button>
     <div class="row">
+      <button id="btn-zukan" class="btn grow">📖 ずかん</button>
       <button id="btn-records" class="btn grow">📒 きろく</button>
       <button id="btn-settings" class="btn grow teacher-btn">⚙ せってい（先生用）</button>
       <button id="btn-test" class="btn grow teacher-btn">🧪 テスト</button>
@@ -387,6 +422,20 @@ details.teacher summary{font-weight:700; color:var(--muted); cursor:pointer; min
     </div>
     <p class="note">Safari は 7日間使わないサイトの保存データを消すことがあります。ホーム画面に追加して使うか、学期の区切りで JSON を書き出して保管してください。</p>
     <button id="btn-records-back" class="btn primary big">もどる</button>
+  </div>
+</section>
+
+<!-- ===== ずかん（罠の種類と対策） ===== -->
+<section id="zukan" class="screen">
+  <h1>わなの ずかん</h1>
+  <p class="sub">こうこくの「まぎらわしい ボタン」を しゅるいごとに。「ためす」で その れいが 1つ でます（きろくは のこりません）</p>
+  <div class="card" style="padding:10px">
+    <div class="g-rule">📌 <b>きほんの ルール</b><br>① すぐ おさない。まず ぜんたいを みる。<br>② ほんものの ✕は、こうこくの <b>わくの かど</b>に ついている。えの なかの ✕は にせもの。<br>③ 「とじる」「OK」「もどる」の <b>もじは しんじない</b>。<br>④ まちがえて ストアに とんでも、あわてず <b>ひだりうえ か みぎうえ</b>の「もどる」「かんりょう」「✕」を さがす。</div>
+    <div class="g-tabs" id="g-tabs"></div>
+  </div>
+  <div id="zukan-body" style="width:100%; max-width:640px; margin:0 auto"></div>
+  <div class="card stack">
+    <button id="btn-zukan-back" class="btn primary big">もどる</button>
   </div>
 </section>
 
@@ -446,6 +495,7 @@ details.teacher summary{font-weight:700; color:var(--muted); cursor:pointer; min
   </div>
   <div class="card stack">
     <button id="btn-again" class="btn primary big">もういちど</button>
+    <button id="btn-result-zukan" class="btn">📖 ずかんで たいさくを みる</button>
     <button id="btn-result-title" class="btn">タイトルへ</button>
   </div>
 </section>
@@ -513,6 +563,12 @@ const PATTERNS = [
   {id:'gray_x',         name:'灰色の✕',               desc:'無効に見える灰色の✕が本物（逆に白い✕が偽物の回もある）',      def:['normal','hard']},
   {id:'multi_escape',   name:'多段脱出',              desc:'ストアを閉じると「本当に戻りますか？」やおすすめ画面がもう1枚', def:['hard'], hardOnly:true},
   {id:'countdown_x',    name:'✕入りカウントダウン',   desc:'円のカウントダウンの中に小さな✕。終わるまで押せない',          def:['normal','hard']},
+  {id:'early_x',        name:'早押し✕',               desc:'✕は最初から見えているが、カウントが終わる前に押すとストアへ',   def:['normal','hard']},
+  {id:'endless_cd',     name:'終わらないカウントダウン', desc:'数字がいつまでも終わらない。本物の✕は最初から別の場所に小さくある', def:['hard']},
+  {id:'multi_x',        name:'✕がいくつも',           desc:'同じ見た目の✕が絵の中にも。本物は広告の枠の角についている1つだけ', def:['easy','normal','hard']},
+  {id:'fake_back',      name:'偽の「＜ 戻る」',        desc:'アプリの戻るボタンに似た「＜」が広告の中にある。押すとストアへ',    def:['normal','hard']},
+  {id:'auto_redirect',  name:'勝手にストアへ',         desc:'何も押していないのに数秒でストアに飛ぶ。落ち着いて戻る練習',      def:['normal','hard']},
+  {id:'fake_alert',     name:'偽の警告',               desc:'「ウイルスが見つかりました」「更新が必要です」と脅す。全部ウソ',    def:['normal','hard']},
 ];
 const PAT = Object.fromEntries(PATTERNS.map(p=>[p.id,p]));
 
@@ -522,6 +578,9 @@ const AD_TYPES = [
   {id:'playable',     name:'プレイアブル風'},
   {id:'banner_popup', name:'バナー＋ポップアップ'},
   {id:'rewarded',     name:'報酬型'},
+  {id:'alert',        name:'警告ダイアログ風（偽の警告）'},
+  {id:'prize',        name:'当選・アンケート風'},
+  {id:'native',       name:'記事・ニュース風'},
 ];
 
 const MODES = [
@@ -640,6 +699,12 @@ const BRANDS = [
   {name:'キャンディタウン',   hero:'🍭', grad:['#f857a6','#ff5858'], copy:'3つ そろえて 消そう！', dev:'Sweet Bit'},
   {name:'スターシューター',   hero:'🚀', grad:['#141e30','#243b55'], copy:'宇宙の 果てまで 飛べ', dev:'Nova Play'},
   {name:'ワードパズル王',     hero:'🧩', grad:['#f7971e','#ffd200'], copy:'ことばを つないで 高得点', dev:'Lexi Lab'},
+  {name:'まほうのケーキ屋',   hero:'🎂', grad:['#ff9a9e','#fad0c4'], copy:'デコって うって ひろげよう', dev:'Oven Tales'},
+  {name:'ゾンビロード',       hero:'🧟', grad:['#232526','#414345'], copy:'生きのこれ。48時間', dev:'Night Byte'},
+  {name:'おさかなパーク',     hero:'🐠', grad:['#43cea2','#185a9d'], copy:'すいぞくかんを つくろう', dev:'Reef Works'},
+  {name:'サッカースター',     hero:'⚽', grad:['#1d976c','#93f9b9'], copy:'きみが エースだ！', dev:'Pitch Play'},
+  {name:'ネコとダンジョン',   hero:'🐈‍⬛', grad:['#654ea3','#eaafc8'], copy:'にゃんこと 冒険に でかけよう', dev:'Tail Quest'},
+  {name:'ゴールドラッシュ',   hero:'⛏️', grad:['#c79081','#dfa579'], copy:'ほって ほって おおがねもち', dev:'Nugget Inc.'},
 ];
 function pickBrand(){ return pick(BRANDS); }
 
@@ -669,16 +734,35 @@ function adMark(){ return h('div', {class:'ad-mark', 'data-trap':'admark', text:
 //   note : テンプレート固有の情報（動画のスキップ待ち秒数など）
 const AD_TEMPLATES = {
   interstitial(ctx){
-    const body = h('div', {class:'ad-body'},
-      adArt(ctx),
-      h('div', {style:'position:relative'},
+    const v = ctx.variant ?? ri(0,2);
+    let inner;
+    if (v === 1){   // キャラ並び＋イベントのリボン
+      const others = shuffle(BRANDS.filter(b=>b!==ctx.brand)).slice(0,2).map(b=>b.hero);
+      inner = h('div', {style:'position:relative'},
+        h('div', {style:'display:inline-block; background:#ff3d7f; color:#fff; font-weight:900; padding:4px 14px; border-radius:999px; font-size:14px; margin-bottom:8px', text:'🎉 新イベント 開催中'}),
+        h('div', {class:'ad-brand', text:ctx.brand.name}),
+        h('div', {style:'font-size:clamp(50px,16vw,80px); line-height:1.1; margin:8px 0', text: others[0] + ctx.brand.hero + others[1]}),
+        h('div', {class:'ad-copy', text:ctx.brand.copy}),
+        h('button', {class:'ad-cta', 'data-trap':'cta', text:'いますぐ 参加'}),
+      );
+    } else if (v === 2){   // 特典・限定
+      inner = h('div', {style:'position:relative'},
+        h('div', {class:'ad-hero', text:ctx.brand.hero}),
+        h('div', {class:'ad-brand', text:ctx.brand.name}),
+        h('div', {class:'reward-box', text:'🎁 今だけ 限定アイテム ＋ 💎 ×50'}),
+        h('div', {class:'ad-copy', text:'あと 09:59 で 終了'}),
+        h('button', {class:'ad-cta', 'data-trap':'cta', text:'無料で 受け取る'}),
+      );
+    } else {
+      inner = h('div', {style:'position:relative'},
         h('div', {class:'ad-brand', text:ctx.brand.name}),
         h('div', {class:'ad-hero', text:ctx.brand.hero}),
         h('div', {class:'ad-copy', text:ctx.brand.copy}),
         h('button', {class:'ad-cta', 'data-trap':'cta', text:'今すぐ ダウンロード'}),
-      ),
-      adMark(),
-    );
+      );
+    }
+    const body = h('div', {class:'ad-body'}, adArt(ctx), inner, adMark());
+    if (v === 1) body.style.setProperty('--deco', '1');
     const root = h('div', {class:'ad'}, body, adFoot(ctx));
     return {root, body};
   },
@@ -747,6 +831,55 @@ const AD_TEMPLATES = {
     return {root, body: popup, note:{layerClass:'banner-mode'}};
   },
 
+  // 偽の警告ダイアログ風（本物のシステム警告にそっくりだが、全部ウソ）
+  alert(ctx){
+    const dialog = h('div', {class:'alert-box'},
+      h('div', {class:'al-title', text:'⚠️ 警告'}),
+      h('div', {class:'al-text', text:'お使いの iPad で ウイルスが 3件 見つかりました。今すぐ 対処しないと データが 消えます。'}),
+      h('div', {class:'al-bar'}, h('div')),
+      h('button', {class:'al-btn primary', 'data-role':'trap', 'data-trap':'alertbtn', text:'今すぐ スキャン'}),
+      h('button', {class:'al-btn', 'data-role':'trap', 'data-trap':'alertbtn', text:'OK'}),
+      adMark(),
+    );
+    const root = h('div', {class:'ad compact', style:'background:rgba(0,0,0,.6); box-shadow:none; width:100%; height:100%; border-radius:0; overflow:visible; align-items:center; justify-content:center;'}, dialog);
+    return {root, body: dialog, note:{layerClass:'banner-mode'}};
+  },
+
+  // 当選・アンケート風
+  prize(ctx){
+    const body = h('div', {class:'ad-body', style:'background:linear-gradient(160deg,#ffd200,#f7971e)'},
+      h('div', {style:'position:relative'},
+        h('div', {style:'font-size:64px; line-height:1', text:'🎉'}),
+        h('div', {class:'ad-brand', text:'おめでとうございます！'}),
+        h('div', {class:'ad-copy', text:'あなたは 1,000,000人目の 訪問者に 選ばれました'}),
+        h('div', {class:'reward-box', text:'🎁 最新スマホ が 当たる'}),
+        h('div', {class:'ad-copy', text:'受け取り期限 あと 00:59'}),
+        h('button', {class:'ad-cta', 'data-trap':'cta', text:'プレゼントを 受け取る'}),
+      ),
+      adMark(),
+    );
+    const root = h('div', {class:'ad'}, body, h('div', {class:'ad-foot'}, h('div', {class:'s', text:'※ アンケートに答えると 受け取れます'})));
+    return {root, body};
+  },
+
+  // 記事・ニュース風（ネイティブ広告）
+  native(ctx){
+    const [a,b] = ctx.brand.grad;
+    const body = h('div', {class:'ad-body native-body'},
+      h('div', {class:'nv-head'}, h('span', {class:'nv-pr', text:'PR'}), ' おすすめの 記事'),
+      h('div', {class:'nv-thumb', style:`background:linear-gradient(135deg,${a},${b})`, text:ctx.brand.hero}),
+      h('div', {class:'nv-title', text:`【話題】${ctx.brand.name} が 大人気の 理由とは？`}),
+      h('div', {class:'nv-text', text:'いま SNS で 話題の このゲーム。はじめた人の 9割が「もう やめられない」と…'}),
+      h('button', {class:'nv-more', 'data-trap':'cta', text:'続きを読む ›'}),
+      h('div', {class:'nv-head', style:'margin-top:10px'}, '関連記事'),
+      h('div', {class:'nv-rel', text:'▶ 3日で レベル50に なる 方法'}),
+      h('div', {class:'nv-rel', text:'▶ 無料で 💎 を 集める 裏ワザ'}),
+      adMark(),
+    );
+    const root = h('div', {class:'ad'}, body, adFoot(ctx));
+    return {root, body};
+  },
+
   rewarded(ctx){
     const body = h('div', {class:'ad-body'},
       adArt(ctx),
@@ -767,12 +900,14 @@ const AD_TEMPLATES = {
 // ---------- 4. 出題スペック（パターンの組み合わせ） ----------
 const POSITIONS = ['tl','tr','bl','br','bc','tc'];
 const TEXT_LABELS = ['閉じる','Close','Skip','次へ','いいえ','あとで'];
-const TRAP_NAMES = {fakeX:'絵の中の偽✕', text:'文字ボタン', icon:'罠アイコン（▶ ⓘ 🔊 など）', x:'色ちがいの✕', ghost:'✕のまわりの透明領域', swap:'すり替えの「入手」', reward:'報酬ボタン', 'banner-x':'バナーの小さな✕', cta:'大きなボタン（入手・プレイなど）', admark:'「広告」マーク', body:'広告の絵や文字'};
+const TRAP_NAMES = {fakeX:'絵の中の偽✕', text:'文字ボタン', icon:'罠アイコン（▶ ⓘ 🔊 など）', x:'色ちがいの✕', ghost:'✕のまわりの透明領域', swap:'すり替えの「入手」', reward:'報酬ボタン', 'banner-x':'バナーの小さな✕', cta:'大きなボタン（入手・プレイなど）', admark:'「広告」マーク', body:'広告の絵や文字', early:'カウント前の早押し✕', sameX:'絵の中の✕（本物そっくり）', back:'偽の「＜ 戻る」', auto:'勝手にストアへ（自動遷移）', alertbtn:'偽の警告の「OK」「今すぐ」'};
 const ICON_TRAPS = ['▶','ⓘ','🔊','▷'];
 // 同時に使えない組み合わせ
 const EXCLUSIVE = {
-  delay_x:['countdown_x'], countdown_x:['delay_x','text_trap'],
-  text_trap:['tiny_x','gray_x','countdown_x'], tiny_x:['text_trap'], gray_x:['text_trap'],
+  delay_x:['countdown_x','early_x','endless_cd'], countdown_x:['delay_x','text_trap','early_x','endless_cd'],
+  early_x:['delay_x','countdown_x','endless_cd','text_trap','vanish_x'], endless_cd:['delay_x','countdown_x','early_x','text_trap','tiny_x','random_pos','vanish_x'],
+  text_trap:['tiny_x','gray_x','countdown_x','early_x','endless_cd','multi_x'], tiny_x:['text_trap','endless_cd'], gray_x:['text_trap','multi_x'],
+  multi_x:['gray_x','text_trap'], fake_alert:['text_trap'],
 };
 function compatible(list, p){ return !list.some(q => (EXCLUSIVE[q]||[]).includes(p) || (EXCLUSIVE[p]||[]).includes(q)); }
 function enabledPatterns(settings){ return PATTERNS.filter(p=>settings.patterns[p.id]).map(p=>p.id); }
@@ -782,16 +917,17 @@ function patternCountForLevel(settings, level){
 
 function buildSpec(o){
   const {mode, settings, level=1} = o;
-  const adPool = AD_TYPES.filter(t=>settings.adTypes[t.id]).map(t=>t.id);
-  const adType = o.adType || pick(adPool.length ? adPool : ['interstitial']);
+  const adPool = AD_TYPES.filter(t=>settings.adTypes[t.id] && t.id !== 'alert').map(t=>t.id);   // 警告風は「偽の警告」パターンのときだけ
+  let adType = o.adType || pick(adPool.length ? adPool : ['interstitial']);
   let pats = [];
   // 山札方式：o.first で指定されたパターンを先頭に置く（1ラウンド内で偏らないように）
   const source = o.patterns ? o.patterns.slice() : (o.first ? [o.first, ...shuffle(enabledPatterns(settings).filter(p=>p!==o.first))] : shuffle(enabledPatterns(settings)));
   const n = o.patterns ? 99 : patternCountForLevel(settings, level);
   for (const p of source){ if (pats.length >= n) break; if (compatible(pats, p)) pats.push(p); }
   const has = id => pats.includes(id);
+  if (has('fake_alert')) adType = 'alert';
 
-  const posPool = adType === 'banner_popup' ? ['tl','tr','bl','br'] : POSITIONS;   // ポップアップは中央下が CTA と重なるので四隅のみ
+  const posPool = (adType === 'banner_popup' || adType === 'alert') ? ['tl','tr','bl','br'] : POSITIONS;   // ポップアップは中央下が CTA と重なるので四隅のみ
   const spec = {
     adType, patterns:pats, brand:pickBrand(), mode, imagePath:o.imagePath||null, posPool,
     xSize: Math.max(24, settings.xSize - settings.xShrinkPerLevel*(level-1)), hitScale:settings.hitScale,
@@ -806,9 +942,14 @@ function buildSpec(o){
     doubleAd: has('double_ad') && !o.second, confirm: has('confirm_dialog') && !o.second,
     multiEscape: has('multi_escape'),
     traps:[], textReal:null, rewardReal:false, skipWait:0,
+    earlyX: has('early_x'), endless: has('endless_cd'),
+    autoSec: has('auto_redirect') ? (mode==='hard' ? 4 : 6) : 0,
   };
   if (adType === 'video') spec.skipWait = mode==='easy' ? 3 : 5;          // 動画は常にスキップ待ち
-  if (has('countdown_x')) spec.delaySec = Math.max(spec.delaySec, settings.delaySec);
+  if (has('countdown_x') || has('early_x')) spec.delaySec = Math.max(spec.delaySec, settings.delaySec);
+  if (has('endless_cd')){ spec.delaySec = 0; spec.skipWait = 0; spec.xStyle = 'tiny'; spec.xPos = pick(posPool.filter(p=>p!=='tr')); }
+  if (has('multi_x')){ spec.traps.push({kind:'sameX'}); if (mode !== 'easy') spec.traps.push({kind:'sameX'}); }
+  if (has('fake_back')) spec.traps.push({kind:'back'});
   if (has('gray_x')) { const grayReal = Math.random() < 0.6; spec.xStyle = grayReal ? 'gray' : 'white'; spec.traps.push({kind:'x', style: grayReal ? 'white' : 'gray'}); }
   else if (has('tiny_x')) spec.xStyle = 'tiny';
   if (has('text_trap')) {
@@ -822,7 +963,11 @@ function buildSpec(o){
   // 罠の位置：本物と重ならない場所に割り当て
   const free = shuffle(posPool.filter(p => p !== spec.xPos));
   let fi = 0;
-  for (const t of spec.traps) t.pos = (t.kind === 'fakeX') ? null : free[(fi++) % free.length];
+  for (const t of spec.traps){
+    if (t.kind === 'fakeX' || t.kind === 'sameX') { t.pos = null; continue; }
+    if (t.kind === 'back' && free.includes('tl')) { t.pos = 'tl'; free.splice(free.indexOf('tl'),1); continue; }   // 偽の戻るは左上が定位置
+    t.pos = free[(fi++) % free.length];
+  }
   return spec;
 }
 
@@ -848,6 +993,8 @@ function makeTrap(t, spec){
   if (t.kind === 'x')         el = makeX(spec.xSize, t.style, 'trap', posStyle(t.pos, spec.xSize, spec.xSize, 8));
   else if (t.kind === 'text') el = h('button', {class:'txtbtn ' + (Math.random()<.5?'dark':''), 'data-role':'trap', style:posStyle(t.pos, 84, 36, 8) + 'width:84px; height:36px; padding:0;', text:t.label});
   else if (t.kind === 'icon') el = h('button', {class:'trap-icon', 'data-role':'trap', style:posStyle(t.pos, 36, 36, 10), text:t.label});
+  else if (t.kind === 'back') el = h('button', {class:'txtbtn back', 'data-role':'trap', style:posStyle(t.pos, 70, 32, 8) + 'padding:4px 8px;', text:'＜ 戻る'});
+  else if (t.kind === 'sameX') el = makeX(s, spec.xStyle, 'trap', `top:${ri(20,62)}%; left:${ri(12,74)}%;`);   // 本物そっくりの✕を絵の中に
   else { const sz = Math.max(26, Math.round(s*0.9)); el = makeX(sz, 'fake-deco', 'trap', `top:${ri(22,60)}%; left:${ri(12,78)}%;`); }   // fakeX: 絵の中の飾りの✕
   el.dataset.trap = t.kind;
   return el;
@@ -926,13 +1073,28 @@ function mountAd(spec, layerEl, cb){
 
   // 遅延／カウントダウン
   const wait = Math.max(spec.delaySec, spec.skipWait);
-  inst.forceReal = () => placeReal();   // 失敗時に「本物はここ」を見せるため、待ち時間を打ち切る
+  inst.forceReal = () => { if (earlyEl){ earlyEl.remove(); earlyEl = null; } placeReal(); };   // 失敗時に「本物はここ」を見せるため、待ち時間を打ち切る
+  // 早押し✕：最初から✕は見えているが、カウントが終わるまでは罠
+  let earlyEl = null;
+  if (spec.earlyX && wait > 0){
+    earlyEl = makeX(xSizeFor(spec), spec.xStyle, 'trap', posStyle(spec.xPos, xSizeFor(spec), xSizeFor(spec), 8));
+    earlyEl.dataset.trap = 'early'; body.appendChild(earlyEl);
+  }
+  // 終わらないカウントダウン：右上の円は永遠に回る。本物は最初から別の場所
+  if (spec.endless){
+    const ce = h('div', {class:'cd-circle', 'data-role':'cd', style:posStyle('tr',44,44,6)}, h('div',{class:'inner'}, h('span',{class:'n', text:'5'}), h('span',{class:'x',text:'✕'})));
+    body.appendChild(ce); const t0 = now();
+    every(()=>{ const el = (now()-t0)/1000 % 5; ce.style.setProperty('--cd-deg', `${el/5*360}deg`); ce.querySelector('.n').textContent = Math.ceil(5-el); }, 100);
+  }
+  // 勝手にストアへ：何も押していなくても数秒で飛ぶ（1回だけ）
+  if (spec.autoSec > 0) later(()=>{ if (!inst.lock && cb.onAuto) cb.onAuto(); }, spec.autoSec*1000);
   if (wait > 0){
     const label = spec.adType === 'video' ? 'スキップまで ' : 'あと ';
+    const cdPos = spec.earlyX ? (spec.xPos === 'tc' ? 'bc' : 'tc') : spec.xPos;
     if (spec.countdownX){
-      cdEl = h('div', {class:'cd-circle', 'data-role':'cd', style:posStyle(spec.xPos,44,44,6)}, h('div',{class:'inner'}, h('span',{class:'n', text:String(wait)}), h('span',{class:'x',text:'✕'})));
+      cdEl = h('div', {class:'cd-circle', 'data-role':'cd', style:posStyle(cdPos,44,44,6)}, h('div',{class:'inner'}, h('span',{class:'n', text:String(wait)}), h('span',{class:'x',text:'✕'})));
     } else {
-      cdEl = h('div', {class:'cd-text', 'data-role':'cd', style:posStyle(spec.xPos,110,30,8), text: label + wait});
+      cdEl = h('div', {class:'cd-text', 'data-role':'cd', style:posStyle(cdPos,110,30,8), text: label + wait});
     }
     body.appendChild(cdEl);
     const t0 = now(); let lastSec = wait;
@@ -944,7 +1106,7 @@ function mountAd(spec, layerEl, cb){
       else cdEl.textContent = label + sec;
       if (sec !== lastSec){ lastSec = sec; if (sec>0) Sound.tick(); }
     }, 100);
-    later(()=>placeReal(), wait*1000);
+    later(()=>{ if (earlyEl){ earlyEl.remove(); earlyEl = null; } placeReal(); }, wait*1000);
   } else placeReal();
 
   layerEl.onclick = e => {
@@ -1109,7 +1271,7 @@ const Game = {
   q:null, inst:null, store:null, timer:{limit:0, remain:0, running:false, id:null, last:0}, pendingTimers:[],
 
   start(mode, opt={}){
-    this.mode = mode; this.settings = DB.settings(mode); this.test = !!opt.test; this.testSpec = opt.spec || null;
+    this.mode = mode; this.settings = opt.settingsOverride || DB.settings(mode); this.test = !!opt.test; this.testSpec = opt.spec || null; this.returnTo = opt.returnTo || 'test';
     Sound.enabled = !!this.settings.sound; Sound.failEnabled = this.settings.failSound !== false; Sound.cdEnabled = this.settings.cdSound !== false;
     this.level = clamp(this.settings.startLevel || 1, 1, this.settings.maxLevel); this.streak = 0; this.score = 0; this.qIndex = 0; this.questions = []; this.active = true;
     this.deck = [];   // 山札：全パターンを引き切るまで再シャッフルしない
@@ -1126,7 +1288,7 @@ const Game = {
     $('#blackout').classList.remove('on');
     this.stopTimer();
   },
-  quit(){ this.active = false; this.clearAll(); showScreen(this.test ? 'test' : 'title'); },
+  quit(){ this.active = false; this.clearAll(); showScreen(this.test ? this.returnTo : 'title'); },
 
   updateHud(){
     const total = this.test ? 1 : this.settings.questions;
@@ -1144,7 +1306,7 @@ const Game = {
     if (!this.deck.length) this.deck = shuffle(enabledPatterns(this.settings));
     const first = this.deck.shift();
     const spec = this.testSpec || buildSpec({mode:this.mode, settings:this.settings, level:this.level, first});
-    this.q = {spec, level:this.level, startAt:null, availableAt:null, findMs:null, misses:0, storeTrips:0, escapes:[], escapeMisses:0, trapKinds:[], secondShown:false, confirmed:false, result:null, score:0};
+    this.q = {spec, level:this.level, startAt:null, availableAt:null, findMs:null, misses:0, storeTrips:0, autoTrips:0, escapes:[], escapeMisses:0, trapKinds:[], secondShown:false, confirmed:false, result:null, score:0};
     this.later(()=>this.showAd(spec), this.test ? 800 : ri(1500, 3000));
   },
 
@@ -1179,6 +1341,7 @@ const Game = {
       onAvailable: ()=>{ if (!q.availableAt) q.availableAt = now(); },
       onReal: (el)=>this.onReal(el),
       onTrap: (el)=>this.onTrap(el),
+      onAuto: ()=>this.onTrap(null, true),
       onNoop: (el)=>this.onNoop(el),
     });
     if (!second) { q.startAt = now(); this.startTimer(spec); }
@@ -1197,9 +1360,10 @@ const Game = {
     if (inst.realWrap){ inst.realWrap.classList.remove('vanish'); inst.realWrap.classList.add('reveal'); }
     this.later(()=>{ if (inst.realWrap) inst.realWrap.classList.remove('reveal'); cb && cb(); }, ms);
   },
-  onTrap(el){
+  onTrap(el, auto){
     const q = this.q; if (!this.inst) return;
-    q.storeTrips++; q.trapKinds.push((el && el.dataset && el.dataset.trap) || 'body');
+    if (auto){ q.autoTrips++; q.trapKinds.push('auto'); toast('かってに ストアへ！', true); }   // 自分のせいではないので一発正解は消えない
+    else { q.storeTrips++; q.trapKinds.push((el && el.dataset && el.dataset.trap) || 'body'); }
     this.inst.lock = true; this.stopTimer(); Sound.fail();
     const open = ()=> {
       this.store = openStore({settings:this.settings, spec:q.spec, root:$('#store-root'),
@@ -1281,9 +1445,9 @@ const Game = {
     let leveled = false;
     if (q.oneShot){ this.streak++; if (this.streak >= this.settings.levelUpEvery && this.level < this.settings.maxLevel){ this.level++; this.streak = 0; leveled = true; toast(`レベル ${this.level}！`); } }
     else this.streak = 0;
-    this.questions.push({patterns:q.spec.patterns, adType:q.spec.adType, level:q.level, result:q.result, oneShot:q.oneShot, findMs:q.findMs, misses:q.misses, storeTrips:q.storeTrips, escapes:q.escapes, escapeMisses:q.escapeMisses, trapKinds:q.trapKinds, score:q.score});
+    this.questions.push({patterns:q.spec.patterns, adType:q.spec.adType, level:q.level, result:q.result, oneShot:q.oneShot, findMs:q.findMs, misses:q.misses, storeTrips:q.storeTrips, escapes:q.escapes, escapeMisses:q.escapeMisses, autoTrips:q.autoTrips, trapKinds:q.trapKinds, score:q.score});
     this.qIndex++;
-    if (this.test){ this.later(()=>{ this.active=false; this.clearAll(); showScreen('test'); renderTestResult(this.questions[0]); }, q.oneShot ? 900 : 100); return; }
+    if (this.test){ this.later(()=>{ this.active=false; this.clearAll(); showScreen(this.returnTo); if (this.returnTo === 'test') renderTestResult(this.questions[0]); else toastTitle(q.oneShot ? 'いっぱつ！ できた' : (q.result==='ok' ? 'できた（つぎは いっぱつで）' : 'つぎは ずかんを みてから')); }, q.oneShot ? 900 : 100); return; }
     this.later(()=>this.nextQuestion(), leveled ? 1300 : 500);
   },
 
@@ -1348,6 +1512,151 @@ function renderResult(rec){
   $('#result-patterns').innerHTML = ''; $('#result-patterns').appendChild(ids.length ? tbl : h('p',{class:'note', text:'（パターンなし）'}));
   $('#result-teacher').open = false;
 }
+
+// ---------- ずかん：まぎらわしいボタンの種類と対策 ----------
+// cat: 系統 / look: どんなもの / spot: みわけかた / todo: どうする（生徒向け） / teacher: 先生向けの補足 / try: 例を出す条件
+const GUIDE_CATS = [
+  {id:'wait',   ico:'⏳', name:'まつ系',          sub:'✕が すぐに でない',            color:'#e8a11b'},
+  {id:'find',   ico:'🔍', name:'みつけにくい系',   sub:'✕が ちいさい・うすい・うごく',   color:'#2b6fe0'},
+  {id:'fool',   ico:'🎭', name:'だます系',         sub:'ほんものに にせた ボタン',       color:'#d6453a'},
+  {id:'shift',  ico:'🎯', name:'ずらす系',         sub:'おしたつもりが ずれる',           color:'#7b2ff7'},
+  {id:'again',  ico:'🔁', name:'しつこい系',       sub:'とじても また でる',             color:'#1f9d4a'},
+  {id:'store',  ico:'🏪', name:'ストアから もどる', sub:'とばされたときの だっしゅつ',     color:'#6b7480'},
+  {id:'help',   ico:'🆘', name:'こまったとき',     sub:'✕が どうしても みつからない',     color:'#1d2430'},
+];
+const GUIDE = [
+  // ---- まつ系 ----
+  {cat:'wait', id:'delay_x', ico:'⏱', name:'あとから でる ✕',
+   look:'「あと 3」と かぞえてから ✕が でる。', spot:'すうじが みえる あいだは、✕は どこにも ない。',
+   todo:'すうじが 0に なるまで、なにも おさない。',
+   teacher:'カウント中に触った場所はすべてリンクです。「待つ」練習そのものなので、やさしいモードではカウント中のタップを無駄押しに数えません。', try:{patterns:['delay_x']}},
+  {cat:'wait', id:'countdown_x', ico:'⭕', name:'まるの なかの ✕',
+   look:'まるい カウントダウンの なかに ちいさな ✕。', spot:'まるが ぜんぶ うまるまで おせない。',
+   todo:'まるが いっぱいに なってから、まんなかを おす。',
+   teacher:'円が満ちるまでは押しても反応しません（ふつう以上では無駄押しに数えます）。', try:{patterns:['countdown_x']}},
+  {cat:'wait', id:'early_x', ico:'🫸', name:'はやおし ✕',
+   look:'✕は さいしょから みえている。でも すうじが おわる まえに おすと ストアへ。', spot:'✕の ちかくに すうじが ある。',
+   todo:'すうじが きえてから おす。',
+   teacher:'本物の広告で最も多い「見えているのに押せない」型。反射で押す癖を直す練習になります。', try:{patterns:['early_x']}},
+  {cat:'wait', id:'endless_cd', ico:'♾', name:'おわらない カウントダウン',
+   look:'すうじが 5→1→5→1 と、いつまでも おわらない。', spot:'2かい まわっても おわらない。',
+   todo:'まつのを やめて、ほかの かどを さがす。ちいさい ✕が べつの ばしょに ある。',
+   teacher:'「待てば出る」を逆手に取る手口です。本格モードのみ既定ON。', try:{patterns:['endless_cd'], mode:'hard'}},
+  {cat:'wait', id:'video', ico:'🎬', name:'どうが こうこく',
+   look:'どうがが ながれて「スキップまで 5」。', spot:'したに あかい バーが すすむ。',
+   todo:'「スキップ」か ✕が でてから おす。「プレイする」は おさない。',
+   teacher:'スキップ待ちの秒数は制限時間に自動で足されます。', try:{adType:'video'}},
+  // ---- みつけにくい系 ----
+  {cat:'find', id:'tiny_x', ico:'🔬', name:'ちいさい・うすい ✕',
+   look:'かどに とても ちいさく、うすい いろで でる。', spot:'4つの かどを じゅんばんに みる。',
+   todo:'みつけたら、✕の どまんなかを おす。',
+   teacher:'当たり判定は最低16pxを確保しています。運動に困難がある生徒は設定「✕の大きさ」を大きめに。', try:{patterns:['tiny_x']}},
+  {cat:'find', id:'gray_x', ico:'⚪', name:'はいいろの ✕',
+   look:'おせなさそうな はいいろの ✕が ほんもの。しろい ✕が にせものの ときも。', spot:'いろで きめない。「わくの かどに ついているか」で きめる。',
+   todo:'はいいろでも、かどに あれば おしてみる。',
+   teacher:'「無効に見える＝押せない」という思い込みを利用した手口です。', try:{patterns:['gray_x']}},
+  {cat:'find', id:'vanish_x', ico:'👻', name:'きえる ✕',
+   look:'でていた ✕が きえて、また でる。', spot:'2びょう みえて、1びょう きえる。',
+   todo:'きえても ばしょを おぼえておく。でた ときに おちついて おす。',
+   teacher:'消えている間に同じ場所を押すと広告本体のリンクになります。', try:{patterns:['vanish_x']}},
+  {cat:'find', id:'random_pos', ico:'🧭', name:'ばしょが かわる ✕',
+   look:'みぎうえ とは かぎらない。ひだりうえ・した にも でる。', spot:'まいかい ちがう。',
+   todo:'みぎうえ だけ みない。4つの かどを みる。',
+   teacher:'「右上を反射で押す」癖を崩すための基本パターンです。', try:{patterns:['random_pos']}},
+  // ---- だます系 ----
+  {cat:'fool', id:'fake_x', ico:'🎨', name:'えの なかの ✕',
+   look:'こうこくの えの なかに ✕の かざりが ある。', spot:'えの まんなかに ある ✕は かざり。',
+   todo:'えの なかの ✕は おさない。わくの かどを さがす。',
+   teacher:'本物の✕は広告の枠（角）に付いています。絵柄の一部として描かれた✕はすべてリンクです。', try:{patterns:['fake_x']}},
+  {cat:'fool', id:'multi_x', ico:'✖✖', name:'✕が いくつも',
+   look:'おなじ みための ✕が えの なかにも ある。', spot:'ほんものは わくの かどに ある 1つだけ。',
+   todo:'かどの ✕ だけ おす。',
+   teacher:'色や形では区別できません。「位置」で見分ける練習です。', try:{patterns:['multi_x']}},
+  {cat:'fool', id:'text_trap', ico:'🔤', name:'もじの ボタン',
+   look:'「閉じる」「Close」「Skip」「いいえ」の もじボタンが いくつも。ほんものは 1つ。', spot:'もじは しんじられない。',
+   todo:'まよったら、もじより ✕マーク。かどに あるものを えらぶ。',
+   teacher:'やさしいモードでは本物が必ず「とじる」、罠は「次へ」「Skip」です。ふつう以上ではラベルがランダムになり、「いいえ」が本物のこともあります。', try:{patterns:['text_trap']}},
+  {cat:'fool', id:'trap_icon', ico:'🔊', name:'おしたくなる マーク',
+   look:'▶ ⓘ 🔊 ▷ などの マーク。', spot:'✕ ではない。',
+   todo:'✕ いがいの マークは おさない。',
+   teacher:'「広告 ▷」の小さな表示も含め、すべてリンクです。', try:{patterns:['trap_icon']}},
+  {cat:'fool', id:'fake_back', ico:'◀', name:'にせの「＜ もどる」',
+   look:'アプリの「もどる」に にた「＜ 戻る」が こうこくの なかに ある。', spot:'ほんものの もどるは、こうこくの なかには ない。',
+   todo:'こうこくの なかの「＜」は おさない。',
+   teacher:'ストア画面の左上「＜ 戻る」は本物ですが、広告の中の「＜」は偽物、という違いを教えてください。', try:{patterns:['fake_back']}},
+  {cat:'fool', id:'fake_alert', ico:'⚠️', name:'にせの けいこく',
+   look:'「ウイルスが みつかりました」「こうしんが ひつよう」と おどす。', spot:'こうこくの なかに でる けいこくは ぜんぶ ウソ。',
+   todo:'「今すぐ」「OK」は おさない。ちいさい ✕を さがす。しんぱいなら おとなに みせる。',
+   teacher:'消費者トラブルにつながりやすい手口です。「本物のiPadの警告は広告の中には出ない」と伝えてください。', try:{patterns:['fake_alert']}},
+  {cat:'fool', id:'prize', ico:'🎉', name:'「おめでとうございます」',
+   look:'「あたりました」「えらばれました」と プレゼントを みせる。', spot:'しらない ところから プレゼントは こない。',
+   todo:'「受け取る」は おさない。✕を さがす。',
+   teacher:'当選詐欺型。アンケートや個人情報の入力に誘導します。', try:{adType:'prize'}},
+  {cat:'fool', id:'native', ico:'📰', name:'きじに みえる こうこく',
+   look:'ニュースや きじの ように みえる。', spot:'「PR」「広告」の しるしが ある。',
+   todo:'「続きを読む」は おさない。',
+   teacher:'ネイティブ広告。記事風でも角の✕とPR表記で見分けます。', try:{adType:'native'}},
+  {cat:'fool', id:'rewarded', ico:'🎁', name:'ごほうび ボタン',
+   look:'「報酬を受け取る」ボタン。ほんものの ときと わなの ときが ある。', spot:'みためでは わからない。',
+   todo:'まず ✕を さがす。ごほうびボタンは そのあと。',
+   teacher:'やさしいモードでは常に罠にしています（「ごほうびは押さない」で一貫）。ふつう以上では50%で本物です。', try:{adType:'rewarded'}},
+  // ---- ずらす系 ----
+  {cat:'shift', id:'ghost_link', ico:'🫥', name:'✕の まわりの みえない リンク',
+   look:'✕の まわりの なにもない ところも リンクに なっている。', spot:'みためでは わからない。',
+   todo:'✕の どまんなかを おす。',
+   teacher:'透明領域の幅は設定で変えられます。テストモードの「色で見せる」で確認できます。', try:{patterns:['ghost_link'], mode:'hard'}},
+  {cat:'shift', id:'hit', ico:'🎯', name:'あたりはんていの ずれ',
+   look:'✕の ふちを おすと ストアに とぶ。', spot:'みためより おせる ばしょが せまい。',
+   todo:'ふちでは なく、どまんなか。',
+   teacher:'本格モードでは当たり判定を見た目の70%にしています（設定で変更可）。', try:{patterns:['random_pos'], mode:'hard'}},
+  {cat:'shift', id:'swap_in', ico:'🔀', name:'すりかえ',
+   look:'おそうとした ばしょに「入手」が すべりこんでくる。✕は おしのけられる。', spot:'なにかが うごいた。',
+   todo:'うごいた ちょくごは おさない。ひとつ いきを して、✕の いまの ばしょを みなおす。',
+   teacher:'速さを競うと最も引っかかる手口です。本格モードのみ既定ON。', try:{patterns:['swap_in'], mode:'hard'}},
+  // ---- しつこい系 ----
+  {cat:'again', id:'double_ad', ico:'🔂', name:'2まいめの こうこく',
+   look:'✕を おしたら、べつの こうこくが でる。', spot:'えが かわった。',
+   todo:'2まいめも おなじように、おちついて ✕を さがす。',
+   teacher:'2枚目のぶん、制限時間を4秒足しています。', try:{patterns:['double_ad']}},
+  {cat:'again', id:'confirm_dialog', ico:'❓', name:'「本当に閉じますか？」',
+   look:'とじた あとに かくにんが でる。おおきい あおい ボタンが「いいえ・つづける」。', spot:'いろと ならびが いつもと ぎゃく。',
+   todo:'いろで えらばない。もじを よんで「はい」を おす。',
+   teacher:'ダークパターンの典型です。「大きい青＝OK」の習慣を突きます。', try:{patterns:['confirm_dialog']}},
+  {cat:'again', id:'multi_escape', ico:'🪆', name:'ストアの あとの もう1まい',
+   look:'ストアを とじても「本当に戻りますか？」や「おすすめアプリ」が でる。', spot:'まだ ゲームに もどっていない。',
+   todo:'もう1かい「戻る」を さがす。',
+   teacher:'本格モードのみ既定ON。脱出の段数が増えます。', try:{patterns:['multi_escape'], mode:'hard'}},
+  {cat:'again', id:'auto_redirect', ico:'🚀', name:'かってに ストアへ',
+   look:'なにも おしていないのに、すうびょうで ストアに とぶ。', spot:'じぶんは おしていない。',
+   todo:'じぶんの せいでは ない。あわてず「もどる」を さがす。',
+   teacher:'自動遷移。このパターンでのストア行きは無駄押しに数えず、一発正解も消えません。脱出だけを評価します。', try:{patterns:['auto_redirect']}},
+  {cat:'again', id:'banner_popup', ico:'🪧', name:'バナー ＋ ポップアップ',
+   look:'したの ほそい バナーと、まんなかの ポップアップ。', spot:'バナーの ちいさな ✕は にせもの が おおい。',
+   todo:'ポップアップの かどの ✕を さがす。',
+   teacher:'バナーの飾り✕はやさしいモードでは出しません。', try:{adType:'banner_popup'}},
+  {cat:'again', id:'playable', ico:'🕹', name:'おためし ゲーム',
+   look:'「タップして遊ぶ」の ちいさな ゲーム。', spot:'ゆびの マークが てまねき している。',
+   todo:'あそばない。さわると ストアに とぶ。✕を さがす。',
+   teacher:'プレイアブル広告。盤面のどこを触ってもリンクです。', try:{adType:'playable'}},
+  // ---- ストアから もどる ----
+  {cat:'store', id:'store_close', ico:'🏪', name:'ストアの「もどる」',
+   look:'ひだりうえに「＜ 戻る」「◀ ゲームにもどる」、みぎうえに「完了」「✕」。', spot:'うえの はしを みる。',
+   todo:'「入手」「開く」「レビューを書く」は おさない。うえの はしの ちいさい もじを さがす。',
+   teacher:'やさしいモードでは大きな「⬅ もどる」を出し、脱出は1段だけです。実機のストアでは画面左上のステータスバーに「◀ ゲーム名」が出ることもあります。'},
+  {cat:'store', id:'install', ico:'⏬', name:'「インストール中…」の がめん',
+   look:'「入手」を おすと、ぐるぐる まわる がめんに なる。', spot:'まだ ストアの なか。',
+   todo:'「キャンセル」か ✕で ストアに もどり、それから「もどる」を おす。',
+   teacher:'ふつう以上で、ストアの「入手」「開く」などを押すと1段深くなります。'},
+  {cat:'store', id:'reco', ico:'📋', name:'「おすすめアプリ」「本当に戻りますか？」',
+   look:'ストアを とじた あとに、もう1まい でる。', spot:'おおきい ボタンは「ストアに残る」。',
+   todo:'ちいさい ほうの「戻る」を おす。',
+   teacher:'本格モードの多段脱出です。'},
+  // ---- こまったとき ----
+  {cat:'help', id:'giveup', ico:'🏠', name:'✕が どうしても みつからない',
+   look:'さがしても ない。じかんが すぎる。', spot:'—',
+   todo:'アプリごと とじて（ホームに もどって）OK。おとなを よぶのも せいかい。',
+   teacher:'このゲームでは練習できませんが、本物では「アプリを終了する」「人に聞く」が最も安全な正解です。結果画面の注意書きと合わせて教えてください。'},
+];
 
 // ---------- 7. 画面：タイトル・設定・記録・テスト ----------
 const UI = {
@@ -1500,6 +1809,39 @@ const UI = {
     const ta = $('#json-out'); ta.value = JSON.stringify(out, null, 1); ta.classList.remove('hidden'); $('#btn-json-copy').classList.remove('hidden');
   },
 
+  // ---- ずかん ----
+  gtab: 'all',
+  renderZukan(){
+    const tabs = $('#g-tabs'); tabs.innerHTML = '';
+    const mk = (id, label) => h('button', {class: this.gtab===id?'selected':'', text:label, onclick:()=>{ this.gtab = id; this.renderZukan(); }});
+    tabs.appendChild(mk('all', 'ぜんぶ'));
+    for (const c of GUIDE_CATS) tabs.appendChild(mk(c.id, c.ico + ' ' + c.name));
+    const body = $('#zukan-body'); body.innerHTML = '';
+    for (const c of GUIDE_CATS){
+      if (this.gtab !== 'all' && this.gtab !== c.id) continue;
+      body.appendChild(h('div', {class:'gcat', style:`background:${c.color}`}, h('span', {text:c.ico}), h('span', null, c.name, ' ', h('small', {text:'— ' + c.sub}))));
+      for (const g of GUIDE.filter(x=>x.cat===c.id)){
+        const card = h('div', {class:'gentry', id:'g-' + g.id},
+          h('div', {class:'g-head'}, h('div', {class:'g-ico', text:g.ico}), h('div', {class:'g-name', text:g.name})),
+          h('div', {class:'g-row'}, h('b', {text:'どんなもの'}), h('span', {text:g.look})),
+          h('div', {class:'g-row'}, h('b', {text:'みわけかた'}), h('span', {text:g.spot})),
+          h('div', {class:'g-row g-todo'}, h('b', {text:'どうする'}), h('span', {text:g.todo})),
+          h('details', null, h('summary', {text:'せんせい向け'}), h('div', {class:'note', text:g.teacher})),
+          g.try ? h('button', {class:'btn small primary g-try', text:'▶ ためす', onclick:()=>this.tryGuide(g)}) : null,
+        );
+        body.appendChild(card);
+      }
+    }
+  },
+  tryGuide(g){
+    const mode = g.try.mode || DB.data.lastMode;
+    const settings = Object.assign({}, DB.settings(mode));
+    settings.patterns = Object.assign({}, settings.patterns);
+    if (g.try.patterns) for (const id of g.try.patterns) settings.patterns[id] = true;
+    const spec = buildSpec({mode, settings, level:1, adType:g.try.adType, patterns:g.try.patterns || []});
+    Game.start(mode, {test:true, spec, returnTo:'zukan', settingsOverride:settings});
+  },
+
   // ---- テスト ----
   testSel: {adType:'interstitial', mode:'normal', patterns:new Set(), debug:false},
   renderTest(){
@@ -1568,6 +1910,9 @@ function init(){
   });
   $('#btn-json-copy').onclick = async ()=>{ const ta=$('#json-out'); try{ await navigator.clipboard.writeText(ta.value); toastTitle('コピーしました'); }catch(e){ ta.focus(); ta.select(); toastTitle('長押しでコピーしてください'); } };
   $('#btn-test').onclick = ()=>{ UI.renderTest(); showScreen('test'); };
+  $('#btn-zukan').onclick = ()=>{ UI.renderZukan(); showScreen('zukan'); };
+  $('#btn-zukan-back').onclick = ()=>{ UI.renderTitle(); showScreen('title'); };
+  $('#btn-result-zukan').onclick = ()=>{ UI.gtab = 'all'; UI.renderZukan(); showScreen('zukan'); };
   $('#btn-test-back').onclick = ()=>showScreen('title');
   $('#btn-test-run').onclick = ()=>UI.runTest();
   $('#hud-quit').onclick = ()=>{ if (Game.test || confirm('やめますか？ このラウンドの記録は残りません')) Game.quit(); };
