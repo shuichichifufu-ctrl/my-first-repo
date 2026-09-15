@@ -352,6 +352,7 @@ details.teacher summary{font-weight:700; color:var(--muted); cursor:pointer; min
 .g-tabs{display:flex; gap:6px; flex-wrap:wrap; justify-content:center; margin-bottom:6px;}
 .g-tabs button{min-height:40px; padding:6px 12px; border-radius:999px; background:#e9edf2; font-weight:700; font-size:14px;}
 .g-tabs button.selected{background:var(--ink); color:#fff;}
+.rtag{display:inline-block; font-size:12px; font-weight:800; padding:3px 8px; border-radius:999px; margin-left:auto; white-space:nowrap;}
 </style>
 </head>
 <body>
@@ -430,7 +431,8 @@ details.teacher summary{font-weight:700; color:var(--muted); cursor:pointer; min
   <h1>わなの ずかん</h1>
   <p class="sub">こうこくの「まぎらわしい ボタン」を しゅるいごとに。「ためす」で その れいが 1つ でます（きろくは のこりません）</p>
   <div class="card" style="padding:10px">
-    <div class="g-rule">📌 <b>きほんの ルール</b><br>① すぐ おさない。まず ぜんたいを みる。<br>② ほんものの ✕は、こうこくの <b>わくの かど</b>に ついている。えの なかの ✕は にせもの。<br>③ 「とじる」「OK」「もどる」の <b>もじは しんじない</b>。<br>④ まちがえて ストアに とんでも、あわてず <b>ひだりうえ か みぎうえ</b>の「もどる」「かんりょう」「✕」を さがす。</div>
+    <div class="g-rule">📌 <b>きほんの ルール</b><br>① すぐ おさない。まず ぜんたいを みる。<br>② ほんものの ✕は、こうこくの <b>わくの かど</b>に ついている。えの なかの ✕は にせもの。<br>③ 「とじる」「OK」「もどる」の <b>もじは しんじない</b>。<br>④ まちがえて ストアに とんでも、あわてず <b>ひだりうえ か みぎうえ</b>の「もどる」「かんりょう」「✕」を さがす。<br>⑤ こうこくには きまりが ある。でも <b>きまりが あっても あんぜんでは ない</b>。じぶんの めで みわける。</div>
+    <div id="g-rules"></div>
     <div class="g-tabs" id="g-tabs"></div>
   </div>
   <div id="zukan-body" style="width:100%; max-width:640px; margin:0 auto"></div>
@@ -1524,130 +1526,146 @@ const GUIDE_CATS = [
   {id:'store',  ico:'🏪', name:'ストアから もどる', sub:'とばされたときの だっしゅつ',     color:'#6b7480'},
   {id:'help',   ico:'🆘', name:'こまったとき',     sub:'✕が どうしても みつからない',     color:'#1d2430'},
 ];
+const RULE_TAGS = {
+  ok: {t:'きまりどおり',    c:'#e8f6ec', ink:'#1f6b3a', why:'きまりの はんい内。でも ぎりぎりまで またせる'},
+  gap:{t:'きまりの すきま', c:'#fff3cd', ink:'#7a4b00', why:'「ボタンは ある」と いいはれる はんいで、みつけにくく・おしにくく している'},
+  bad:{t:'きまりやぶり',    c:'#fde2e0', ink:'#8a1f17', why:'きまりに はんしている。でも とりしまりが おいつかず のこっている'},
+  os: {t:'OSの ぶひん',     c:'#e4edfc', ink:'#1f3f8a', why:'こうこくでは なく iPad じたいの がめん。ここは しんよう できる'},
+};
+const RULES_TEXT = {
+  student: [
+    '📱 Apple と Google の きまり：「とじるボタンは わかりやすく、おおきく」「だまして おさせない」「15びょう いないに とじられるように」。',
+    '🏢 ぎょうかいの きまり：「みぎうえに 50×50 の とじる ばしょを つくる」。でも こうこくが「じぶんの ✕を つかう」と いえば、ちいさい ✕でも いい。ここが すきま。',
+    '📡 こうこくネットワークの きまり：「とじるボタンは 5びょうまで おくらせて いい」。だから「あと 5」は きまりどおり。',
+    '⚖️ だから こうこくの わなは 3しゅるい：きまりどおり ／ きまりの すきま ／ きまりやぶり。',
+    '🛡 きまりが あっても、あんぜんでは ない。じぶんの めで みわける。',
+  ],
+  teacher: 'Apple の App Store 審査ガイドライン 2.5.18 は「割り込む広告は広告であることを明示し、だましてタップさせず、簡単に見つかる十分な大きさの閉じる／スキップボタンを備えること」と定めています。Google Play のデベロッパーポリシーは 2022年9月から「全画面広告は15秒以内に閉じられること」「予期しないタイミングで出さないこと」を必須にし、システム警告に似せた広告も禁じています。業界の技術規格 MRAID 3.0 は「50×50dp の閉じる領域、推奨は右上」としつつ、広告側が自前の閉じるマークを使うことを認めています。広告ネットワーク（例：AdMob）の規約は「誤タップを誘う配置の禁止」と同時に「閉じるボタンは最大5秒遅らせてよい」と明記しています。違反が残る理由は、審査がアプリ本体に対して行われ、広告の中身は配信ネットワークが後から差し替えるため、取り締まりが通報後になるからです。ストア画面の「完了」「＜ 戻る」は広告ではなく OS の部品なので、そこだけは信用してよいと教えられます。',
+};
 const GUIDE = [
   // ---- まつ系 ----
-  {cat:'wait', id:'delay_x', ico:'⏱', name:'あとから でる ✕',
+  {cat:'wait', id:'delay_x', rule:'ok', ico:'⏱', name:'あとから でる ✕',
    look:'「あと 3」と かぞえてから ✕が でる。', spot:'すうじが みえる あいだは、✕は どこにも ない。',
    todo:'すうじが 0に なるまで、なにも おさない。',
    teacher:'カウント中に触った場所はすべてリンクです。「待つ」練習そのものなので、やさしいモードではカウント中のタップを無駄押しに数えません。', try:{patterns:['delay_x']}},
-  {cat:'wait', id:'countdown_x', ico:'⭕', name:'まるの なかの ✕',
+  {cat:'wait', id:'countdown_x', rule:'ok', ico:'⭕', name:'まるの なかの ✕',
    look:'まるい カウントダウンの なかに ちいさな ✕。', spot:'まるが ぜんぶ うまるまで おせない。',
    todo:'まるが いっぱいに なってから、まんなかを おす。',
    teacher:'円が満ちるまでは押しても反応しません（ふつう以上では無駄押しに数えます）。', try:{patterns:['countdown_x']}},
-  {cat:'wait', id:'early_x', ico:'🫸', name:'はやおし ✕',
+  {cat:'wait', id:'early_x', rule:'gap', ico:'🫸', name:'はやおし ✕',
    look:'✕は さいしょから みえている。でも すうじが おわる まえに おすと ストアへ。', spot:'✕の ちかくに すうじが ある。',
    todo:'すうじが きえてから おす。',
    teacher:'本物の広告で最も多い「見えているのに押せない」型。反射で押す癖を直す練習になります。', try:{patterns:['early_x']}},
-  {cat:'wait', id:'endless_cd', ico:'♾', name:'おわらない カウントダウン',
+  {cat:'wait', id:'endless_cd', rule:'bad', ico:'♾', name:'おわらない カウントダウン',
    look:'すうじが 5→1→5→1 と、いつまでも おわらない。', spot:'2かい まわっても おわらない。',
    todo:'まつのを やめて、ほかの かどを さがす。ちいさい ✕が べつの ばしょに ある。',
    teacher:'「待てば出る」を逆手に取る手口です。本格モードのみ既定ON。', try:{patterns:['endless_cd'], mode:'hard'}},
-  {cat:'wait', id:'video', ico:'🎬', name:'どうが こうこく',
+  {cat:'wait', id:'video', rule:'ok', ico:'🎬', name:'どうが こうこく',
    look:'どうがが ながれて「スキップまで 5」。', spot:'したに あかい バーが すすむ。',
    todo:'「スキップ」か ✕が でてから おす。「プレイする」は おさない。',
    teacher:'スキップ待ちの秒数は制限時間に自動で足されます。', try:{adType:'video'}},
   // ---- みつけにくい系 ----
-  {cat:'find', id:'tiny_x', ico:'🔬', name:'ちいさい・うすい ✕',
+  {cat:'find', id:'tiny_x', rule:'gap', ico:'🔬', name:'ちいさい・うすい ✕',
    look:'かどに とても ちいさく、うすい いろで でる。', spot:'4つの かどを じゅんばんに みる。',
    todo:'みつけたら、✕の どまんなかを おす。',
    teacher:'当たり判定は最低16pxを確保しています。運動に困難がある生徒は設定「✕の大きさ」を大きめに。', try:{patterns:['tiny_x']}},
-  {cat:'find', id:'gray_x', ico:'⚪', name:'はいいろの ✕',
+  {cat:'find', id:'gray_x', rule:'gap', ico:'⚪', name:'はいいろの ✕',
    look:'おせなさそうな はいいろの ✕が ほんもの。しろい ✕が にせものの ときも。', spot:'いろで きめない。「わくの かどに ついているか」で きめる。',
    todo:'はいいろでも、かどに あれば おしてみる。',
    teacher:'「無効に見える＝押せない」という思い込みを利用した手口です。', try:{patterns:['gray_x']}},
-  {cat:'find', id:'vanish_x', ico:'👻', name:'きえる ✕',
+  {cat:'find', id:'vanish_x', rule:'gap', ico:'👻', name:'きえる ✕',
    look:'でていた ✕が きえて、また でる。', spot:'2びょう みえて、1びょう きえる。',
    todo:'きえても ばしょを おぼえておく。でた ときに おちついて おす。',
    teacher:'消えている間に同じ場所を押すと広告本体のリンクになります。', try:{patterns:['vanish_x']}},
-  {cat:'find', id:'random_pos', ico:'🧭', name:'ばしょが かわる ✕',
+  {cat:'find', id:'random_pos', rule:'gap', ico:'🧭', name:'ばしょが かわる ✕',
    look:'みぎうえ とは かぎらない。ひだりうえ・した にも でる。', spot:'まいかい ちがう。',
    todo:'みぎうえ だけ みない。4つの かどを みる。',
    teacher:'「右上を反射で押す」癖を崩すための基本パターンです。', try:{patterns:['random_pos']}},
   // ---- だます系 ----
-  {cat:'fool', id:'fake_x', ico:'🎨', name:'えの なかの ✕',
+  {cat:'fool', id:'fake_x', rule:'bad', ico:'🎨', name:'えの なかの ✕',
    look:'こうこくの えの なかに ✕の かざりが ある。', spot:'えの まんなかに ある ✕は かざり。',
    todo:'えの なかの ✕は おさない。わくの かどを さがす。',
    teacher:'本物の✕は広告の枠（角）に付いています。絵柄の一部として描かれた✕はすべてリンクです。', try:{patterns:['fake_x']}},
-  {cat:'fool', id:'multi_x', ico:'✖✖', name:'✕が いくつも',
+  {cat:'fool', id:'multi_x', rule:'bad', ico:'✖✖', name:'✕が いくつも',
    look:'おなじ みための ✕が えの なかにも ある。', spot:'ほんものは わくの かどに ある 1つだけ。',
    todo:'かどの ✕ だけ おす。',
    teacher:'色や形では区別できません。「位置」で見分ける練習です。', try:{patterns:['multi_x']}},
-  {cat:'fool', id:'text_trap', ico:'🔤', name:'もじの ボタン',
+  {cat:'fool', id:'text_trap', rule:'gap', ico:'🔤', name:'もじの ボタン',
    look:'「閉じる」「Close」「Skip」「いいえ」の もじボタンが いくつも。ほんものは 1つ。', spot:'もじは しんじられない。',
    todo:'まよったら、もじより ✕マーク。かどに あるものを えらぶ。',
    teacher:'やさしいモードでは本物が必ず「とじる」、罠は「次へ」「Skip」です。ふつう以上ではラベルがランダムになり、「いいえ」が本物のこともあります。', try:{patterns:['text_trap']}},
-  {cat:'fool', id:'trap_icon', ico:'🔊', name:'おしたくなる マーク',
+  {cat:'fool', id:'trap_icon', rule:'bad', ico:'🔊', name:'おしたくなる マーク',
    look:'▶ ⓘ 🔊 ▷ などの マーク。', spot:'✕ ではない。',
    todo:'✕ いがいの マークは おさない。',
    teacher:'「広告 ▷」の小さな表示も含め、すべてリンクです。', try:{patterns:['trap_icon']}},
-  {cat:'fool', id:'fake_back', ico:'◀', name:'にせの「＜ もどる」',
+  {cat:'fool', id:'fake_back', rule:'bad', ico:'◀', name:'にせの「＜ もどる」',
    look:'アプリの「もどる」に にた「＜ 戻る」が こうこくの なかに ある。', spot:'ほんものの もどるは、こうこくの なかには ない。',
    todo:'こうこくの なかの「＜」は おさない。',
    teacher:'ストア画面の左上「＜ 戻る」は本物ですが、広告の中の「＜」は偽物、という違いを教えてください。', try:{patterns:['fake_back']}},
-  {cat:'fool', id:'fake_alert', ico:'⚠️', name:'にせの けいこく',
+  {cat:'fool', id:'fake_alert', rule:'bad', ico:'⚠️', name:'にせの けいこく',
    look:'「ウイルスが みつかりました」「こうしんが ひつよう」と おどす。', spot:'こうこくの なかに でる けいこくは ぜんぶ ウソ。',
    todo:'「今すぐ」「OK」は おさない。ちいさい ✕を さがす。しんぱいなら おとなに みせる。',
    teacher:'消費者トラブルにつながりやすい手口です。「本物のiPadの警告は広告の中には出ない」と伝えてください。', try:{patterns:['fake_alert']}},
-  {cat:'fool', id:'prize', ico:'🎉', name:'「おめでとうございます」',
+  {cat:'fool', id:'prize', rule:'bad', ico:'🎉', name:'「おめでとうございます」',
    look:'「あたりました」「えらばれました」と プレゼントを みせる。', spot:'しらない ところから プレゼントは こない。',
    todo:'「受け取る」は おさない。✕を さがす。',
    teacher:'当選詐欺型。アンケートや個人情報の入力に誘導します。', try:{adType:'prize'}},
-  {cat:'fool', id:'native', ico:'📰', name:'きじに みえる こうこく',
+  {cat:'fool', id:'native', rule:'ok', ico:'📰', name:'きじに みえる こうこく',
    look:'ニュースや きじの ように みえる。', spot:'「PR」「広告」の しるしが ある。',
    todo:'「続きを読む」は おさない。',
    teacher:'ネイティブ広告。記事風でも角の✕とPR表記で見分けます。', try:{adType:'native'}},
-  {cat:'fool', id:'rewarded', ico:'🎁', name:'ごほうび ボタン',
+  {cat:'fool', id:'rewarded', rule:'gap', ico:'🎁', name:'ごほうび ボタン',
    look:'「報酬を受け取る」ボタン。ほんものの ときと わなの ときが ある。', spot:'みためでは わからない。',
    todo:'まず ✕を さがす。ごほうびボタンは そのあと。',
    teacher:'やさしいモードでは常に罠にしています（「ごほうびは押さない」で一貫）。ふつう以上では50%で本物です。', try:{adType:'rewarded'}},
   // ---- ずらす系 ----
-  {cat:'shift', id:'ghost_link', ico:'🫥', name:'✕の まわりの みえない リンク',
+  {cat:'shift', id:'ghost_link', rule:'gap', ico:'🫥', name:'✕の まわりの みえない リンク',
    look:'✕の まわりの なにもない ところも リンクに なっている。', spot:'みためでは わからない。',
    todo:'✕の どまんなかを おす。',
    teacher:'透明領域の幅は設定で変えられます。テストモードの「色で見せる」で確認できます。', try:{patterns:['ghost_link'], mode:'hard'}},
-  {cat:'shift', id:'hit', ico:'🎯', name:'あたりはんていの ずれ',
+  {cat:'shift', id:'hit', rule:'gap', ico:'🎯', name:'あたりはんていの ずれ',
    look:'✕の ふちを おすと ストアに とぶ。', spot:'みためより おせる ばしょが せまい。',
    todo:'ふちでは なく、どまんなか。',
    teacher:'本格モードでは当たり判定を見た目の70%にしています（設定で変更可）。', try:{patterns:['random_pos'], mode:'hard'}},
-  {cat:'shift', id:'swap_in', ico:'🔀', name:'すりかえ',
+  {cat:'shift', id:'swap_in', rule:'gap', ico:'🔀', name:'すりかえ',
    look:'おそうとした ばしょに「入手」が すべりこんでくる。✕は おしのけられる。', spot:'なにかが うごいた。',
    todo:'うごいた ちょくごは おさない。ひとつ いきを して、✕の いまの ばしょを みなおす。',
    teacher:'速さを競うと最も引っかかる手口です。本格モードのみ既定ON。', try:{patterns:['swap_in'], mode:'hard'}},
   // ---- しつこい系 ----
-  {cat:'again', id:'double_ad', ico:'🔂', name:'2まいめの こうこく',
+  {cat:'again', id:'double_ad', rule:'gap', ico:'🔂', name:'2まいめの こうこく',
    look:'✕を おしたら、べつの こうこくが でる。', spot:'えが かわった。',
    todo:'2まいめも おなじように、おちついて ✕を さがす。',
    teacher:'2枚目のぶん、制限時間を4秒足しています。', try:{patterns:['double_ad']}},
-  {cat:'again', id:'confirm_dialog', ico:'❓', name:'「本当に閉じますか？」',
+  {cat:'again', id:'confirm_dialog', rule:'gap', ico:'❓', name:'「本当に閉じますか？」',
    look:'とじた あとに かくにんが でる。おおきい あおい ボタンが「いいえ・つづける」。', spot:'いろと ならびが いつもと ぎゃく。',
    todo:'いろで えらばない。もじを よんで「はい」を おす。',
    teacher:'ダークパターンの典型です。「大きい青＝OK」の習慣を突きます。', try:{patterns:['confirm_dialog']}},
-  {cat:'again', id:'multi_escape', ico:'🪆', name:'ストアの あとの もう1まい',
+  {cat:'again', id:'multi_escape', rule:'bad', ico:'🪆', name:'ストアの あとの もう1まい',
    look:'ストアを とじても「本当に戻りますか？」や「おすすめアプリ」が でる。', spot:'まだ ゲームに もどっていない。',
    todo:'もう1かい「戻る」を さがす。',
    teacher:'本格モードのみ既定ON。脱出の段数が増えます。', try:{patterns:['multi_escape'], mode:'hard'}},
-  {cat:'again', id:'auto_redirect', ico:'🚀', name:'かってに ストアへ',
+  {cat:'again', id:'auto_redirect', rule:'bad', ico:'🚀', name:'かってに ストアへ',
    look:'なにも おしていないのに、すうびょうで ストアに とぶ。', spot:'じぶんは おしていない。',
    todo:'じぶんの せいでは ない。あわてず「もどる」を さがす。',
    teacher:'自動遷移。このパターンでのストア行きは無駄押しに数えず、一発正解も消えません。脱出だけを評価します。', try:{patterns:['auto_redirect']}},
-  {cat:'again', id:'banner_popup', ico:'🪧', name:'バナー ＋ ポップアップ',
+  {cat:'again', id:'banner_popup', rule:'gap', ico:'🪧', name:'バナー ＋ ポップアップ',
    look:'したの ほそい バナーと、まんなかの ポップアップ。', spot:'バナーの ちいさな ✕は にせもの が おおい。',
    todo:'ポップアップの かどの ✕を さがす。',
    teacher:'バナーの飾り✕はやさしいモードでは出しません。', try:{adType:'banner_popup'}},
-  {cat:'again', id:'playable', ico:'🕹', name:'おためし ゲーム',
+  {cat:'again', id:'playable', rule:'ok', ico:'🕹', name:'おためし ゲーム',
    look:'「タップして遊ぶ」の ちいさな ゲーム。', spot:'ゆびの マークが てまねき している。',
    todo:'あそばない。さわると ストアに とぶ。✕を さがす。',
    teacher:'プレイアブル広告。盤面のどこを触ってもリンクです。', try:{adType:'playable'}},
   // ---- ストアから もどる ----
-  {cat:'store', id:'store_close', ico:'🏪', name:'ストアの「もどる」',
+  {cat:'store', id:'store_close', rule:'os', ico:'🏪', name:'ストアの「もどる」',
    look:'ひだりうえに「＜ 戻る」「◀ ゲームにもどる」、みぎうえに「完了」「✕」。', spot:'うえの はしを みる。',
    todo:'「入手」「開く」「レビューを書く」は おさない。うえの はしの ちいさい もじを さがす。',
-   teacher:'やさしいモードでは大きな「⬅ もどる」を出し、脱出は1段だけです。実機のストアでは画面左上のステータスバーに「◀ ゲーム名」が出ることもあります。'},
-  {cat:'store', id:'install', ico:'⏬', name:'「インストール中…」の がめん',
+   teacher:'ストア画面の「完了」「＜ 戻る」は広告ではなく iPad（OS）の部品なので、ここは信用してよい数少ない場所です。やさしいモードでは大きな「⬅ もどる」を出し、脱出は1段だけです。実機では画面左上のステータスバーに「◀ ゲーム名」が出ることもあります。'},
+  {cat:'store', id:'install', rule:'os', ico:'⏬', name:'「インストール中…」の がめん',
    look:'「入手」を おすと、ぐるぐる まわる がめんに なる。', spot:'まだ ストアの なか。',
    todo:'「キャンセル」か ✕で ストアに もどり、それから「もどる」を おす。',
    teacher:'ふつう以上で、ストアの「入手」「開く」などを押すと1段深くなります。'},
-  {cat:'store', id:'reco', ico:'📋', name:'「おすすめアプリ」「本当に戻りますか？」',
+  {cat:'store', id:'reco', rule:'bad', ico:'📋', name:'「おすすめアプリ」「本当に戻りますか？」',
    look:'ストアを とじた あとに、もう1まい でる。', spot:'おおきい ボタンは「ストアに残る」。',
    todo:'ちいさい ほうの「戻る」を おす。',
    teacher:'本格モードの多段脱出です。'},
@@ -1816,13 +1834,23 @@ const UI = {
     const mk = (id, label) => h('button', {class: this.gtab===id?'selected':'', text:label, onclick:()=>{ this.gtab = id; this.renderZukan(); }});
     tabs.appendChild(mk('all', 'ぜんぶ'));
     for (const c of GUIDE_CATS) tabs.appendChild(mk(c.id, c.ico + ' ' + c.name));
+    // こうこくの きまり（折りたたみ）
+    const rules = $('#g-rules'); rules.innerHTML = '';
+    rules.appendChild(h('details', {class:'teacher', open: this.gtab==='rules' ? true : null},
+      h('summary', {text:'⚖️ こうこくの きまり と、わなの 3しゅるい ▽'}),
+      h('div', {class:'howto'}, RULES_TEXT.student.map(t=>h('div', {style:'margin:4px 0', text:t}))),
+      h('div', {class:'row', style:'margin:8px 0'}, Object.entries(RULE_TAGS).map(([k,v])=>h('span', {class:'rtag', style:`background:${v.c}; color:${v.ink}`, text:v.t}))),
+      h('div', {class:'note'}, Object.values(RULE_TAGS).map(v=>h('div', {text:`${v.t}：${v.why}`}))),
+      h('details', null, h('summary', {text:'せんせい向け：どの きまりか'}), h('div', {class:'note', text:RULES_TEXT.teacher})),
+    ));
     const body = $('#zukan-body'); body.innerHTML = '';
     for (const c of GUIDE_CATS){
       if (this.gtab !== 'all' && this.gtab !== c.id) continue;
       body.appendChild(h('div', {class:'gcat', style:`background:${c.color}`}, h('span', {text:c.ico}), h('span', null, c.name, ' ', h('small', {text:'— ' + c.sub}))));
       for (const g of GUIDE.filter(x=>x.cat===c.id)){
         const card = h('div', {class:'gentry', id:'g-' + g.id},
-          h('div', {class:'g-head'}, h('div', {class:'g-ico', text:g.ico}), h('div', {class:'g-name', text:g.name})),
+          h('div', {class:'g-head'}, h('div', {class:'g-ico', text:g.ico}), h('div', {class:'g-name', text:g.name}),
+            g.rule ? h('span', {class:'rtag', style:`background:${RULE_TAGS[g.rule].c}; color:${RULE_TAGS[g.rule].ink}`, text:RULE_TAGS[g.rule].t, title:RULE_TAGS[g.rule].why}) : null),
           h('div', {class:'g-row'}, h('b', {text:'どんなもの'}), h('span', {text:g.look})),
           h('div', {class:'g-row'}, h('b', {text:'みわけかた'}), h('span', {text:g.spot})),
           h('div', {class:'g-row g-todo'}, h('b', {text:'どうする'}), h('span', {text:g.todo})),
