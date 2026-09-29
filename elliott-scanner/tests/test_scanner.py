@@ -100,7 +100,7 @@ def test_dedup_and_upgrade_and_withdraw(tmp_path):
 
 
 def test_state_old_entries_expire():
-    s = {"k": {"status": "started", "symbol": "X", "name": "x", "direction": "up", "inv": 1, "date": "2026-01-01",
+    s = {"k": {"status": "started", "symbol": "X", "name": "x", "direction": "up", "inv": 1, "date": "2025-01-01",
                "withdrawn": False}}
     st.find_withdrawn(s, {}, date(2026, 9, 1))
     assert s == {}
@@ -175,3 +175,52 @@ def test_nan_rows_do_not_shift_chart_positions(tmp_path):
     cf = clean_frame(df)
     assert str(cf.index[c.points["L0"][0]])[:10] == c.dates["L0"]
     assert draw(cf, c, str(tmp_path / "a.png"))
+
+
+# 上位の文脈・表示・検出経路への接続 ---------------------------------------
+@pytest.mark.parametrize("direction", ["up", "down"])
+def test_bounce_inside_big_counter_trend_is_rejected(direction):
+    hits = sum(any(c.direction == direction for c in
+                   find_candidates("X", "x", planted_third_of_third(s, direction, lead_drop=300)))
+               for s in range(30))
+    assert hits <= 1
+
+
+def test_same_pattern_without_big_counter_trend_is_detected():
+    hits = sum(any(c.direction == "up" for c in find_candidates("X", "x", planted_third_of_third(s, "up")))
+               for s in range(30))
+    assert hits >= 24
+
+
+def test_impulse_rules_are_part_of_detection_path():
+    c = [x for x in find_candidates("X", "x", planted_third_of_third(3)) if x.direction == "up"][0]
+    assert any(k.startswith("projected_") for k in c.checks) and all(c.checks.values())
+
+
+def test_message_says_wave3_already_started_when_past_wave1_top():
+    from dataclasses import replace
+    c = [x for x in find_candidates("X", "x", planted_third_of_third(3)) if x.direction == "up"][0]
+    assert "本格化する価格" in notify.format_candidate(replace(c, close=c.wave1_top - 1))
+    t = notify.format_candidate(replace(c, close=c.wave1_top + 1))
+    assert "既に超えており" in t and "本格化する価格" not in t
+
+
+def test_withdrawn_message_distinguishes_minor_and_major():
+    minor = notify.format_withdrawn("X", "x", 105, 106, "up", major=100)
+    major = notify.format_withdrawn("X", "x", 99, 106, "up", major=100)
+    assert "(ii)" in minor and "第3波の見立て自体が崩れ" in major
+
+
+def test_send_failure_keeps_candidate_unrecorded_and_saves_state(tmp_path, monkeypatch):
+    from scanner import run, data
+    cfg = tmp_path / "t.yaml"
+    cfg.write_text("instruments:\n  a:\n    - {symbol: OK, name: 正常}\n", encoding="utf-8")
+    monkeypatch.setattr(data, "fetch_all", lambda ins, period="2y": ({"OK": planted_third_of_third(3)}, {}))
+    monkeypatch.setenv("DISCORD_WEBHOOK_URL", "http://example.invalid")
+
+    def boom(*a, **k):
+        raise RuntimeError("down")
+    monkeypatch.setattr(notify, "send_discord", boom)
+    sp = tmp_path / "s.json"
+    rc = run.main(["--config", str(cfg), "--state", str(sp), "--out", str(tmp_path / "o")])
+    assert rc == 3 and sp.exists() and st.load(str(sp)) == {}  # 送れなかったので記録しない = 翌日再送

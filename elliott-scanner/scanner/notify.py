@@ -12,6 +12,13 @@ from .waves import Candidate
 STATUS_JA = {"started": "入口（小3波が小1波の端を突破）", "approaching": "準備（小3波の直前）"}
 
 
+def _wave3_line(c: Candidate, ex: str) -> str:
+    passed = c.close > c.wave1_top if c.direction == "up" else c.close < c.wave1_top
+    if passed:
+        return f"大3波: 大1の{ex} {c.wave1_top:.5g} は既に超えており、大3波は本格化しています"
+    return f"大3波が本格化する価格: {c.wave1_top:.5g}（大1の{ex}を超えたら）"
+
+
 def format_candidate(c: Candidate) -> str:
     d = "上昇" if c.direction == "up" else "下降"
     ex = "高値" if c.direction == "up" else "安値"
@@ -23,7 +30,8 @@ def format_candidate(c: Candidate) -> str:
         f"2={c.points['L2'][1]:.5g}（戻り率{c.r2 * 100:.0f}%）\n"
         f"・小さな波: (i)={c.points['i'][1]:.5g} → (ii)={c.points['ii'][1]:.5g}（戻り率{c.rii * 100:.0f}%）\n"
         f"・突破の目安: {c.entry:.5g}（(i)の{ex}）\n"
-        f"・大3波が本格化する価格: {c.wave1_top:.5g}（大1の{ex}を超えたら）\n"
+        f"・{_wave3_line(c, ex)}\n"
+        f"・大1波の内側の脚: {c.wave1_legs}本（{'5本以上で推進波らしい' if c.wave1_legs >= 5 else '5本未満: 単純な動きで、推進波かは未確認'}）\n"
         f"・無効になる価格: {c.invalidation_minor:.5g}（(ii)を割る/超えると小さな数え方が失敗）、"
         f"{c.invalidation_major:.5g}（2を割る/超えると大きな数え方が失敗）\n"
         f"・(iii)の目安: {c.target:.5g}\n"

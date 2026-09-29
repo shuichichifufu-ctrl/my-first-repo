@@ -42,7 +42,7 @@ def remember(state: dict, c: Candidate, today: date) -> None:
                       "inv": c.invalidation_minor, "inv_major": c.invalidation_major, "date": today.isoformat(), "withdrawn": False}
 
 
-def find_withdrawn(state: dict, closes: Dict[str, float], today: date, keep_days: int = 60) -> List[Tuple[str, dict, float]]:
+def find_withdrawn(state: dict, closes: Dict[str, float], today: date, keep_days: int = 365) -> List[Tuple[str, dict, float]]:
     """無効化価格を逆行して抜けた候補を返し、記録を更新する。古い記録は捨てる。"""
     out = []
     for k in list(state):

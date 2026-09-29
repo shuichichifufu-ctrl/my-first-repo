@@ -20,11 +20,13 @@ def _ease(t: np.ndarray) -> np.ndarray:
 
 
 def planted_third_of_third(seed: int, direction: str = "up", sigma: float = 0.8, end: str = "started",
-                           variant: str = "linear", w1=None, r2=None, wi=None, rii=None) -> pd.DataFrame:
+                           variant: str = "linear", w1=None, r2=None, wi=None, rii=None,
+                           lead_drop: float = 22.0) -> pd.DataFrame:
     """L0→H1→L2→小1→小2→小3の入口、という既知の波形を埋め込む。
 
     end: "started"（小3波が小1波の端を少し超えた所で終わる）/ "approaching"（超える手前）
     variant: "linear"（直線の脚）/ "curved"（脚をなだらかな曲線に）/ "abc"（第2波をA-B-Cの3波で下げる）
+    lead_drop: 波動の前の長い下落の幅（大きくすると「大きな下落の底での反発」になる）
     w1, r2, wi, rii: 指定すると乱数の代わりにその値を使う（範囲外の波形での否定テスト用）
     """
     rng = np.random.default_rng(seed)
@@ -65,7 +67,7 @@ def planted_third_of_third(seed: int, direction: str = "up", sigma: float = 0.8,
             close[k] = y0 + (y1 - y0) * _ease((k - x0) / max(1, x1 - x0))
     # 事前の助走（長い横ばい〜緩い下落）
     lead = 120
-    lead_close = np.linspace(l0 + 22, l0 + 16, lead) + rng.normal(0, sigma, lead)
+    lead_close = np.linspace(l0 + lead_drop, l0 + 16, lead) + rng.normal(0, sigma, lead)
     close = np.concatenate([lead_close, close]) + rng.normal(0, sigma, len(close) + lead)
     if direction == "down":
         close = 2 * base - (close - base) + 0  # 上下反転

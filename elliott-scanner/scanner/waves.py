@@ -43,14 +43,16 @@ def check_partial_rules(l0: float, h1: float, l2: float, hi: float, lii: float) 
 def check_projected_rules(l0: float, h1: float, l2: float, lii: float, wi: float) -> Dict[str, bool]:
     """(iii)がこれから伸びる場合に、大3波として不自然でないか。上昇向き前提。
 
-    ・(iii)が1.618倍まで伸びれば大1波の頂点を超える（超えられない波は第3波として不自然）
-    ・(iii)が2.618倍まで伸びれば、大3波が大1波の長さに届く（届かないほど小1波が小さいと最短の第3波になりやすい）
-    第4波の重なり・第5波との比較は入口ではまだ存在しないので判定できない。
+    ・(iii)が1.618倍まで伸びれば大1波の頂点を超える
+    ・標準的な比率で最後まで進んだ場合の推進波（(iii)=2.618倍、第4波=第3波の38.2%戻し、第5波=第1波と同じ長さ）
+      を仮に置き、完成した推進波の鉄則判定 check_impulse_rules に通す。
+    第4波・第5波は入口ではまだ存在しないので、これは仮定にもとづく判定である。
     """
-    return {
-        "wave3_can_pass_wave1_top": lii + 1.618 * wi > h1,
-        "wave3_can_reach_wave1_length": (lii + 2.618 * wi - l2) >= (h1 - l0),
-    }
+    p3 = lii + 2.618 * wi
+    p4 = p3 - 0.382 * (p3 - l2)
+    p5 = p4 + (h1 - l0)
+    rules = check_impulse_rules([l0, h1, l2, p3, p4, p5])
+    return {"wave3_can_pass_wave1_top": lii + 1.618 * wi > h1, **{"projected_" + k: v for k, v in rules.items()}}
 
 
 # 検出結果 -----------------------------------------------------------------
@@ -70,6 +72,7 @@ class Candidate:
     target: float  # 小3波が小1波の1.618倍まで伸びた場合の目安
     r2: float
     rii: float
+    wave1_legs: int = 0  # 大1波の内側にある小さな脚の数（5以上なら推進波らしい。判定には使わず表示のみ）
     wave1_top: float = 0.0  # 大1波の頂点（これを超えると大3波が本格化）
     checks: Dict[str, bool] = field(default_factory=dict)
     dates: Dict[str, str] = field(default_factory=dict)
@@ -175,6 +178,21 @@ def _detect_up(high: np.ndarray, low: np.ndarray, close: np.ndarray, p: Params) 
                 w1=w1, wi=wi, atr=a, proj=proj)
 
 
+def _trend_penalty(close: np.ndarray, w1: float) -> float:
+    """長期の流れに逆らう数え方を減点する。
+
+    直近250本で「高値→安値」の大きな下落があり（下落幅が大1波の3倍超）、現在値がその下落の
+    半値戻しにも届いていなければ、下落の途中の反発（調整波の可能性）とみなして減点する。
+    上昇向きで見た場合の話で、下降はあらかじめ価格を反転してから呼ばれる。
+    """
+    seg = close[-250:]
+    hi_i, lo_i = int(np.argmax(seg)), int(np.argmin(seg))
+    drop = float(seg[hi_i] - seg[lo_i])
+    if hi_i < lo_i and drop > 3.0 * w1 and float(close[-1]) < float(seg[lo_i]) + 0.5 * drop:
+        return 40.0
+    return 0.0
+
+
 def _score(d: dict, close: np.ndarray) -> float:
     s = 40.0
     s += 20.0 * _fit(d["r2"], 0.55, 0.23)
@@ -185,7 +203,8 @@ def _score(d: dict, close: np.ndarray) -> float:
     if len(close) >= 60 and float(np.mean(close[-10:])) > float(np.mean(close[-60:-50])):
         s += 5.0
     s += 15.0 if d["status"] == "started" else 8.0
-    return min(100.0, s)
+    s -= _trend_penalty(close, d["w1"])
+    return max(0.0, min(100.0, s))
 
 
 def clean_frame(df):
@@ -220,6 +239,8 @@ def find_candidates(symbol: str, name: str, df, params: Optional[Params] = None)
             return (int(t[1]), float(sign * t[2]))
 
         pts = {"L0": pt(d["l0"]), "H1": pt(d["h1"]), "L2": pt(d["l2"]), "i": pt(d["hi"]), "ii": pt(d["lii"])}
+        seg = slice(d["l0"][1], d["h1"][1] + 1)
+        legs_p, legs_prov = zigzag((h if sign > 0 else -l)[seg], (l if sign > 0 else -h)[seg], p.minor_atr * d["atr"])
         entry = sign * d["hi"][2]
         target = sign * (d["lii"][2] + 1.618 * d["wi"])
         out.append(Candidate(
@@ -227,7 +248,7 @@ def find_candidates(symbol: str, name: str, df, params: Optional[Params] = None)
             points=pts, close=float(c[-1]), entry=entry,
             invalidation_minor=sign * d["lii"][2], invalidation_major=sign * d["l2"][2],
             target=target, r2=round(d["r2"], 3), rii=round(d["rii"], 3),
-            wave1_top=float(sign * d["h1"][2]),
+            wave1_top=float(sign * d["h1"][2]), wave1_legs=len(legs_p) + (1 if legs_prov else 0),
             checks={**check_partial_rules(d["l0"][2], d["h1"][2], d["l2"][2], d["hi"][2], d["lii"][2]), **d["proj"]},
             dates={k: str(idx[v[0]])[:10] for k, v in pts.items()},
         ))
