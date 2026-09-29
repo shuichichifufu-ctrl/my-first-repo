@@ -109,7 +109,7 @@ def test_state_old_entries_expire():
 def test_message_contains_required_parts():
     c = [x for x in find_candidates("X", "テスト", planted_third_of_third(3)) if x.direction == "up"][0]
     t = notify.format_candidate(c)
-    for w in ("テスト", "上昇", "確度", "無効になる価格", "突破の目安", "戻り率"):
+    for w in ("テスト", "上昇", "形の整い具合", "無効になる価格", "突破の目安", "戻り率", "統計的に区別できませんでした"):
         assert w in t
     assert len(t) < 1900
 
@@ -235,3 +235,20 @@ def test_baseline_and_bootstrap_run_offline():
     assert {"symbol", "edge_atr"} <= set(r.columns)
     obs, base_mean, p = bootstrap_p(r, {("X", "up"): b["up"], ("X", "down"): b["down"]}, n_iter=50)
     assert 0.0 <= p <= 1.0
+
+
+def test_approaching_goes_to_watch_digest_only(tmp_path, monkeypatch, capsys):
+    from scanner import run, data
+    cfg = tmp_path / "t.yaml"
+    cfg.write_text("instruments:\n  a:\n    - {symbol: OK, name: 正常}\n", encoding="utf-8")
+    monkeypatch.setattr(data, "fetch_all", lambda ins, period="2y": ({"OK": planted_third_of_third(3, end="approaching")}, {}))
+    rc = run.main(["--config", str(cfg), "--dry-run", "--state", str(tmp_path / "s.json"), "--out", str(tmp_path / "o")])
+    out = capsys.readouterr().out
+    assert rc == 0 and "ウォッチリスト" in out and "サードオブサード候補】" not in out
+    assert not list((tmp_path / "o").glob("*.png"))  # 準備の局面は画像・個別通知なし
+
+
+def test_watch_digest_text():
+    c = [x for x in find_candidates("X", "テスト", planted_third_of_third(3, end="approaching")) if x.direction == "up"][0]
+    t = notify.format_watch_digest([c])
+    assert "テスト" in t and "統計的な優位性" in t

@@ -24,7 +24,7 @@ def format_candidate(c: Candidate) -> str:
     ex = "高値" if c.direction == "up" else "安値"
     return (
         f"【サードオブサード候補】{c.name}（{c.symbol}） {d}\n"
-        f"局面: {STATUS_JA[c.status]}　確度: {c.score:.0f}/100\n"
+        f"局面: {STATUS_JA[c.status]}　形の整い具合: {c.score:.0f}/100（当たりやすさを示す数字ではありません）\n"
         f"現在値: {c.close:.5g}\n"
         f"・大きな波: 0={c.points['L0'][1]:.5g}（{c.dates['L0']}）→ 1={c.points['H1'][1]:.5g} → "
         f"2={c.points['L2'][1]:.5g}（戻り率{c.r2 * 100:.0f}%）\n"
@@ -35,8 +35,21 @@ def format_candidate(c: Candidate) -> str:
         f"・無効になる価格: {c.invalidation_minor:.5g}（(ii)を割る/超えると小さな数え方が失敗）、"
         f"{c.invalidation_major:.5g}（2を割る/超えると大きな数え方が失敗）\n"
         f"・(iii)の目安: {c.target:.5g}\n"
-        f"※機械的な判定です。チャートを見て最終判断してください。売買の助言ではありません。"
+        f"※過去15年・26銘柄での検証では、この種の候補の20日後の値動きは、ランダムな日と統計的に区別できませんでした"
+        f"（「入口」の局面は平均でやや良い傾向ですが、件数が少なく有意ではありません）。"
+        f"機械的な判定です。チャートを見て最終判断してください。売買の助言ではありません。"
     )
+
+
+def format_watch_digest(cands: List[Candidate]) -> str:
+    """「準備」の局面の候補を1通にまとめる（過去検証で裏づけが弱いため、個別の通知はしない）。"""
+    lines = []
+    for c in cands[:15]:
+        d = "上昇" if c.direction == "up" else "下降"
+        lines.append(f"・{c.name}（{c.symbol}）{d}　突破の目安 {c.entry:.5g}／無効化 {c.invalidation_minor:.5g}／現在値 {c.close:.5g}")
+    more = f"\n…ほか{len(cands) - 15}件" if len(cands) > 15 else ""
+    return ("【ウォッチリスト（準備の局面）】小3波の直前に見える銘柄です。過去検証では、この局面の候補に統計的な優位性は"
+            "確認できていません。参考としてご覧ください。\n" + "\n".join(lines) + more)
 
 
 def format_withdrawn(symbol: str, name: str, close: float, level: float, direction: str,

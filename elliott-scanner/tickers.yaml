@@ -1,5 +1,6 @@
 # 監視する銘柄。追加・削除はここを編集するだけ（コード変更不要）。
 period: 2y          # 取得する期間
+full_notice_statuses: [started]   # 画像つきで個別に通知する局面。それ以外（準備）は1通のウォッチリストにまとめる
 params:             # 検出の感度（省略可）
   min_score: 65
 instruments:

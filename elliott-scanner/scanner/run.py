@@ -60,13 +60,21 @@ def main(argv=None) -> int:
             print(f"送信失敗: {type(e).__name__}: {e}", file=sys.stderr)
             return False
 
-    for c, df in new.values():
+    full_statuses = set(cfg.get("full_notice_statuses", ["started"]))
+    watch = [c for c, _ in new.values() if c.status not in full_statuses]
+    for c, df in [v for v in new.values() if v[0].status in full_statuses]:
         text = notify.format_candidate(c)
         img = chart.draw(clean_frame(df), c,
                          os.path.join(a.out, f"{c.symbol.replace('^', '').replace('=', '_')}_{c.direction}.png"))
         print("\n" + text)
         if deliver(text, img):
             st.remember(state, c, today)  # 送れなかった候補は記録せず、翌日もう一度試す
+    if watch:
+        text = notify.format_watch_digest(watch)
+        print("\n" + text)
+        if deliver(text):
+            for c in watch:
+                st.remember(state, c, today)
     for _, e, cl in withdrawn:
         text = notify.format_withdrawn(e["symbol"], e["name"], cl, e["inv"], e["direction"], e.get("inv_major"))
         print("\n" + text)
