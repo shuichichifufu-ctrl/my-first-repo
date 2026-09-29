@@ -7,7 +7,7 @@ import sys
 from datetime import date
 
 from . import chart, data, notify, state as st
-from .waves import Params, find_candidates
+from .waves import Params, clean_frame, find_candidates
 
 
 def main(argv=None) -> int:
@@ -45,26 +45,43 @@ def main(argv=None) -> int:
     withdrawn = st.find_withdrawn(state, closes, today)
 
     print(f"取得成功 {len(frames)} / 失敗 {len(failed)} / 候補 {len(all_c)} / 新規通知 {len(new)} / 取り下げ {len(withdrawn)}")
+    send_errors = 0
+
+    def deliver(text, img=None) -> bool:
+        """送信に成功したら True。失敗しても他の通知と記録の保存は続ける。"""
+        nonlocal send_errors
+        if a.dry_run:
+            return True
+        try:
+            notify.send_discord(webhook, text, img)
+            return True
+        except Exception as e:  # noqa: BLE001
+            send_errors += 1
+            print(f"送信失敗: {type(e).__name__}: {e}", file=sys.stderr)
+            return False
+
     for c, df in new.values():
         text = notify.format_candidate(c)
-        img = chart.draw(df, c, os.path.join(a.out, f"{c.symbol.replace('^', '').replace('=', '_')}_{c.direction}.png"))
+        img = chart.draw(clean_frame(df), c,
+                         os.path.join(a.out, f"{c.symbol.replace('^', '').replace('=', '_')}_{c.direction}.png"))
         print("\n" + text)
-        if not a.dry_run:
-            notify.send_discord(webhook, text, img)
-        st.remember(state, c, today)
+        if deliver(text, img):
+            st.remember(state, c, today)  # 送れなかった候補は記録せず、翌日もう一度試す
     for _, e, cl in withdrawn:
-        text = notify.format_withdrawn(e["symbol"], e["name"], cl, e["inv"], e["direction"])
+        text = notify.format_withdrawn(e["symbol"], e["name"], cl, e["inv"], e["direction"], e.get("inv_major"))
         print("\n" + text)
-        if not a.dry_run:
-            notify.send_discord(webhook, text)
+        deliver(text)
     if failed:
         text = notify.format_failures(failed)
         print("\n" + text)
-        if not a.dry_run and len(failed) >= 1:
-            notify.send_discord(webhook, text)
+        deliver(text)
+    if not frames:
+        deliver("【エラー】全銘柄の取得に失敗しました。データ元の障害か、ネットワークを確認してください。")
     if not a.dry_run:
         st.save(a.state, state)
-    return 0 if frames else 1
+    if not frames:
+        return 1
+    return 3 if send_errors else 0
 
 
 if __name__ == "__main__":

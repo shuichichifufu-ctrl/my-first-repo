@@ -40,6 +40,19 @@ def check_partial_rules(l0: float, h1: float, l2: float, hi: float, lii: float) 
     }
 
 
+def check_projected_rules(l0: float, h1: float, l2: float, lii: float, wi: float) -> Dict[str, bool]:
+    """(iii)がこれから伸びる場合に、大3波として不自然でないか。上昇向き前提。
+
+    ・(iii)が1.618倍まで伸びれば大1波の頂点を超える（超えられない波は第3波として不自然）
+    ・(iii)が2.618倍まで伸びれば、大3波が大1波の長さに届く（届かないほど小1波が小さいと最短の第3波になりやすい）
+    第4波の重なり・第5波との比較は入口ではまだ存在しないので判定できない。
+    """
+    return {
+        "wave3_can_pass_wave1_top": lii + 1.618 * wi > h1,
+        "wave3_can_reach_wave1_length": (lii + 2.618 * wi - l2) >= (h1 - l0),
+    }
+
+
 # 検出結果 -----------------------------------------------------------------
 
 @dataclass
@@ -57,6 +70,7 @@ class Candidate:
     target: float  # 小3波が小1波の1.618倍まで伸びた場合の目安
     r2: float
     rii: float
+    wave1_top: float = 0.0  # 大1波の頂点（これを超えると大3波が本格化）
     checks: Dict[str, bool] = field(default_factory=dict)
     dates: Dict[str, str] = field(default_factory=dict)
 
@@ -70,8 +84,8 @@ class Params:
     minor_atr: float = 2.5  # 小さな次数の転換とみなす値幅（ATR倍数）
     atr_window: int = 60
     min_score: float = 65.0
-    r2_lo: float = 0.30  # 戻りの許容範囲
-    r2_hi: float = 0.90
+    r2_lo: float = 0.382 - 0.02  # 戻り率の関門（38.2〜78.6%、丸め誤差ぶんの許容0.02）
+    r2_hi: float = 0.786 + 0.02
     max_ext: float = 0.618  # 小3波が小1波の端からこの倍率（小1波比）までを「入口」とする
     max_wave3_ext: float = 1.618  # 大3波がこの倍率を超えていたら遅い
 
@@ -135,6 +149,9 @@ def _detect_up(high: np.ndarray, low: np.ndarray, close: np.ndarray, p: Params) 
         return None
     wi = hi[2] - l2[2]
     rii = (hi[2] - lii[2]) / wi
+    proj = check_projected_rules(l0[2], h1[2], l2[2], lii[2], wi)
+    if not all(proj.values()):
+        return None  # (iii)が伸びても大1波の頂点に届かない = 大3波として不自然
     if not (p.r2_lo <= rii <= p.r2_hi):
         return None
     c = float(close[-1])
@@ -155,13 +172,13 @@ def _detect_up(high: np.ndarray, low: np.ndarray, close: np.ndarray, p: Params) 
     if c > l2[2] + p.max_wave3_ext * w1:
         return None
     return dict(l0=l0, h1=h1, l2=l2, hi=hi, lii=lii, r2=r2, rii=rii, close=c, status=status,
-                w1=w1, wi=wi, atr=a)
+                w1=w1, wi=wi, atr=a, proj=proj)
 
 
 def _score(d: dict, close: np.ndarray) -> float:
     s = 40.0
-    s += 20.0 * _fit(d["r2"], 0.55, 0.25)
-    s += 15.0 * _fit(d["rii"], 0.50, 0.30)
+    s += 20.0 * _fit(d["r2"], 0.55, 0.23)
+    s += 15.0 * _fit(d["rii"], 0.55, 0.23)
     sma = float(np.mean(close[-50:])) if len(close) >= 50 else float(np.mean(close))
     if d["close"] > sma:
         s += 5.0
@@ -171,15 +188,20 @@ def _score(d: dict, close: np.ndarray) -> float:
     return min(100.0, s)
 
 
+def clean_frame(df):
+    """欠損行を除いた DataFrame。検出とチャート描画で同じ位置番号を使うために共通化する。"""
+    d = df.dropna(subset=["High", "Low", "Close"])
+    return d[np.isfinite(d["High"]) & np.isfinite(d["Low"]) & np.isfinite(d["Close"])]
+
+
 def find_candidates(symbol: str, name: str, df, params: Optional[Params] = None) -> List[Candidate]:
-    """df は High/Low/Close 列を持つ DataFrame（日付昇順）。"""
+    """df は High/Low/Close 列を持つ DataFrame（日付昇順）。位置番号は clean_frame(df) 基準。"""
     p = params or Params()
+    df = clean_frame(df)
     h = df["High"].to_numpy(dtype=float)
     l = df["Low"].to_numpy(dtype=float)
     c = df["Close"].to_numpy(dtype=float)
-    ok = np.isfinite(h) & np.isfinite(l) & np.isfinite(c)
-    h, l, c = h[ok], l[ok], c[ok]
-    idx = df.index[ok]
+    idx = df.index
     if len(c) < 120:
         return []
     out: List[Candidate] = []
@@ -205,7 +227,8 @@ def find_candidates(symbol: str, name: str, df, params: Optional[Params] = None)
             points=pts, close=float(c[-1]), entry=entry,
             invalidation_minor=sign * d["lii"][2], invalidation_major=sign * d["l2"][2],
             target=target, r2=round(d["r2"], 3), rii=round(d["rii"], 3),
-            checks=check_partial_rules(d["l0"][2], d["h1"][2], d["l2"][2], d["hi"][2], d["lii"][2]),
+            wave1_top=float(sign * d["h1"][2]),
+            checks={**check_partial_rules(d["l0"][2], d["h1"][2], d["l2"][2], d["hi"][2], d["lii"][2]), **d["proj"]},
             dates={k: str(idx[v[0]])[:10] for k, v in pts.items()},
         ))
     return out

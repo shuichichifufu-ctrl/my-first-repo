@@ -39,7 +39,7 @@ def select_new(cands: List[Candidate], state: dict) -> List[Candidate]:
 
 def remember(state: dict, c: Candidate, today: date) -> None:
     state[c.key()] = {"status": c.status, "symbol": c.symbol, "name": c.name, "direction": c.direction,
-                      "inv": c.invalidation_minor, "date": today.isoformat(), "withdrawn": False}
+                      "inv": c.invalidation_minor, "inv_major": c.invalidation_major, "date": today.isoformat(), "withdrawn": False}
 
 
 def find_withdrawn(state: dict, closes: Dict[str, float], today: date, keep_days: int = 60) -> List[Tuple[str, dict, float]]:
