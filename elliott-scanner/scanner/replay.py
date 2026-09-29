@@ -33,10 +33,42 @@ def replay(df: pd.DataFrame, symbol: str = "X", params: Params | None = None, ho
             sign = 1.0 if c.direction == "up" else -1.0
             fav = (fut["High"].max() - c.close) if sign > 0 else (c.close - fut["Low"].min())
             adv = (c.close - fut["Low"].min()) if sign > 0 else (fut["High"].max() - c.close)
-            rows.append(dict(date=str(df.index[t])[:10], direction=c.direction, status=c.status, score=c.score,
+            rows.append(dict(symbol=symbol, date=str(df.index[t])[:10], direction=c.direction, status=c.status,
+                             score=c.score, edge_atr=round(float(fav - adv) / a, 2),
                              favorable_atr=round(fav / a, 2), adverse_atr=round(adv / a, 2),
                              failed=bool(adv >= abs(c.close - c.invalidation_minor))))
     return pd.DataFrame(rows)
+
+
+def baseline_edges(df: pd.DataFrame, horizon: int = 20, warmup: int = 150) -> dict:
+    """全ての日に「その日の終値で入った」と仮定した場合の (最大有利幅 − 最大不利幅)（ATR倍数）。
+
+    候補の日の成績が、何もしなくても出る値動きと違うのかを比べるための基準。
+    """
+    df = clean_frame(df)
+    h, l, c = (df[k].to_numpy(dtype=float) for k in ("High", "Low", "Close"))
+    up, down = [], []
+    for t in range(warmup, len(df) - horizon - 1):
+        a = atr(h[: t + 1], l[: t + 1], c[: t + 1], 60)
+        if not a > 0:
+            continue
+        hi, lo = h[t + 1: t + 1 + horizon].max(), l[t + 1: t + 1 + horizon].min()
+        up.append(((hi - c[t]) - (c[t] - lo)) / a)
+        down.append(((c[t] - lo) - (hi - c[t])) / a)
+    return {"up": np.array(up), "down": np.array(down)}
+
+
+def bootstrap_p(cands: pd.DataFrame, base: dict, n_iter: int = 5000, seed: int = 0) -> tuple:
+    """候補と同じ銘柄・同じ向き・同じ件数の日をランダムに選んだとき、候補の平均以上になる確率。"""
+    rng = np.random.default_rng(seed)
+    groups = [(g["edge_atr"].to_numpy(), base[(sym, d)]) for (sym, d), g in cands.groupby(["symbol", "direction"])
+              if len(base.get((sym, d), [])) > 0]
+    total = sum(len(g[0]) for g in groups)
+    observed = sum(g[0].sum() for g in groups) / total
+    sims = np.empty(n_iter)
+    for i in range(n_iter):
+        sims[i] = sum(rng.choice(b, size=len(e)).sum() for e, b in groups) / total
+    return observed, float(sims.mean()), float((sims >= observed).mean())
 
 
 def main() -> None:

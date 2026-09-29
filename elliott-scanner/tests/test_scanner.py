@@ -224,3 +224,14 @@ def test_send_failure_keeps_candidate_unrecorded_and_saves_state(tmp_path, monke
     sp = tmp_path / "s.json"
     rc = run.main(["--config", str(cfg), "--state", str(sp), "--out", str(tmp_path / "o")])
     assert rc == 3 and sp.exists() and st.load(str(sp)) == {}  # 送れなかったので記録しない = 翌日再送
+
+
+def test_baseline_and_bootstrap_run_offline():
+    from scanner.replay import baseline_edges, bootstrap_p, replay
+    df = planted_third_of_third(3)
+    r = replay(df, "X")
+    b = baseline_edges(df)
+    assert len(b["up"]) > 50 and len(b["up"]) == len(b["down"])
+    assert {"symbol", "edge_atr"} <= set(r.columns)
+    obs, base_mean, p = bootstrap_p(r, {("X", "up"): b["up"], ("X", "down"): b["down"]}, n_iter=50)
+    assert 0.0 <= p <= 1.0
