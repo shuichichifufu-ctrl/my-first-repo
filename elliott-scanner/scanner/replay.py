@@ -34,7 +34,9 @@ def replay(df: pd.DataFrame, symbol: str = "X", params: Params | None = None, ho
             fav = (fut["High"].max() - c.close) if sign > 0 else (c.close - fut["Low"].min())
             adv = (c.close - fut["Low"].min()) if sign > 0 else (fut["High"].max() - c.close)
             rows.append(dict(symbol=symbol, date=str(df.index[t])[:10], direction=c.direction, status=c.status,
-                             score=c.score, edge_atr=round(float(fav - adv) / a, 2),
+                             score=c.score, edge_atr=round(float(fav - adv) / a, 2), r2=c.r2, rii=c.rii,
+                             wave1_legs=c.wave1_legs,
+                             wi_over_w1=round(abs(c.entry - c.points["L2"][1]) / max(1e-9, abs(c.wave1_top - c.points["L0"][1])), 2),
                              favorable_atr=round(fav / a, 2), adverse_atr=round(adv / a, 2),
                              failed=bool(adv >= abs(c.close - c.invalidation_minor))))
     return pd.DataFrame(rows)

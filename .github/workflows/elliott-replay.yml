@@ -15,7 +15,7 @@ permissions:
 jobs:
   replay:
     runs-on: ubuntu-latest
-    timeout-minutes: 60
+    timeout-minutes: 90
     defaults:
       run:
         working-directory: elliott-scanner
@@ -28,7 +28,7 @@ jobs:
       - name: データ取得の疎通確認
         run: python -c "from scanner.data import fetch_one; d=fetch_one('USDJPY=X','5y',retries=2); print(len(d), d.index[0], d.index[-1])"
       - name: 全銘柄を過去チャートで検証（候補の日 vs ランダムな日）
-        run: python -m scanner.replay_batch --config tickers.yaml --period 15y --out out
+        run: python -m scanner.replay_batch --config tickers.yaml --period 15y --out out --grid "7:2.5:65,7:2.5:0,5:2:0,5:2.5:0,9:3:0,7:2:0,7:3:0"
       - uses: actions/upload-artifact@v4
         if: always()
         with:
