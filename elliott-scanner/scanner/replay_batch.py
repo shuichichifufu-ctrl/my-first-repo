@@ -36,7 +36,7 @@ def summarize(label: str, cands: pd.DataFrame, base: dict, years: float, horizon
     print("  [大1波の内側の脚] " + " | ".join(f"{k} {len(g)}件 {g['edge_atr'].mean():+.2f}"
                                           for k, g in cands.groupby("脚")))
     for col in ("score", "r2", "rii", "wi_over_w1", "wave1_legs"):
-        print(f"  相関(edgeとの順位相関) {col:<11}{cands[col].corr(cands['edge_atr'], method='spearman'):+.2f}")
+        print(f"  相関(edgeとの順位相関) {col:<11}{cands[col].rank().corr(cands['edge_atr'].rank()):+.2f}")
     for sub, g in cands.groupby("status"):
         if len(g) >= 10:
             o, b, pp = bootstrap_p(g, base, n_iter=2000)
