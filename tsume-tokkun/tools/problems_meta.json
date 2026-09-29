@@ -1,0 +1,722 @@
+[
+ {
+  "id": "atama-1",
+  "cat": "atama",
+  "sfen": "1Bk6/9/9/9/9/9/9/9/4K4 b G 1",
+  "claimed_moves": 1,
+  "claimed_first_move": "G*7b",
+  "claimed_main_line": [
+   "▲７二金"
+  ]
+ },
+ {
+  "id": "atama-2",
+  "cat": "atama",
+  "sfen": "1Sk6/9/9/9/9/9/9/9/4K4 b G 1",
+  "claimed_moves": 1,
+  "claimed_first_move": "G*7b",
+  "claimed_main_line": [
+   "▲７二金"
+  ]
+ },
+ {
+  "id": "atama-3",
+  "cat": "atama",
+  "sfen": "3Sk4/9/9/9/9/9/9/9/4K4 b G 1",
+  "claimed_moves": 1,
+  "claimed_first_move": "G*5b",
+  "claimed_main_line": [
+   "▲５二金"
+  ]
+ },
+ {
+  "id": "atama-4",
+  "cat": "atama",
+  "sfen": "7k1/9/9/6N2/9/9/9/9/4K4 b G 1",
+  "claimed_moves": 1,
+  "claimed_first_move": "G*2b",
+  "claimed_main_line": [
+   "▲２二金"
+  ]
+ },
+ {
+  "id": "atama-5",
+  "cat": "atama",
+  "sfen": "5k3/9/4+P4/9/9/9/9/9/4K4 b G 1",
+  "claimed_moves": 1,
+  "claimed_first_move": "G*4b",
+  "claimed_main_line": [
+   "▲４二金"
+  ]
+ },
+ {
+  "id": "atama-6",
+  "cat": "atama",
+  "sfen": "6k2/9/5G3/9/9/9/9/9/4K4 b G 1",
+  "claimed_moves": 1,
+  "claimed_first_move": "G*3b",
+  "claimed_main_line": [
+   "▲３二金打"
+  ]
+ },
+ {
+  "id": "atama-7",
+  "cat": "atama",
+  "sfen": "1k7/2R6/9/9/9/9/9/9/4K4 b G 1",
+  "claimed_moves": 1,
+  "claimed_first_move": "G*8b",
+  "claimed_main_line": [
+   "▲８二金"
+  ]
+ },
+ {
+  "id": "atama-8",
+  "cat": "atama",
+  "sfen": "1p7/k8/9/1B1+B5/9/9/9/9/4K4 b G 1",
+  "claimed_moves": 1,
+  "claimed_first_move": "G*9c",
+  "claimed_main_line": [
+   "▲９三金"
+  ]
+ },
+ {
+  "id": "atama-9",
+  "cat": "atama",
+  "sfen": "3k5/5R3/9/9/9/9/9/9/4K4 b G 1",
+  "claimed_moves": 1,
+  "claimed_first_move": "G*6b",
+  "claimed_main_line": [
+   "▲６二金"
+  ]
+ },
+ {
+  "id": "atama-10",
+  "cat": "atama",
+  "sfen": "4k4/1+R7/9/9/9/9/9/9/4K4 b G 1",
+  "claimed_moves": 1,
+  "claimed_first_move": "G*5b",
+  "claimed_main_line": [
+   "▲５二金"
+  ]
+ },
+ {
+  "id": "atama-11",
+  "cat": "atama",
+  "sfen": "4R4/8k/9/9/6+B2/9/9/9/4K4 b G 1",
+  "claimed_moves": 1,
+  "claimed_first_move": "G*1c",
+  "claimed_main_line": [
+   "▲１三金"
+  ]
+ },
+ {
+  "id": "atama-12",
+  "cat": "atama",
+  "sfen": "2+R6/4k4/9/5+P3/9/9/9/9/4K4 b G 1",
+  "claimed_moves": 1,
+  "claimed_first_move": "G*5c",
+  "claimed_main_line": [
+   "▲５三金"
+  ]
+ },
+ {
+  "id": "atama-13",
+  "cat": "atama",
+  "sfen": "1np6/1k7/9/9/9/4B4/+R8/9/4K4 b G 1",
+  "claimed_moves": 1,
+  "claimed_first_move": "G*8c",
+  "claimed_main_line": [
+   "▲８三金"
+  ]
+ },
+ {
+  "id": "atama-14",
+  "cat": "atama",
+  "sfen": "5B1ng/7k1/9/9/9/9/6+R2/9/4K4 b G 1",
+  "claimed_moves": 1,
+  "claimed_first_move": "G*2c",
+  "claimed_main_line": [
+   "▲２三金"
+  ]
+ },
+ {
+  "id": "atama-15",
+  "cat": "atama",
+  "sfen": "7R1/5k3/9/5+S3/9/9/9/9/4K4 b G 1",
+  "claimed_moves": 1,
+  "claimed_first_move": "G*4c",
+  "claimed_main_line": [
+   "▲４三金"
+  ]
+ },
+ {
+  "id": "atama-16",
+  "cat": "atama",
+  "sfen": "B8/2k6/N3B4/9/9/9/3R5/9/4K4 b G 1",
+  "claimed_moves": 1,
+  "claimed_first_move": "G*7c",
+  "claimed_main_line": [
+   "▲７三金"
+  ]
+ },
+ {
+  "id": "hara-1",
+  "cat": "hara",
+  "sfen": "k1+P6/l8/9/9/9/9/9/9/4K4 b G 1",
+  "claimed_moves": 1,
+  "claimed_first_move": "G*8a",
+  "claimed_main_line": [
+   "▲８一金"
+  ]
+ },
+ {
+  "id": "hara-2",
+  "cat": "hara",
+  "sfen": "5nk2/5np2/8N/9/9/9/9/9/4K4 b G 1",
+  "claimed_moves": 1,
+  "claimed_first_move": "G*2a",
+  "claimed_main_line": [
+   "▲２一金"
+  ]
+ },
+ {
+  "id": "hara-3",
+  "cat": "hara",
+  "sfen": "1k7/pp7/1N7/9/9/9/9/9/4K4 b G 1",
+  "claimed_moves": 1,
+  "claimed_first_move": "G*7a",
+  "claimed_main_line": [
+   "▲７一金"
+  ]
+ },
+ {
+  "id": "hara-4",
+  "cat": "hara",
+  "sfen": "4k4/3lg4/4N4/9/9/9/9/9/4K4 b G 1",
+  "claimed_moves": 1,
+  "claimed_first_move": "G*4a",
+  "claimed_main_line": [
+   "▲４一金"
+  ]
+ },
+ {
+  "id": "hara-5",
+  "cat": "hara",
+  "sfen": "5kg2/6l2/9/9/8B/9/9/9/4K4 b G 1",
+  "claimed_moves": 1,
+  "claimed_first_move": "G*5a",
+  "claimed_main_line": [
+   "▲５一金"
+  ]
+ },
+ {
+  "id": "hara-6",
+  "cat": "hara",
+  "sfen": "9/8k/7R1/9/9/9/9/9/4K4 b G 1",
+  "claimed_moves": 1,
+  "claimed_first_move": "G*2b",
+  "claimed_main_line": [
+   "▲２二金"
+  ]
+ },
+ {
+  "id": "hara-7",
+  "cat": "hara",
+  "sfen": "6gk1/9/6+B2/9/9/9/9/9/4K4 b G 1",
+  "claimed_moves": 1,
+  "claimed_first_move": "G*1a",
+  "claimed_main_line": [
+   "▲１一金"
+  ]
+ },
+ {
+  "id": "hara-8",
+  "cat": "hara",
+  "sfen": "9/8k/6+R2/9/9/9/9/9/4K4 b G 1",
+  "claimed_moves": 1,
+  "claimed_first_move": "G*2b",
+  "claimed_main_line": [
+   "▲２二金"
+  ]
+ },
+ {
+  "id": "hara-9",
+  "cat": "hara",
+  "sfen": "9/k1+P6/3R5/9/9/9/9/9/4K4 b G 1",
+  "claimed_moves": 1,
+  "claimed_first_move": "G*8b",
+  "claimed_main_line": [
+   "▲８二金"
+  ]
+ },
+ {
+  "id": "hara-10",
+  "cat": "hara",
+  "sfen": "9/5kL2/7+S1/6B2/9/9/9/9/4K4 b G 1",
+  "claimed_moves": 1,
+  "claimed_first_move": "G*5b",
+  "claimed_main_line": [
+   "▲５二金"
+  ]
+ },
+ {
+  "id": "hara-11",
+  "cat": "hara",
+  "sfen": "3G5/2k6/2l6/9/1L7/9/9/9/4K4 b G 1",
+  "claimed_moves": 1,
+  "claimed_first_move": "G*6b",
+  "claimed_main_line": [
+   "▲６二金打"
+  ]
+ },
+ {
+  "id": "hara-12",
+  "cat": "hara",
+  "sfen": "2g6/2sk5/9/1+R7/1+B7/9/9/9/4K4 b G 1",
+  "claimed_moves": 1,
+  "claimed_first_move": "G*5b",
+  "claimed_main_line": [
+   "▲５二金"
+  ]
+ },
+ {
+  "id": "hara-13",
+  "cat": "hara",
+  "sfen": "p8/1k7/1l7/2L6/L8/9/9/9/4K4 b G 1",
+  "claimed_moves": 1,
+  "claimed_first_move": "G*7b",
+  "claimed_main_line": [
+   "▲７二金"
+  ]
+ },
+ {
+  "id": "hara-14",
+  "cat": "hara",
+  "sfen": "7l1/6kl1/4+R4/9/9/9/9/9/4K4 b G 1",
+  "claimed_moves": 1,
+  "claimed_first_move": "G*4b",
+  "claimed_main_line": [
+   "▲４二金"
+  ]
+ },
+ {
+  "id": "hara-15",
+  "cat": "hara",
+  "sfen": "4S4/4k1G2/5l3/3S5/9/9/9/9/4K4 b G 1",
+  "claimed_moves": 1,
+  "claimed_first_move": "G*6b",
+  "claimed_main_line": [
+   "▲６二金"
+  ]
+ },
+ {
+  "id": "hara-16",
+  "cat": "hara",
+  "sfen": "8p/7kl/5R3/9/9/6R2/9/9/4K4 b G 1",
+  "claimed_moves": 1,
+  "claimed_first_move": "G*3b",
+  "claimed_main_line": [
+   "▲３二金"
+  ]
+ },
+ {
+  "id": "shiri-1",
+  "cat": "shiri",
+  "sfen": "9/k8/sp7/9/4B4/9/9/9/4K4 b G 1",
+  "claimed_moves": 1,
+  "claimed_first_move": "G*9a",
+  "claimed_main_line": [
+   "▲９一金"
+  ]
+ },
+ {
+  "id": "shiri-2",
+  "cat": "shiri",
+  "sfen": "8+S/9/8k/8s/9/7L1/9/9/4K4 b G 1",
+  "claimed_moves": 1,
+  "claimed_first_move": "G*1b",
+  "claimed_main_line": [
+   "▲１二金"
+  ]
+ },
+ {
+  "id": "shiri-3",
+  "cat": "shiri",
+  "sfen": "9/7lk/7N1/8S/9/9/9/9/4K4 b G 1",
+  "claimed_moves": 1,
+  "claimed_first_move": "G*1a",
+  "claimed_main_line": [
+   "▲１一金"
+  ]
+ },
+ {
+  "id": "shiri-4",
+  "cat": "shiri",
+  "sfen": "1S7/9/kp7/9/1+P7/9/9/9/4K4 b G 1",
+  "claimed_moves": 1,
+  "claimed_first_move": "G*9b",
+  "claimed_main_line": [
+   "▲９二金"
+  ]
+ },
+ {
+  "id": "shiri-5",
+  "cat": "shiri",
+  "sfen": "9/2G6/3kn4/2ppg4/9/9/9/9/4K4 b G 1",
+  "claimed_moves": 1,
+  "claimed_first_move": "G*6b",
+  "claimed_main_line": [
+   "▲６二金打"
+  ]
+ },
+ {
+  "id": "shiri-6",
+  "cat": "shiri",
+  "sfen": "9/1R7/k8/s8/9/9/9/9/4K4 b G 1",
+  "claimed_moves": 1,
+  "claimed_first_move": "G*9b",
+  "claimed_main_line": [
+   "▲９二金"
+  ]
+ },
+ {
+  "id": "shiri-7",
+  "cat": "shiri",
+  "sfen": "9/2Bkl4/1+P2p4/9/9/9/9/9/4K4 b G 1",
+  "claimed_moves": 1,
+  "claimed_first_move": "G*6a",
+  "claimed_main_line": [
+   "▲６一金"
+  ]
+ },
+ {
+  "id": "shiri-8",
+  "cat": "shiri",
+  "sfen": "9/9/6pkB/6n2/8R/9/9/9/4K4 b G 1",
+  "claimed_moves": 1,
+  "claimed_first_move": "G*2b",
+  "claimed_main_line": [
+   "▲２二金"
+  ]
+ },
+ {
+  "id": "shiri-9",
+  "cat": "shiri",
+  "sfen": "2G6/9/1nkp5/1p7/3S5/9/9/9/4K4 b G 1",
+  "claimed_moves": 1,
+  "claimed_first_move": "G*7b",
+  "claimed_main_line": [
+   "▲７二金打"
+  ]
+ },
+ {
+  "id": "shiri-10",
+  "cat": "shiri",
+  "sfen": "3G5/2k6/G1gp5/9/9/9/9/9/4K4 b G 1",
+  "claimed_moves": 1,
+  "claimed_first_move": "G*7a",
+  "claimed_main_line": [
+   "▲７一金打"
+  ]
+ },
+ {
+  "id": "shiri-11",
+  "cat": "shiri",
+  "sfen": "3+S5/2k6/+R8/9/9/9/9/9/4K4 b G 1",
+  "claimed_moves": 1,
+  "claimed_first_move": "G*7a",
+  "claimed_main_line": [
+   "▲７一金"
+  ]
+ },
+ {
+  "id": "shiri-12",
+  "cat": "shiri",
+  "sfen": "9/2k6/+R3B4/9/9/9/9/9/4K4 b G 1",
+  "claimed_moves": 1,
+  "claimed_first_move": "G*7a",
+  "claimed_main_line": [
+   "▲７一金"
+  ]
+ },
+ {
+  "id": "shiri-13",
+  "cat": "shiri",
+  "sfen": "9/4nk3/9/4+S3B/5N3/9/9/9/4K4 b G 1",
+  "claimed_moves": 1,
+  "claimed_first_move": "G*4a",
+  "claimed_main_line": [
+   "▲４一金"
+  ]
+ },
+ {
+  "id": "shiri-14",
+  "cat": "shiri",
+  "sfen": "+P8/1k7/3+R5/9/9/9/9/9/4K4 b G 1",
+  "claimed_moves": 1,
+  "claimed_first_move": "G*8a",
+  "claimed_main_line": [
+   "▲８一金"
+  ]
+ },
+ {
+  "id": "shiri-15",
+  "cat": "shiri",
+  "sfen": "9/3+P5/4k4/6+R2/9/9/9/9/4K4 b G 1",
+  "claimed_moves": 1,
+  "claimed_first_move": "G*5b",
+  "claimed_main_line": [
+   "▲５二金"
+  ]
+ },
+ {
+  "id": "shiri-16",
+  "cat": "shiri",
+  "sfen": "9/7+S1/5pk2/8G/5+B3/9/9/9/4K4 b G 1",
+  "claimed_moves": 1,
+  "claimed_first_move": "G*3b",
+  "claimed_main_line": [
+   "▲３二金"
+  ]
+ },
+ {
+  "id": "shita-1",
+  "cat": "shita",
+  "sfen": "9/5GSkg/6p2/9/9/9/9/9/4K4 b BG 1",
+  "claimed_moves": 3,
+  "claimed_first_move": "B*3a",
+  "claimed_main_line": [
+   "▲３一角",
+   "△１一玉",
+   "▲２一金"
+  ]
+ },
+ {
+  "id": "shita-2",
+  "cat": "shita",
+  "sfen": "3G5/Bks6/9/1GB6/9/9/9/9/4K4 b GN 1",
+  "claimed_moves": 3,
+  "claimed_first_move": "N*9d",
+  "claimed_main_line": [
+   "▲９四桂",
+   "△９一玉",
+   "▲８二金"
+  ]
+ },
+ {
+  "id": "shita-3",
+  "cat": "shita",
+  "sfen": "9/1Sk6/3g5/1+B7/9/9/9/9/4K4 b GS 1",
+  "claimed_moves": 3,
+  "claimed_first_move": "S*8c",
+  "claimed_main_line": [
+   "▲８三銀",
+   "△６一玉",
+   "▲５一金"
+  ]
+ },
+ {
+  "id": "shita-4",
+  "cat": "shita",
+  "sfen": "6n2/7k1/6n1s/7N1/9/9/9/9/4K4 b RG 1",
+  "claimed_moves": 3,
+  "claimed_first_move": "R*2a",
+  "claimed_main_line": [
+   "▲２一飛",
+   "△同玉",
+   "▲１二金"
+  ]
+ },
+ {
+  "id": "shita-5",
+  "cat": "shita",
+  "sfen": "9/GSknP4/1s7/9/9/9/9/9/4K4 b BG 1",
+  "claimed_moves": 3,
+  "claimed_first_move": "B*8a",
+  "claimed_main_line": [
+   "▲８一角",
+   "△６一玉",
+   "▲５一金"
+  ]
+ },
+ {
+  "id": "shita-6",
+  "cat": "shita",
+  "sfen": "2S6/k8/1s7/9/9/9/9/9/4K4 b RG 1",
+  "claimed_moves": 3,
+  "claimed_first_move": "R*9a",
+  "claimed_main_line": [
+   "▲９一飛",
+   "△同玉",
+   "▲８二金"
+  ]
+ },
+ {
+  "id": "shita-7",
+  "cat": "shita",
+  "sfen": "7s1/6k2/5lB2/9/9/9/7+R1/9/4K4 b RG 1",
+  "claimed_moves": 3,
+  "claimed_first_move": "R*3a",
+  "claimed_main_line": [
+   "▲３一飛",
+   "△同玉",
+   "▲４二金"
+  ]
+ },
+ {
+  "id": "shita-8",
+  "cat": "shita",
+  "sfen": "4S2n1/6kg1/5p1s1/9/9/9/9/9/4K4 b RG 1",
+  "claimed_moves": 3,
+  "claimed_first_move": "R*3a",
+  "claimed_main_line": [
+   "▲３一飛",
+   "△同玉",
+   "▲４二金"
+  ]
+ },
+ {
+  "id": "shita-9",
+  "cat": "shita",
+  "sfen": "1n7/1g1k5/3g5/B8/9/4+R4/9/9/4K4 b BG 1",
+  "claimed_moves": 3,
+  "claimed_first_move": "B*5a",
+  "claimed_main_line": [
+   "▲５一角",
+   "△７一玉",
+   "▲６一金"
+  ]
+ },
+ {
+  "id": "shita-10",
+  "cat": "shita",
+  "sfen": "5s3/5p1k1/5B1g1/9/9/8R/9/9/4K4 b BG 1",
+  "claimed_moves": 3,
+  "claimed_first_move": "B*1a",
+  "claimed_main_line": [
+   "▲１一角",
+   "△３一玉",
+   "▲２一金"
+  ]
+ },
+ {
+  "id": "kin_todome-1",
+  "cat": "kin_todome",
+  "sfen": "9/9/kB7/9/9/2L6/9/9/4K4 b GS 1",
+  "claimed_moves": 3,
+  "claimed_first_move": "S*9d",
+  "claimed_main_line": [
+   "▲９四銀",
+   "△８二玉",
+   "▲９二金"
+  ]
+ },
+ {
+  "id": "kin_todome-2",
+  "cat": "kin_todome",
+  "sfen": "6l2/9/6gBk/9/9/9/9/9/4K4 b GS 1",
+  "claimed_moves": 3,
+  "claimed_first_move": "S*1d",
+  "claimed_main_line": [
+   "▲１四銀",
+   "△２二玉",
+   "▲１二金"
+  ]
+ },
+ {
+  "id": "kin_todome-3",
+  "cat": "kin_todome",
+  "sfen": "+S8/9/kp7/9/9/9/2+R6/9/4K4 b RG 1",
+  "claimed_moves": 3,
+  "claimed_first_move": "R*9b",
+  "claimed_main_line": [
+   "▲９二飛",
+   "△８四玉",
+   "▲９五金"
+  ]
+ },
+ {
+  "id": "kin_todome-4",
+  "cat": "kin_todome",
+  "sfen": "+P8/1kl1+B4/9/9/9/9/9/9/4K4 b RG 1",
+  "claimed_moves": 3,
+  "claimed_first_move": "R*8a",
+  "claimed_main_line": [
+   "▲８一飛",
+   "△９三玉",
+   "▲８四金"
+  ]
+ },
+ {
+  "id": "kin_todome-5",
+  "cat": "kin_todome",
+  "sfen": "2Sg5/9/1k1s5/9/+B8/9/9/9/4K4 b GS 1",
+  "claimed_moves": 3,
+  "claimed_first_move": "S*8d",
+  "claimed_main_line": [
+   "▲８四銀",
+   "△９二玉",
+   "▲８二金"
+  ]
+ },
+ {
+  "id": "kin_todome-6",
+  "cat": "kin_todome",
+  "sfen": "8G/5Bn2/7pk/9/9/9/9/9/4K4 b BG 1",
+  "claimed_moves": 3,
+  "claimed_first_move": "B*2b",
+  "claimed_main_line": [
+   "▲２二角",
+   "△同玉",
+   "▲１二金打"
+  ]
+ },
+ {
+  "id": "kin_todome-7",
+  "cat": "kin_todome",
+  "sfen": "2R6/9/3k5/5B3/9/9/9/9/4K4 b GS 1",
+  "claimed_moves": 3,
+  "claimed_first_move": "S*5b",
+  "claimed_main_line": [
+   "▲５二銀",
+   "△同玉",
+   "▲５三金"
+  ]
+ },
+ {
+  "id": "kin_todome-8",
+  "cat": "kin_todome",
+  "sfen": "5R3/9/6k2/8B/9/9/9/9/4K4 b GS 1",
+  "claimed_moves": 3,
+  "claimed_first_move": "S*2b",
+  "claimed_main_line": [
+   "▲２二銀",
+   "△同玉",
+   "▲２三金"
+  ]
+ },
+ {
+  "id": "kin_todome-9",
+  "cat": "kin_todome",
+  "sfen": "1n+R6/9/1k7/9/9/3B5/9/9/4K4 b BG 1",
+  "claimed_moves": 3,
+  "claimed_first_move": "B*7d",
+  "claimed_main_line": [
+   "▲７四角",
+   "△９四玉",
+   "▲８五金"
+  ]
+ },
+ {
+  "id": "kin_todome-10",
+  "cat": "kin_todome",
+  "sfen": "5l+R2/9/5k3/3S5/9/9/9/9/4K4 b BG 1",
+  "claimed_moves": 3,
+  "claimed_first_move": "B*3d",
+  "claimed_main_line": [
+   "▲３四角",
+   "△５四玉",
+   "▲５五金"
+  ]
+ }
+]

@@ -1,0 +1,815 @@
+<!doctype html>
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>詰将棋 格言特訓</title>
+<style>
+:root{
+  --bg:#14152e; --bg2:#1d1f45; --surface:#232650; --surface2:#2d3164; --ink:#f5f0e4; --muted:#bebcd8; --line:#454a8c;
+  --gold:#f2c65a; --gold2:#c99a2e; --accent-ink:#231a05;
+  --ok:#8ff0b3; --ok-bg:#173a2c; --ng:#ff9a91; --ng-bg:#472026; --info-bg:#2a2e60;
+  --board1:#ebc77f; --board2:#d6a552; --board-line:#7a5620; --wood-dark:#5a3c17;
+  --piece1:#fdf0c8; --piece2:#e8c678; --piece-line:#5e3f14; --promo:#c0281f;
+  --sel:#0b5d44; --hint:#1a3fb0; --last:rgba(11,93,68,.22);
+  --serif:"Yu Mincho","Hiragino Mincho ProN","Noto Serif JP","BIZ UDPMincho",serif;
+  --sans:"Hiragino Sans","Hiragino Kaku Gothic ProN","Yu Gothic","Noto Sans JP","Meiryo",system-ui,sans-serif;
+}
+*{box-sizing:border-box}
+html{-webkit-text-size-adjust:100%}
+body{margin:0;color:var(--ink);font-family:var(--sans);font-size:16px;line-height:1.7;min-height:100vh;
+  background-color:var(--bg);
+  background-image:
+    radial-gradient(ellipse at 50% -10%, #3a3f9a 0%, rgba(58,63,154,0) 60%),
+    url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='60' height='30' viewBox='0 0 60 30'><g fill='none' stroke='%23ffffff' stroke-opacity='.06' stroke-width='1.2'><circle cx='0' cy='30' r='10'/><circle cx='0' cy='30' r='20'/><circle cx='0' cy='30' r='30'/><circle cx='60' cy='30' r='10'/><circle cx='60' cy='30' r='20'/><circle cx='60' cy='30' r='30'/><circle cx='30' cy='30' r='10'/><circle cx='30' cy='30' r='20'/><circle cx='30' cy='30' r='30'/></g></svg>");
+  background-attachment:fixed}
+.wrap{max-width:560px;margin:0 auto;padding:16px 10px 56px}
+@media (min-width:700px){.wrap{max-width:680px}}
+.nw{white-space:nowrap}
+h2{font-family:var(--serif);font-size:1.1rem;margin:26px 0 10px;color:var(--gold);letter-spacing:.08em}
+h3{font-size:1rem;margin:16px 0 6px}
+button{font:inherit;color:inherit;cursor:pointer}
+button:focus-visible{outline:3px solid #ffffff;outline-offset:2px}
+.btn{min-height:46px;padding:8px 18px;border-radius:12px;border:1px solid var(--line);background:var(--surface2);font-weight:700;color:var(--ink)}
+.btn:hover{border-color:var(--gold)}
+.btn.primary{background:linear-gradient(180deg,var(--gold),var(--gold2));border-color:#ffe6a0;color:var(--accent-ink);box-shadow:0 2px 0 #8a6210}
+.btn.ghost{background:transparent}
+.btn[disabled]{opacity:.45;cursor:not-allowed}
+.row{display:flex;gap:8px;flex-wrap:wrap;align-items:center}
+.small{font-size:.85rem;color:var(--muted)}
+.sr{position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0 0 0 0)}
+
+/* タイトル */
+.hero{text-align:center;padding:18px 0 8px}
+.hero .logo{font-family:var(--serif);font-weight:900;font-size:3.4rem;line-height:1.1;letter-spacing:.12em;margin:0;
+  background:linear-gradient(180deg,#fff2c2 0%,#f2c65a 45%,#b9821a 100%);-webkit-background-clip:text;background-clip:text;color:transparent;
+  filter:drop-shadow(0 3px 0 rgba(0,0,0,.35))}
+.hero .catch{font-family:var(--serif);letter-spacing:.35em;color:var(--ink);margin:2px 0 0;font-size:1.05rem}
+.hero .lead{color:var(--muted);font-size:.9rem;margin:10px 4px 0}
+.rank{display:flex;align-items:center;gap:14px;margin:16px 0 4px;padding:12px 14px;border-radius:16px;
+  background:linear-gradient(180deg,var(--surface2),var(--surface));border:1px solid var(--line)}
+.rank .medal{width:64px;height:64px;flex:none}
+.rank .rt{font-size:.8rem;color:var(--muted)}
+.rank .rn{font-family:var(--serif);font-size:1.45rem;font-weight:800;color:var(--gold);line-height:1.2}
+.rank .rs{font-size:.85rem;color:var(--muted)}
+.xp{height:8px;border-radius:99px;background:#12132b;overflow:hidden;margin-top:6px}
+.xp>i{display:block;height:100%;background:linear-gradient(90deg,var(--gold2),var(--gold))}
+
+/* 道場カード */
+.dojo{display:flex;gap:12px;align-items:center;width:100%;text-align:left;margin:0 0 10px;padding:12px 14px;border-radius:16px;
+  border:1px solid var(--line);background:linear-gradient(180deg,var(--surface2),var(--surface));position:relative}
+.dojo:hover:not([disabled]){border-color:var(--gold);transform:translateY(-1px)}
+.dojo[disabled]{opacity:.5;cursor:not-allowed}
+.dojo .icon{width:58px;height:58px;flex:none;border-radius:50%;background:radial-gradient(circle at 35% 30%,#4b51a8,#22265a);
+  border:2px solid var(--gold2);display:grid;place-items:center;padding:8px}
+.dojo .body{min-width:0;flex:1}
+.dojo .no{font-size:.72rem;color:var(--gold);letter-spacing:.14em}
+.dojo .name{font-family:var(--serif);font-size:1.2rem;font-weight:800;line-height:1.3}
+.dojo .blurb{font-size:.82rem;color:var(--muted);line-height:1.5;margin:2px 0 6px}
+.stars{display:flex;gap:3px;flex-wrap:wrap;align-items:center}
+.stars b{font-size:1.05rem;line-height:1}
+.st-clean{color:var(--gold)} .st-assist{color:#d9dcff} .st-done{color:#9aa0e6} .st-new{color:#9096d8}
+.stat{font-size:.78rem;color:var(--muted);margin-top:3px}
+.badge{white-space:nowrap;font-size:.7rem;padding:1px 8px;border-radius:99px;background:#3a3f86;color:#dfe2ff;font-weight:700;margin-left:6px;vertical-align:middle}
+
+/* 対局画面 */
+.hud{display:flex;align-items:center;gap:8px;margin:2px 0 8px}
+.hud .title{font-family:var(--serif);font-weight:800;font-size:1.05rem;flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.hud .pill,.hud .btn{flex:none}
+.pill{font-size:.8rem;padding:3px 12px;border-radius:99px;border:1px solid var(--gold2);background:#2b2410;color:var(--gold);font-weight:700;white-space:nowrap}
+.pill.combo{background:#2a1f10;border-color:var(--hint);color:#ffc079}
+.qnav{display:flex;align-items:center;gap:8px;margin:0 0 8px}
+.qnav .lab{flex:1;text-align:center;font-weight:700}
+.qnav .btn{min-width:48px;padding:4px 10px}
+.sd{min-width:40px;height:40px;border-radius:10px;border:1px solid var(--line);background:var(--surface);font-weight:700;font-size:.9rem;position:relative}
+.sd.cur{border-color:var(--gold);box-shadow:0 0 0 2px var(--gold) inset}
+.sd.clean{background:#3a3010;color:var(--gold)} .sd.done{background:#2a2f66}
+.side{display:flex;align-items:center;gap:8px;min-height:36px;font-size:.88rem;color:var(--muted);flex-wrap:wrap}
+.side b{color:var(--ink)}
+.stand{background:linear-gradient(180deg,#6b4720,#4d3212);border:1px solid #2e1d08;border-radius:12px;padding:6px 10px;box-shadow:inset 0 2px 4px rgba(0,0,0,.4)}
+.boardwrap{display:grid;grid-template-columns:1fr 1.2em;margin:6px auto;
+  max-width:max(calc((100vh - 450px) * var(--cols,6) / var(--rows,6) + 1.2em), calc(var(--cols,6) * 44px + 1.2em + 8px))}
+.files{display:grid;grid-template-columns:repeat(9,1fr);font-size:.75rem;color:var(--muted);text-align:center;margin-bottom:2px}
+.ranks{display:grid;font-size:.75rem;color:var(--muted);align-items:center;justify-items:center}
+.boardbox{position:relative}
+.board{position:relative;display:grid;grid-template-columns:repeat(9,1fr);border:3px solid var(--wood-dark);border-radius:4px;
+  background:
+    repeating-linear-gradient(90deg,rgba(110,60,10,.07) 0 2px,transparent 2px 9px),
+    linear-gradient(135deg,var(--board1),var(--board2));
+  box-shadow:0 8px 20px rgba(0,0,0,.5), inset 0 0 0 1px rgba(255,255,255,.25)}
+.cell{position:relative;aspect-ratio:1;padding:0;border:0;background:transparent;min-width:0;
+  border-right:1px solid var(--board-line);border-bottom:1px solid var(--board-line)}
+.cell:nth-child(9n){border-right:0}
+.cell.last{background:var(--last)}
+.cell:focus-visible{outline:3px solid #14213d;outline-offset:-3px;box-shadow:inset 0 0 0 6px rgba(255,255,255,.85)}
+.cell.sel{box-shadow:inset 0 0 0 3px var(--sel);background:rgba(11,93,68,.22)}
+.cell.target::after{content:"";position:absolute;left:50%;top:50%;width:26%;height:26%;transform:translate(-50%,-50%);border-radius:50%;background:var(--sel);opacity:.85;pointer-events:none}
+.cell.target.occ::after{width:84%;height:84%;background:transparent;border:3px solid var(--sel)}
+.cell.hintcell::before{content:"";position:absolute;inset:4%;border:4px dashed var(--hint);border-radius:6px;pointer-events:none;background:rgba(26,63,176,.12)}
+.cell svg{width:100%;height:100%;display:block;filter:drop-shadow(0 1.5px 1px rgba(0,0,0,.45))}
+.star{position:absolute;width:7px;height:7px;margin:-3.5px 0 0 -3.5px;border-radius:50%;background:var(--board-line);pointer-events:none;z-index:1}
+.hand{display:flex;gap:6px;flex-wrap:wrap;min-height:60px;align-items:center}
+.hp{position:relative;width:52px;height:58px;padding:0;border:2px solid transparent;border-radius:8px;background:transparent}
+.hp svg{filter:drop-shadow(0 2px 1px rgba(0,0,0,.5))}
+.hp.sel{border-color:#8ff0b3;background:rgba(143,240,179,.2)}
+.hp .n{position:absolute;right:-2px;bottom:-2px;background:var(--gold);color:var(--accent-ink);font-size:.75rem;min-width:20px;height:20px;line-height:20px;border-radius:10px;text-align:center;font-weight:800}
+.none{color:#d9c9a8}
+.msg{margin:10px 0;padding:10px 14px;border-radius:14px;background:var(--info-bg);border:1px solid var(--line);min-height:52px}
+.msg.ok{background:var(--ok-bg);border-color:#2f7a55} .msg.ng{background:var(--ng-bg);border-color:#8d3a42}
+.msg strong{display:block}
+.msg.ok strong{color:var(--ok)} .msg.ng strong{color:var(--ng)}
+.promo{display:flex;gap:8px;margin:8px 0;align-items:center}
+.card{background:linear-gradient(180deg,var(--surface2),var(--surface));border:1px solid var(--line);border-radius:16px;padding:14px 16px}
+.line{font-family:var(--serif);font-size:1.05rem;letter-spacing:.03em}
+.expl ul{margin:4px 0 8px;padding-left:1.3em} .expl li{margin:2px 0}
+footer{margin-top:32px;font-size:.8rem;color:var(--muted)} footer a{color:var(--gold)}
+.topline{display:flex;justify-content:flex-end;gap:8px;flex-wrap:wrap;margin:0 0 4px}
+.topline.bottom{justify-content:flex-start;margin:18px 0 0}
+.topline.bottom::before{content:"せってい";flex-basis:100%;font-size:.8rem;color:var(--muted)}
+.toggle{min-height:44px;padding:2px 14px;font-size:.8rem}
+
+@media (orientation:landscape) and (min-width:700px){
+  .wrap{max-width:960px;padding-top:6px}
+  .topline.bottom::before{display:none}
+  .trainwrap{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr);grid-template-areas:"a hud" "a qnav" "a b";
+    grid-template-rows:auto auto 1fr;column-gap:20px;align-items:start}
+  .trainwrap>.hud{grid-area:hud;margin:0 0 2px}
+  .trainwrap>.qnav{grid-area:qnav;margin:0 0 4px}
+  .trainwrap>.pl-a{grid-area:a}
+  .trainwrap>.pl-b{grid-area:b}
+  .boardwrap{max-width:max(calc((100vh - 300px) * var(--cols,6) / var(--rows,6) + 1.2em), calc(var(--cols,6) * 44px + 1.2em + 8px));margin-left:0}
+  .side{min-height:26px}
+  .hand{min-height:52px}
+}
+/* 高さの小さい画面: 上の余白をつめて、盤と持駒を同時に見せる */
+@media (max-height:700px){
+  .wrap{padding-top:8px}
+  .stand{padding:3px 8px}
+  .hp{width:46px;height:50px}
+  .boardwrap{margin:2px auto}
+  .qnav .small{display:none}
+  .qnav{margin-bottom:4px} .hud{margin-bottom:4px}
+  .side{min-height:24px;font-size:.8rem}
+  .msg{padding:6px 10px;min-height:44px;margin:6px 0;font-size:.92rem}
+  .hand{min-height:52px}
+}
+/* 演出 */
+.overlay{position:fixed;left:0;right:0;top:0;z-index:20;padding:calc(8px + env(safe-area-inset-top)) 12px 8px;pointer-events:none}
+.overlay .sheet{pointer-events:auto;max-width:560px;margin:0 auto;padding:12px 16px;border-radius:18px;text-align:center;
+  background:linear-gradient(180deg,#34386f,#232650);border:2px solid var(--gold);box-shadow:0 6px 24px rgba(0,0,0,.55)}
+.overlay .big{font-family:var(--serif);font-weight:900;font-size:2.2rem;letter-spacing:.15em;line-height:1.2;
+  background:linear-gradient(180deg,#fff2c2,#f2c65a 50%,#b9821a);-webkit-background-clip:text;background-clip:text;color:transparent}
+.overlay .rate{font-size:1.5rem;letter-spacing:.3em;color:var(--gold);line-height:1.2}
+.overlay .sub{color:var(--ink);font-size:.95rem}
+.conf{position:fixed;top:-20px;width:9px;height:14px;z-index:21;pointer-events:none;opacity:.95}
+@keyframes fall{to{transform:translateY(110vh) rotate(720deg);opacity:.9}}
+@keyframes pop{0%{transform:translateY(-40px);opacity:0}100%{transform:translateY(0);opacity:1}}
+@keyframes shake{0%,100%{transform:translateX(0)}20%{transform:translateX(-7px)}40%{transform:translateX(6px)}60%{transform:translateX(-4px)}80%{transform:translateX(3px)}}
+@media (prefers-reduced-motion:no-preference){
+  .overlay .sheet{animation:pop .35s ease-out}
+  .conf{animation:fall 1.9s ease-in forwards}
+  .shake{animation:shake .4s}
+  .xp>i{transition:width .5s}
+  .dojo{transition:transform .12s,border-color .12s}
+}
+</style>
+</head>
+<body>
+<svg width="0" height="0" style="position:absolute" aria-hidden="true"><defs>
+  <linearGradient id="pg" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="var(--piece1)"/><stop offset="1" stop-color="var(--piece2)"/></linearGradient>
+</defs></svg>
+<div class="wrap">
+  <div class="topline"><button class="btn toggle" id="asBtn" aria-pressed="true">王手のしるし（点）：表示する</button><button class="btn toggle" id="sndBtn" aria-pressed="false">効果音：オフ</button></div>
+  <main id="app"></main>
+  <footer id="foot"></footer>
+</div>
+<script>
+"use strict";
+/* ===== 教材データ（問題はすべて、詰み・手数・余詰なしを探索プログラムで確認済み） ===== */
+const PROBLEMS = /*__PROBLEMS__*/[];
+const CATS = [
+ {id:"atama", group:"form", name:"頭金", kind:"詰みの形", icon:"G",
+  blurb:"玉のすぐ前（真正面）に金を打つ、詰みの基本の形。",
+  check:["玉の逃げ道が、金の利きと味方の駒でふさがれているか。","打った金に味方の駒の「紐（ひも）」が付いていて、玉に取られないか。"],
+  reason:"頭金は詰みの基本形です。玉の真正面に打った金が、玉の逃げ道の多くを同時にふさぎます。",
+  hint:"玉のすぐ手前（真正面）のマスに金を打てないか考えよう。"},
+ {id:"hara", group:"form", name:"腹金", kind:"詰みの形", icon:"G",
+  blurb:"玉の真横に金を打つ形。",
+  check:["金は、前・斜め前（2方向）・横（2方向）・真後ろの6方向に1マス動ける（利きがある）。金の利きが届かない玉の逃げ道は、ほかの駒でふさげているか。","打った金に紐（ひも）が付いていて、玉に取られないか。"],
+  reason:"玉の真横に打った金が王手をかけ、金の利きと味方の駒で、玉の逃げ道をふさぎます。",
+  hint:"玉の左右どちらかの隣に金を打てないか考えよう。"},
+ {id:"shiri", group:"form", name:"尻金", kind:"詰みの形", icon:"G",
+  blurb:"玉の後ろ側（盤の奥側）に金を打つ形。",
+  check:["玉の後ろに打った金が、後ろ向きの利き（金は後ろにも1マス動ける）で王手をかけているか。","玉が前や横へ逃げるマスが、ほかの駒でふさがれているか。"],
+  reason:"玉の後ろに打った金は、後ろ向きの利きで王手をかけます。玉が前や横に逃げられないことが、この形で詰むための条件です。",
+  hint:"玉のすぐ後ろ（盤の奥側）のマスに金を打てないか考えよう。"},
+ {id:"shita", group:"proverb", name:"玉は下段に落とせ", kind:"格言", icon:"K",
+  blurb:"玉を上に逃がすと捕まえにくい。王手で一段目（盤の一番奥）に落として詰ませる。",
+  check:["最初の王手で、玉が一段目に落ちる（落ちるしかない）か。","一段目に落ちた玉を、次の一手でとどめられるか。"],
+  reason:"玉を上（盤の中央側）に逃がすと、捕まえるために多くの駒が必要になります。一段目（盤の一番奥）に落とせば、少ない駒で詰ませやすくなります。",
+  hint:"最初の王手で、玉を盤の一番奥（一段目）に追い込めないか考えよう。"},
+ {id:"kin_todome", group:"proverb", name:"金はとどめに残せ", kind:"格言", icon:"G",
+  blurb:"金は最後の一手（とどめ）に使えるよう、持駒に残しておく。",
+  check:["最初は金以外の駒で王手をかけているか。","金を先に打つ王手は、なぜ詰まないのか。"],
+  reason:"金は、玉のまわりの逃げ道をふさぐ力が強い駒です。最後のとどめに使えるよう残しておくと、詰みの形を作りやすくなります。",
+  hint:"持駒の金を先に打ちたくなるところを我慢して、別の駒で王手しよう。"}
+];
+const LEVELS = ["", "やさしい", "ふつう", "むずかしい"];
+const RANKS = [["歩","歩兵"],["香","香車"],["桂","桂馬"],["銀","銀将"],["金","金将"],["角","角行"],["飛","飛車"],["玉","玉将"]];
+const GLYPH = {P:"歩",L:"香",N:"桂",S:"銀",G:"金",B:"角",R:"飛",K:"玉","+P":"と","+L":"杏","+N":"圭","+S":"全","+B":"馬","+R":"龍"};
+const PJA = {P:"歩",L:"香",N:"桂",S:"銀",G:"金",B:"角",R:"飛",K:"玉","+P":"と金","+L":"成香","+N":"成桂","+S":"成銀","+B":"馬","+R":"龍"};
+const ZEN = "０１２３４５６７８９", KAN = "〇一二三四五六七八九", RL = "abcdefghi";
+const HAND_ORDER = ["R","B","G","S","N","L","P"];
+const KEY = "tsume-kakugen-v1", SKEY = "tsume-kakugen-sound";
+
+/* ===== 保存（使えない環境でも動く） ===== */
+let memStore = {}, memSound = false;
+const store = {
+  load(){ try{ const v = JSON.parse(localStorage.getItem(KEY)); return v && typeof v === "object" ? v : memStore; }catch(e){ return memStore; } },
+  save(v){ memStore = v; try{ localStorage.setItem(KEY, JSON.stringify(v)); }catch(e){} }
+};
+function rec(pid){ const d = store.load(); return d[pid] || {clean:false, solved:0, misses:0, hints:0, needOther:0}; }
+function setRec(pid, r){ const d = store.load(); d[pid] = r; store.save(d); }
+function bump(pid, field){ const r = rec(pid); r[field] = (r[field]||0) + 1; setRec(pid, r); }
+/* 間違い・ヒント・答えを見た問題は、ほかの問題を解くまで、★を付けない（n問）。 */
+function spoil(pid, n){ const r = rec(pid); r.needOther = Math.max(r.needOther||0, n); setRec(pid, r); }
+
+let assist = true;
+try{ assist = localStorage.getItem("tsume-kakugen-assist") !== "0"; }catch(e){}
+function setAssist(v){ assist = v; try{ localStorage.setItem("tsume-kakugen-assist", v ? "1" : "0"); }catch(e){} }
+function storageOK(){ try{ const k = KEY+"-t"; localStorage.setItem(k,"1"); localStorage.removeItem(k); return true; }catch(e){ return false; } }
+/* ===== 効果音（初期設定はオフ。Web Audio で生成するので外部ファイル不要） ===== */
+const sound = {
+  on:(()=>{ try{ return localStorage.getItem(SKEY) === "1"; }catch(e){ return false; } })(), ctx:null,
+  set(v){ this.on = v; memSound = v; try{ localStorage.setItem(SKEY, v ? "1" : "0"); }catch(e){} },
+  tone(freq, t0, dur, type, vol){
+    if(!this.on) return;
+    try{
+      this.ctx = this.ctx || new (window.AudioContext || window.webkitAudioContext)();
+      const c = this.ctx, o = c.createOscillator(), g = c.createGain();
+      o.type = type || "sine"; o.frequency.value = freq;
+      const t = c.currentTime + t0;
+      g.gain.setValueAtTime(0.0001, t); g.gain.exponentialRampToValueAtTime(vol || 0.15, t + 0.02);
+      g.gain.exponentialRampToValueAtTime(0.0001, t + dur);
+      o.connect(g); g.connect(c.destination); o.start(t); o.stop(t + dur + 0.05);
+    }catch(e){}
+  },
+  tick(){ this.tone(660, 0, .06, "triangle", .08); },
+  good(){ this.tone(523,0,.14,"triangle"); this.tone(659,.1,.14,"triangle"); },
+  win(){ [523,659,784,1047].forEach((f,i) => this.tone(f, i*.11, .3, "triangle", .18)); },
+  bad(){ this.tone(180,0,.22,"sawtooth",.1); }
+};
+
+/* ===== 盤面の状態 ===== */
+function initState(p){
+  const cells = {};
+  for(const [f,r,ch] of p.board){
+    const promoted = ch.startsWith("+");
+    const base = promoted ? ch[1] : ch;
+    const white = base === base.toLowerCase();
+    cells[f+","+r] = {p:(promoted?"+":"")+base.toUpperCase(), c:white?1:0};
+  }
+  return {cells, hands:[Object.assign({},p.hand),{}], turn:0, last:null};
+}
+function clone(s){ return {cells:Object.assign({},s.cells), hands:[Object.assign({},s.hands[0]),Object.assign({},s.hands[1])], turn:s.turn, last:s.last}; }
+function parseSq(t){ return [parseInt(t[0],10), RL.indexOf(t[1])]; }
+function applyMove(st, usi){
+  const s = clone(st), me = st.turn;
+  let to;
+  if(usi[1] === "*"){
+    to = parseSq(usi.slice(2,4));
+    s.cells[to[0]+","+to[1]] = {p:usi[0], c:me};
+    s.hands[me][usi[0]] = (s.hands[me][usi[0]]||0) - 1;
+    if(s.hands[me][usi[0]] <= 0) delete s.hands[me][usi[0]];
+  } else {
+    const from = parseSq(usi.slice(0,2)); to = parseSq(usi.slice(2,4));
+    const fk = from[0]+","+from[1], tk = to[0]+","+to[1];
+    const pc = s.cells[fk], cap = s.cells[tk];
+    if(cap){
+      const base = cap.p.replace("+","");
+      if(base !== "K") s.hands[me][base] = (s.hands[me][base]||0) + 1;
+    }
+    delete s.cells[fk];
+    s.cells[tk] = {p: usi.endsWith("+") ? "+"+pc.p : pc.p, c:pc.c};
+  }
+  s.turn = 1 - me; s.last = to[0]+","+to[1];
+  return s;
+}
+
+/* ===== 駒の絵 ===== */
+function pieceSVG(p, c){
+  const promoted = p.startsWith("+");
+  const g = GLYPH[p] || "?";
+  const rot = c === 1 ? ' transform="rotate(180 20 22)"' : "";
+  return '<svg viewBox="0 0 40 44" aria-hidden="true"><g'+rot+'>'+
+    '<polygon points="20,2.5 34.5,10 37.5,41.5 2.5,41.5 5.5,10" fill="url(#pg)" stroke="var(--piece-line)" stroke-width="1.5" stroke-linejoin="round"/>'+
+    '<polygon points="20,5.5 32,11.5 34.6,38.8 5.4,38.8 8,11.5" fill="none" stroke="rgba(255,255,255,.55)" stroke-width=".8" stroke-linejoin="round"/>'+
+    '<text x="20" y="31" text-anchor="middle" font-size="24" font-weight="900" font-family="\'Yu Mincho\',\'Hiragino Mincho ProN\',\'Noto Serif JP\',serif" fill="'+
+    (promoted ? "var(--promo)" : "#1d1a15")+'">'+g+'</text></g></svg>';
+}
+
+/* ===== 画面状態 ===== */
+const $app = document.getElementById("app");
+const $top = document.querySelector(".topline"), $wrap = document.querySelector(".wrap");
+function dockSettings(where){
+  if(where === "top"){ $wrap.insertBefore($top, $app); $top.classList.remove("bottom"); }
+  else { $app.appendChild($top); $top.classList.add("bottom"); }
+}
+const S = {view:"home", catId:null, prob:null, node:null, st:null, sel:null, promo:null,
+  hint:0, missed:false, done:false, revealed:false, pending:null, msg:null, busy:false, showExpl:false, timer:null, combo:0, bestCombo:0};
+const WEEK = 7 * 24 * 3600 * 1000;
+const probsOf = id => id === "old" ? PROBLEMS.filter(p => { const r = rec(p.id); return r.clean && r.cleanAt && Date.now() - r.cleanAt > WEEK; }) : id === "weak" ? PROBLEMS.filter(p => { const r = rec(p.id); return (r.misses > 0 || r.hints > 0) && !r.clean; }) : PROBLEMS.filter(p => p.cat === id);
+const esc = s => String(s).replace(/[&<>"]/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c]));
+const catOf = id => CATS.find(c => c.id === id);
+
+function catStats(id){
+  const ps = probsOf(id); let clean = 0, tried = 0;
+  for(const p of ps){ const r = rec(p.id); if(r.clean) clean++; if(r.solved>0||r.misses>0) tried++; }
+  return {total:ps.length, clean, tried};
+}
+function totalClean(){ return PROBLEMS.filter(p => rec(p.id).clean).length; }
+function rankInfo(){
+  const total = PROBLEMS.length, clean = totalClean();
+  const lv = total ? Math.min(RANKS.length - 1, Math.floor(clean * RANKS.length / total)) : 0;
+  const maxed = clean >= total && total > 0;
+  const level = maxed ? RANKS.length - 1 : lv;
+  const need = maxed ? 0 : Math.ceil((level + 1) * total / RANKS.length) - clean;
+  const lo = Math.ceil(level * total / RANKS.length), hi = Math.ceil((level + 1) * total / RANKS.length);
+  const pct = maxed ? 100 : hi > lo ? Math.round(100 * (clean - lo) / (hi - lo)) : 0;
+  return {level, clean, total, need, pct, maxed};
+}
+function starsHTML(ps){
+  const pure = ps.filter(p => rec(p.id).pure).length, cl = ps.filter(p => rec(p.id).clean).length;
+  return '<span class="stars" role="img" aria-label="'+cl+'問がヒントなし・ノーミスで正解済み（うち'+pure+'問は王手のしるしなし）、全'+ps.length+'問">'+
+    ps.map(p => { const r = rec(p.id); return r.clean ? '<b class="'+(r.pure?"st-clean":"st-assist")+'">★</b>' : (r.solved > 0 ? '<b class="st-done">☆</b>' : '<b class="st-new">·</b>'); }).join("")+'</span>';
+}
+
+/* ===== ホーム ===== */
+function renderHome(){
+  S.view = "home"; clearTimeout(S.timer); closeOverlay(); dockSettings("top");
+  const weak = probsOf("weak").length, old = probsOf("old").length, ri = rankInfo();
+  let h = '<div class="hero"><h1 class="logo">詰将棋</h1><p class="catch">格言特訓道場</p>'+
+    '<p class="lead">格言（詰め方の型）を選んで、その型だけを繰り返し解こう。<br>先手（あなた）の王手だけで玉を詰ませます。</p></div>';
+  h += '<div class="rank"><div class="medal">'+pieceSVG(["P","L","N","S","G","B","R","K"][ri.level], 0)+'</div><div style="flex:1;min-width:0">'+
+    '<div class="rt">いまの称号</div><div class="rn">'+RANKS[ri.level][1]+'</div>'+
+    '<div class="xp" role="progressbar" aria-valuemin="0" aria-valuemax="100" aria-valuenow="'+ri.pct+'" aria-label="次の称号までの進み具合"><i style="width:'+ri.pct+'%"></i></div>'+
+    '<div class="rs">'+(ri.maxed ? "全問をヒントなし・ノーミスで正解！ 最高の称号です。" : "次の称号まで、あと "+ri.need+" 問（ヒントなし・ノーミスの正解）")+'</div></div></div>';
+  let no = 0;
+  for(const [gid, title] of [["form","金の詰み形"],["proverb","格言"]]){
+    h += '<h2>'+title+'</h2>';
+    for(const c of CATS.filter(c => c.group === gid)){
+      no++;
+      const ps = probsOf(c.id), st = catStats(c.id);
+      const label = st.total === 0 ? "準備中" : st.clean === st.total ? "マスター済み" : (st.tried ? "特訓中" : "未挑戦");
+      h += '<button class="dojo" data-cat="'+c.id+'"'+(st.total?'':' disabled')+'>'+
+        '<span class="icon">'+pieceSVG(c.icon,0)+'</span><span class="body">'+
+        '<span class="no" style="display:block">第'+KAN[no]+'道場'+'</span>'+
+        '<span class="name" style="display:block">'+esc(c.name)+'<span class="badge">'+esc(c.kind)+'</span></span>'+
+        '<span class="blurb" style="display:block">'+esc(c.blurb)+'</span>'+
+        (st.total ? starsHTML(ps) : '')+
+        '<span class="stat" style="display:block">'+label+'　ヒントなし・ノーミスの正解 <span class="nw">'+st.clean+' / '+st.total+'</span></span></span></button>';
+    }
+  }
+  h += '<p class="small">★の色： 金＝王手のしるしなしで達成 ／ 銀＝しるしありで達成 ／ ☆＝解いたが、ヒントやまちがいあり</p>';
+  h += '<h2>復習</h2>';
+  h += weak ? '<p><button class="btn primary" id="weakBtn">まちがえた問題を解く（'+weak+'問）</button></p>'
+            : '<p class="small">まちがえた問題やヒントを使った問題がたまると、ここから復習できます。</p>';
+  if(old) h += '<p><button class="btn" id="oldBtn">ひさしぶりの復習（★から1週間以上たった '+old+'問）</button></p>';
+  h += '<p style="margin-top:24px"><button class="btn ghost" id="resetBtn">学習の記録を消す</button></p>';
+  if(!storageOK()) h += '<p class="small">この端末（ブラウザ）では記録を保存できません。ページを閉じると記録は消えます。</p>';
+  $app.innerHTML = h;
+  document.querySelectorAll(".dojo[data-cat]").forEach(b => b.addEventListener("click", () => { sound.tick(); startCat(b.dataset.cat); }));
+  const wb = document.getElementById("weakBtn"); if(wb) wb.addEventListener("click", () => startCat("weak"));
+  const ob = document.getElementById("oldBtn"); if(ob) ob.addEventListener("click", () => startCat("old"));
+  document.getElementById("resetBtn").addEventListener("click", () => {
+    if(window.confirm("学習の記録をすべて消します。よろしいですか？")){ store.save({}); renderHome(); }
+  });
+}
+
+/* ===== 出題 ===== */
+function startCat(id){ S.catId = id; S.combo = 0; loadProblem(pickNext(id, null)); }
+function pickNext(id, currentId){
+  const ps = probsOf(id); if(!ps.length) return null;
+  const idx = currentId ? ps.findIndex(p => p.id === currentId) : -1;
+  for(let i = 1; i <= ps.length; i++){
+    const p = ps[(idx + i) % ps.length];
+    if(!rec(p.id).clean && p.id !== currentId) return p;
+  }
+  return ps[(idx + 1) % ps.length];
+}
+function loadProblem(p){
+  if(!p){ renderHome(); return; }
+  clearTimeout(S.timer); closeOverlay();
+  S.prob = p; S.node = p.root; S.st = initState(p); S.crop = computeCrop(p, S.st); S.fc = null; S.sel = null; S.promo = null; S.hint = 0;
+  S.missed = false; S.missRec = false; S.done = false; S.revealed = false; S.replayed = false; S.master = null; S.spoilBlocked = false;
+  S.pending = null; S.busy = false; S.showExpl = false;
+  S.msg = {kind:"info", title:"あなたは先手です。", body:"王手だけで、"+p.moves+"手で詰ませてください。"+(assist ? "駒をタップすると、王手になるマスに印が出ます。" : "")};
+  S.view = "train"; renderTrain();
+  window.scrollTo(0, 0);
+  const first = document.querySelector(".hp") || document.querySelector(".cell svg") && document.querySelector(".cell svg").parentElement;
+  if(first) first.focus({preventScroll:true});
+}
+
+/* ===== 焦点（フォーカス）の保持：再描画のあとも同じ場所に戻す ===== */
+function focusKey(){
+  const a = document.activeElement;
+  if(!a || a === document.body) return null;
+  if(a.id) return "#"+a.id;
+  if(a.dataset && a.dataset.f !== undefined) return '.cell[data-f="'+a.dataset.f+'"][data-r="'+a.dataset.r+'"]';
+  if(a.dataset && a.dataset.hand) return '.hp[data-hand="'+a.dataset.hand+'"]';
+  if(a.dataset && a.dataset.promo) return '[data-promo="'+a.dataset.promo+'"]';
+  if(a.dataset && a.dataset.cat) return '.dojo[data-cat="'+a.dataset.cat+'"]';
+  return null;
+}
+function restoreFocus(key){
+  if(!key) return;
+  const el = document.querySelector(key);
+  if(el && !el.disabled) el.focus({preventScroll:true});
+}
+/* ===== 対局画面 ===== */
+/* 盤の表示範囲は、問題ごとに1回だけ決める（途中で大きさが変わらないように）。
+   初期の駒と、正解の手順が通るマスを必ず含める。 */
+function pathSquares(node, out){
+  for(const u in node){
+    const e = node[u]; if(e.t !== "ok") continue;
+    if(u[1] === "*") out.push(parseSq(u.slice(2,4))); else { out.push(parseSq(u.slice(0,2))); out.push(parseSq(u.slice(2,4))); }
+    if(e.rep) for(const r of e.rep){ out.push(parseSq(r.u.slice(0,2))); out.push(parseSq(r.u.slice(2,4))); pathSquares(r.next, out); }
+  }
+}
+function computeCrop(p, st){
+  const sq = []; pathSquares(p.root, sq);
+  for(const k in st.cells){ const [f,r] = k.split(",").map(Number); sq.push([f,r]); }
+  let lo = 9, hi = 1, mr = 4;
+  for(const [f,r] of sq){ lo = Math.min(lo, f); hi = Math.max(hi, f); mr = Math.max(mr, r); }
+  let left = Math.min(9, hi + 1), right = Math.max(1, lo - 1);
+  while(left - right + 1 < 6 && !(left === 9 && right === 1)){
+    if(left < 9) left++;
+    if(left - right + 1 < 6 && right > 1) right--;
+  }
+  return {left, right, n: left - right + 1, rows: Math.min(9, mr + 2)};
+}
+function visibleRows(){ return S.crop.rows; }
+function visibleCols(){ return S.crop; }
+function legalTargets(){
+  const set = new Map();
+  if(!S.sel || S.done || S.pending) return set;
+  for(const u in S.node){
+    const t = S.node[u].t;
+    if(assist && t !== "ok" && t !== "fail") continue;   // しるしあり: 王手になる手だけを指せる。しるしなし: すべての合法手を指せて、王手でない手は注意される
+    const dest = parseSq(u.slice(2,4));
+    if(dest[0] > S.crop.left || dest[0] < S.crop.right || dest[1] >= S.crop.rows) continue;
+    if(S.sel.type === "hand"){
+      if(u[0] === S.sel.p && u[1] === "*") set.set(u.slice(2,4), true);
+    } else if(u[1] !== "*"){
+      if(u.slice(0,2) === S.sel.f+RL[S.sel.r]) set.set(u.slice(2,4), true);
+    }
+  }
+  return set;
+}
+function firstOk(node){ for(const u in node){ if(node[u].t === "ok") return u; } return null; }
+
+function renderTrain(){
+  const fk = focusKey();
+  const p = S.prob, cat = catOf(p.cat), rows = visibleRows(), vc = visibleCols();
+  // 盤のキーボード移動の入口（Tab が止まるマスは1つだけ。移動は矢印キー）
+  if(!S.fc || !(S.fc.split(",")[0] <= vc.left && S.fc.split(",")[0] >= vc.right && +S.fc.split(",")[1] < rows)){
+    let first = null;
+    for(let r = 0; r < rows && !first; r++) for(let fi = vc.left; fi >= vc.right; fi--){ const c = S.st.cells[fi+","+r]; if(c && c.c === 0){ first = fi+","+r; break; } }
+    S.fc = first || (vc.left+",0");
+  }
+  const targets = assist ? legalTargets() : new Map();
+  const hintU = S.hint >= 3 ? firstOk(S.node) : null;
+  const ps = probsOf(S.catId);
+  let h = '<div class="trainwrap"><div class="hud"><button class="btn ghost" id="backBtn" style="min-height:44px;padding:4px 12px" aria-label="道場の一覧にもどる">← 一覧</button>'+
+    '<div class="title">'+esc((S.catId==="weak"||S.catId==="old") ? "復習："+cat.name : cat.name)+'</div>'+
+    (S.combo >= 2 ? '<span class="pill combo">連続 '+S.combo+'</span>' : '')+
+    '<span class="pill">'+p.moves+'手詰</span></div>';
+  const qi = ps.findIndex(q => q.id === p.id), qs = ps.map(q => { const r = rec(q.id); return r.clean ? "★" : (r.solved > 0 ? "☆" : "·"); }).join("");
+  h += '<div class="qnav"><button class="btn" id="qPrev" aria-label="前の問題"'+(S.busy?" disabled":"")+'>‹</button>'+
+    '<div class="lab">'+(qi>=0 ? '第'+(qi+1)+'問 / '+ps.length : '復習中（残り '+ps.length+'問）')+'　<span class="pill">'+((S.catId==="weak"||S.catId==="old") ? "復習" : "難易度：" + LEVELS[p.level||1])+'</span><div class="small" aria-label="各問題の結果">'+qs+'</div></div>'+
+    '<button class="btn" id="qNext" aria-label="次の問題"'+(S.busy?" disabled":"")+'>›</button></div>';
+  h += '<div class="pl-a">';
+  h += '<div class="side"><span><b>玉方</b>（さかさまの駒）の持駒：残り全部</span></div>';
+  h += '<div class="boardwrap" style="--cols:'+vc.n+';--rows:'+rows+'"><div><div class="files" style="grid-template-columns:repeat('+vc.n+',1fr)" aria-hidden="true">'+Array.from({length:vc.n}, (_,i) => '<span>'+ZEN[vc.left-i]+'</span>').join("")+'</div>';
+  h += '<div class="boardbox"><div class="board'+(S.shake?" shake":"")+'" style="grid-template-columns:repeat('+vc.n+',1fr)" role="group" aria-label="将棋盤">';
+  for(let r = 0; r < rows; r++){
+    for(let fi = vc.left; fi >= vc.right; fi--){
+      const key = fi+","+r, pc = S.st.cells[key], tk = fi+RL[r];
+      const cls = ["cell"];
+      if(S.sel && S.sel.type === "board" && S.sel.f === fi && S.sel.r === r) cls.push("sel");
+      if(targets.has(tk)){ cls.push("target"); if(pc) cls.push("occ"); }
+      if(S.st.last === key) cls.push("last");
+      if(hintU && hintU.slice(2,4) === tk) cls.push("hintcell");
+      const lab = ZEN[fi]+KAN[r+1]+(pc ? "の"+(pc.c?"玉方の":"攻方の")+PJA[pc.p] : "の空きマス");
+      h += '<button class="'+cls.join(" ")+'" data-f="'+fi+'" data-r="'+r+'" tabindex="'+(key === S.fc ? 0 : -1)+'" aria-label="'+lab+'">'+(pc ? pieceSVG(pc.p, pc.c) : "")+'</button>';
+    }
+  }
+  // 星（盤の目印の点）
+  for(const cb of [3,6]) for(const rb of [3,6]){
+    const x = (cb - (9 - vc.left)) / vc.n;
+    if(rb < rows && x > 0 && x < 1) h += '<i class="star" style="left:'+(x*100)+'%;top:'+(rb/rows*100)+'%"></i>';
+  }
+  h += '</div></div></div><div class="ranks" style="grid-template-rows:auto repeat('+rows+',1fr)" aria-hidden="true"><span></span>'+
+    Array.from({length:rows}, (_,i) => '<span>'+KAN[i+1]+'</span>').join("")+'</div></div>';
+  S.shake = false;
+  if(S.promo){
+    h += '<div class="promo" role="group" aria-label="成るか成らないか"><span>成りますか？</span>'+
+      '<button class="btn primary" data-promo="1">成る</button><button class="btn" data-promo="0">成らない</button></div>';
+  }
+  { const m = S.msg;
+    h += '<div class="msg '+(m.kind==="ok"?"ok":m.kind==="ng"?"ng":"")+'" role="status" aria-live="polite"><strong>'+esc(m.title)+'</strong>'+(m.body?esc(m.body):"")+'</div>'; }
+  // 持駒
+  const hand = S.st.hands[0], hk = HAND_ORDER.filter(k => hand[k] > 0);
+  h += '<div class="side"><span><b>あなた（先手）</b>の持駒</span></div><div class="stand"><div class="hand" role="group" aria-label="あなたの持駒">';
+  if(!hk.length) h += '<span class="none">なし</span>';
+  for(const k of hk){
+    const sel = S.sel && S.sel.type === "hand" && S.sel.p === k;
+    h += '<button class="hp'+(sel?" sel":"")+'" data-hand="'+k+'" aria-label="持駒の'+PJA[k]+(hand[k]>1?"、"+hand[k]+"枚":"")+'">'+pieceSVG(k,0)+(hand[k]>1?'<span class="n">'+hand[k]+'</span>':"")+'</button>';
+  }
+  h += '</div></div>';
+  h += '</div><div class="pl-b">';
+  h += '<div class="row">';
+  if(S.pending) h += '<button class="btn primary" id="undoBtn">戻して考え直す</button>';
+  if(!S.done){
+    h += '<button class="btn" id="hintBtn"'+((S.hint>=3||S.busy||S.pending)?" disabled":"")+'>ヒント（'+S.hint+'/3）</button>';
+    h += '<button class="btn ghost" id="giveBtn"'+((S.busy||S.pending)?" disabled":"")+'>答えを見る</button>';
+  } else {
+    h += '<button class="btn primary" id="nextBtn">次の問題へ</button>';
+    h += '<button class="btn" id="replayBtn">手順を再生</button>';
+    h += '<button class="btn ghost" id="retryBtn">もう一度解く</button>';
+  }
+  h += '</div>';
+  if(S.showExpl) h += explHTML(p, cat);
+  const cs = catStats(S.catId);
+  h += '<p class="small" style="margin-top:14px">'+esc((S.catId==="weak"||S.catId==="old")?"復習":cat.name)+'：ヒントなし・ノーミスの正解 <span class="nw">'+cs.clean+' / '+cs.total+'</span></p>';
+  h += '</div></div>';
+  dockSettings("top");            // いったん外に出してから、描き直す
+  $app.innerHTML = h;
+  dockSettings("bottom");
+  bindTrain();
+  restoreFocus(fk);
+  const need = S.pending ? document.getElementById("undoBtn") : (S.done ? document.getElementById("nextBtn") : null);
+  if(need){ need.scrollIntoView({block:"nearest", behavior:"auto"}); if(S.pending) need.focus({preventScroll:true}); }
+}
+
+function explHTML(p, cat){
+  let h = '<div class="card expl" style="margin-top:12px"><h3 style="margin-top:0">解説</h3>';
+  h += '<p class="line"><b>正解の手順：</b>'+esc(p.main.join(" "))+'</p>';
+  h += '<p>'+esc(p.why)+'</p>';
+  { const r = rec(p.id); h += '<p class="small">この問題の成績：正解 '+(r.solved||0)+' 回／まちがい '+(r.misses||0)+' 回／ヒント '+(r.hints||0)+' 回</p>'; }
+  if(p.vars.length){
+    h += '<p class="small" style="margin-bottom:0">玉方が別の応じ方をした場合：</p><ul>'+p.vars.map(v => '<li>'+esc(v.join(" "))+'</li>').join("")+'</ul>';
+  }
+  if(p.misses.length){
+    h += '<h3>'+(p.cat==="kin_todome" ? "金を先に打つと、こうなります" : "ありがちな不正解")+'</h3><ul>'+p.misses.map(l => '<li>'+esc(l)+'</li>').join("")+'</ul>';
+  }
+  for(const sec of p.secs){
+    h += '<h3>'+esc(sec.h)+'</h3><ul>'+sec.lines.map(l => '<li>'+esc(l.t)+'</li>').join("")+'</ul>';
+  }
+  h += '<h3>この型のこころ（'+esc(cat.name)+'）</h3><p>'+esc(cat.reason)+'</p>';
+  h += '<h3>確かめること</h3><ul>'+cat.check.map(l => '<li>'+esc(l)+'</li>').join("")+'</ul>';
+  h += '<p class="small">※ 逃げ道の確認は、探索プログラムで確かめた内容です。</p></div>';
+  return h;
+}
+
+function setMsg(kind, title, body){ S.msg = {kind, title, body: body || ""}; }
+
+function bindTrain(){
+  document.getElementById("backBtn").addEventListener("click", () => { clearTimeout(S.timer); renderHome(); });
+  const jump = d => { if(S.busy) return; const ps = probsOf(S.catId), i = ps.findIndex(q => q.id === S.prob.id); loadProblem(ps[(i + d + ps.length) % ps.length]); };
+  document.getElementById("qPrev").addEventListener("click", () => jump(-1));
+  document.getElementById("qNext").addEventListener("click", () => jump(1));
+  document.querySelectorAll(".cell").forEach(b => {
+    b.addEventListener("click", () => { S.fc = b.dataset.f+","+b.dataset.r; onCell(+b.dataset.f, +b.dataset.r); });
+    b.addEventListener("focus", () => { S.fc = b.dataset.f+","+b.dataset.r; document.querySelectorAll(".cell").forEach(c => c.tabIndex = (c === b) ? 0 : -1); });
+  });
+  const brd = document.querySelector(".board");
+  if(brd) brd.addEventListener("keydown", ev => {
+    const t = ev.target.closest && ev.target.closest(".cell"); if(!t) return;
+    const f = +t.dataset.f, r = +t.dataset.r, vc = S.crop;
+    const d = {ArrowLeft:[1,0], ArrowRight:[-1,0], ArrowUp:[0,-1], ArrowDown:[0,1]}[ev.key];
+    if(!d) return;
+    ev.preventDefault();
+    const nf = f + d[0], nr = r + d[1];
+    if(nf > vc.left || nf < vc.right || nr < 0 || nr >= vc.rows) return;
+    const nx = document.querySelector('.cell[data-f="'+nf+'"][data-r="'+nr+'"]'); if(nx) nx.focus();
+  });
+  document.querySelectorAll(".hp").forEach(b => b.addEventListener("click", () => onHand(b.dataset.hand)));
+  document.querySelectorAll("[data-promo]").forEach(b => b.addEventListener("click", () => finishPromo(b.dataset.promo === "1")));
+  const q = id => document.getElementById(id);
+  if(q("hintBtn")) q("hintBtn").addEventListener("click", onHint);
+  if(q("giveBtn")) q("giveBtn").addEventListener("click", onGiveUp);
+  if(q("undoBtn")) q("undoBtn").addEventListener("click", onUndo);
+  if(q("nextBtn")) q("nextBtn").addEventListener("click", () => loadProblem(pickNext(S.catId, S.prob.id)));
+  if(q("replayBtn")) q("replayBtn").addEventListener("click", replay);
+  if(q("retryBtn")) q("retryBtn").addEventListener("click", () => loadProblem(S.prob));
+}
+
+/* ===== 操作 ===== */
+function onHand(k){
+  if(S.done || S.pending || S.busy) return;
+  S.promo = null; sound.tick();
+  S.sel = (S.sel && S.sel.type === "hand" && S.sel.p === k) ? null : {type:"hand", p:k};
+  selectMsg(); renderTrain();
+}
+function onCell(f, r){
+  if(S.done || S.pending || S.busy) return;
+  const key = f+","+r, pc = S.st.cells[key], tk = f+RL[r];
+  if(S.sel){
+    const t = legalTargets();
+    if(t.has(tk)){ attempt(S.sel, tk); return; }
+  }
+  S.promo = null;
+  if(pc && pc.c === 0){
+    sound.tick();
+    S.sel = (S.sel && S.sel.type === "board" && S.sel.f === f && S.sel.r === r) ? null : {type:"board", f, r};
+    selectMsg(); renderTrain(); return;
+  }
+  if(S.sel){
+    setMsg("info", "そこには動かせません。", assist ? "印が付いたマス（王手になる場所）から選んでください。" : "選んだ駒が動けるマスを選んでください。");
+    sound.bad(); renderTrain(); return;
+  }
+  setMsg("info", "動かしたい駒を選んでください。", "盤上の自分の駒か、持駒をタップします。");
+  renderTrain();
+}
+function selectMsg(){
+  if(!S.sel){ setMsg("info", "動かしたい駒を選んでください。", "盤上の自分の駒か、持駒をタップします。"); return; }
+  if(legalTargets().size === 0) setMsg("info", "この駒では、王手をかけられません。", "ほかの駒を選んでください。");
+  else setMsg("info", "どこに動かしますか？", assist ? "印が付いたマスが、王手になる場所です。" : "王手になるマスを、自分で考えて選んでください。");
+}
+function candidates(sel, tk){
+  const base = sel.type === "hand" ? sel.p+"*"+tk : sel.f+RL[sel.r]+tk;
+  return sel.type === "hand" ? [base] : [base, base+"+"].filter(u => S.node[u]);
+}
+function attempt(sel, tk){
+  const c = candidates(sel, tk);
+  if(c.length === 2){ S.promo = c; renderTrain(); return; }
+  play(c[0]);
+}
+function finishPromo(yes){ const c = S.promo; S.promo = null; play(yes ? c[1] : c[0]); }
+function miss(){
+  S.missed = true; S.combo = 0; S.shake = true; sound.bad();
+  if(!S.missRec){
+    S.missRec = true;
+    const r = rec(S.prob.id); r.misses = (r.misses||0) + 1; r.needOther = Math.max(r.needOther||0, 1);
+    if(r.clean){ r.clean = false; r.pure = false; }      // ★の問題でも、間違えたら★は外れる
+    setRec(S.prob.id, r);
+  }
+}
+
+function play(usi){
+  const e = S.node[usi];
+  S.sel = null; S.promo = null;
+  if(!e) return;
+  if(e.t === "nocheck"){
+    miss(); setMsg("ng", "王手になっていません。", "詰将棋では、毎回王手をかけます。別の手を考えよう。");
+    renderTrain(); return;
+  }
+  if(e.t === "uchifu"){
+    miss(); setMsg("ng", "打ち歩詰めは反則です。", "歩を打って詰ませることはできません。");
+    renderTrain(); return;
+  }
+  const before = S.st;
+  S.st = applyMove(S.st, usi);
+  if(e.t === "fail"){
+    miss(); S.pending = before;
+    if(e.esc) S.st = applyMove(S.st, e.esc);
+    setMsg("ng", "王手ですが、詰みません。", e.n + " には " + (e.et || "") + " と" + (e.aigoma ? "合駒（王手をさえぎるために間へ駒を打つこと）で" : "") + "逃げられます。「戻して考え直す」を押してください。");
+    renderTrain(); return;
+  }
+  if(e.mate){
+    S.done = true; S.showExpl = true;
+    onSolved();
+    renderTrain(); celebrate(); return;
+  }
+  const rep = e.rep[0];
+  S.busy = true; sound.good();
+  setMsg("ok", "正解。"+e.n, "玉方は "+rep.rt+" と応じました。続けて、詰ませてください。");
+  renderTrain();
+  S.timer = setTimeout(() => {
+    S.st = applyMove(S.st, rep.u); S.node = rep.next; S.busy = false; renderTrain();
+  }, 700);
+}
+function onSolved(){
+  const d = store.load();
+  const r = d[S.prob.id] || {clean:false, solved:0, misses:0, hints:0, needOther:0};
+  const noMiss = !S.missed && S.hint === 0 && !S.revealed && !S.replayed;
+  const blocked = noMiss && (r.needOther||0) > 0;       // 答えを見た直後は★を付けない
+  const wasClean = !!r.clean;
+  r.solved = (r.solved||0) + 1;
+  const star = noMiss && !blocked;
+  // ほかの問題のロック解除は、「ヒントなし・ノーミスで正解した別の問題」があったときだけ進む（答えを見た問題どうしで解除し合えない）
+  if(star){ for(const pid in d){ if(pid !== S.prob.id && d[pid] && d[pid].needOther > 0) d[pid].needOther--; } }
+  if(star){ r.clean = true; r.cleanAt = Date.now(); r.needOther = 0; if(!assist) r.pure = true; }   // 王手のしるしなしで達成した★は、金の★として記録
+  d[S.prob.id] = r; store.save(d);
+  S.lastClean = star; S.spoilBlocked = blocked;
+  if(star){ S.combo++; S.bestCombo = Math.max(S.bestCombo, S.combo); } else { S.combo = 0; }
+  if(star && !wasClean && S.catId !== "weak" && S.catId !== "old"){ const st = catStats(S.catId); if(st.total && st.clean === st.total) S.master = catOf(S.prob.cat).name; }
+  const note = star ? "ヒントなし・ノーミスで解けました。" :
+    blocked ? "まちがい・ヒント・答えのあとなので、★はまだ付きません。ほかの問題を解いてから、もう一度挑戦しよう。" :
+    "まちがいやヒントがあったので、あとでもう一度挑戦しよう。";
+  setMsg("ok", "詰みです。正解！", note);
+}
+function onUndo(){
+  S.st = S.pending; S.pending = null;
+  setMsg("info", "もう一度考えてみましょう。", "");
+  renderTrain();
+}
+function onHint(){
+  if(S.hint >= 3 || S.done || S.pending) return;
+  S.hint++; S.combo = 0; sound.tick();
+  if(S.hint === 1) bump(S.prob.id, "hints");
+  { const r0 = rec(S.prob.id); if(r0.clean || r0.pure){ r0.clean = false; r0.pure = false; setRec(S.prob.id, r0); } }   // ヒントを使ったら★は外れる
+  spoil(S.prob.id, S.hint >= 2 ? 2 : 1);
+  const cat = catOf(S.prob.cat), u = firstOk(S.node);
+  if(S.hint === 1){
+    setMsg("info", "ヒント1：格言", cat.hint);
+  } else if(S.hint === 2){
+    const pt = u[1] === "*" ? u[0] : S.st.cells[parseSq(u.slice(0,2)).join(",")].p;
+    setMsg("info", "ヒント2：使う駒", "この一手で動かす（打つ）駒は「"+PJA[pt]+"」です。");
+  } else {
+    S.sel = u[1] === "*" ? {type:"hand", p:u[0]} : (() => { const [f,r] = parseSq(u.slice(0,2)); return {type:"board", f, r}; })();
+    setMsg("info", "ヒント3：場所", "選んだ駒を、点線で囲んだマスへ動かします。");
+  }
+  renderTrain();
+}
+function onGiveUp(){
+  if(S.done || S.pending) return;
+  S.revealed = true; S.done = true; S.showExpl = true; S.sel = null; S.combo = 0;
+  if(!S.missRec){ S.missRec = true; bump(S.prob.id, "misses"); }
+  { const r0 = rec(S.prob.id); if(r0.clean || r0.pure){ r0.clean = false; r0.pure = false; setRec(S.prob.id, r0); } }
+  spoil(S.prob.id, 2);
+  setMsg("info", "答えを見ました。", "「手順を再生」で盤面の動きを確かめてから、もう一度解いてみましょう。");
+  renderTrain();
+}
+function replay(){
+  if(S.busy) return;
+  clearTimeout(S.timer);
+  S.replayed = true; if(!S.done) spoil(S.prob.id, 2);
+  S.busy = true; S.st = initState(S.prob); let node = S.prob.root; S.sel = null;
+  renderTrain();
+  const step = () => {
+    const u = firstOk(node); if(!u){ S.busy = false; renderTrain(); return; }
+    const e = node[u];
+    S.st = applyMove(S.st, u);
+    setMsg("info", e.n, "");
+    renderTrain();
+    if(e.mate){ S.busy = false; setMsg("ok", "詰み。", ""); renderTrain(); return; }
+    S.timer = setTimeout(() => {
+      const rep = e.rep[0]; S.st = applyMove(S.st, rep.u); setMsg("info", rep.rt, ""); renderTrain();
+      node = rep.next; S.timer = setTimeout(step, 900);
+    }, 900);
+  };
+  S.timer = setTimeout(step, 400);
+}
+
+/* ===== 演出 ===== */
+function closeOverlay(){
+  document.querySelectorAll(".overlay,.conf").forEach(n => n.remove());
+}
+function celebrate(){
+  closeOverlay(); sound.win();
+  const clean = S.lastClean, ri = rankInfo();
+  const ov = document.createElement("div");
+  ov.className = "overlay"; ov.setAttribute("role","dialog"); ov.setAttribute("aria-label","正解");
+  ov.innerHTML = '<div class="sheet"><div class="big">詰み！</div><div class="rate" role="img" aria-label="'+(clean?"星1つ":"星なし")+'">'+(clean?"★":"☆")+'</div>'+
+    '<div class="sub">'+(clean ? "ヒントなし・ノーミスで正解！" : (S.spoilBlocked ? "正解！（★は、ほかの問題を解いてから）" : "正解！（次はヒントなしをめざそう）"))+(S.combo>=2 ? "　連続 "+S.combo : "")+'</div>'+
+    (S.master ? '<div class="sub" style="color:var(--gold);font-weight:800;font-family:var(--serif);font-size:1.15rem">「'+esc(S.master)+'」道場をマスターしました！</div>' : '')+
+    '<p style="margin:8px 0 0"><button class="btn primary" id="ovClose">盤面を見る</button></p></div>';
+  document.body.appendChild(ov);
+  const btn = ov.querySelector("#ovClose"); btn.focus();
+  const done = () => { closeOverlay(); const n = document.getElementById("nextBtn"); if(n) n.focus({preventScroll:true}); };
+  btn.addEventListener("click", done);
+  document.addEventListener("keydown", function esc1(ev){ if(ev.key === "Escape"){ done(); document.removeEventListener("keydown", esc1); } });
+  if(!window.matchMedia("(prefers-reduced-motion: reduce)").matches){
+    const colors = ["#f2c65a","#ff8f86","#8ff0b3","#9aa0ff","#fff2c2"];
+    for(let i = 0; i < (S.master ? 90 : (clean ? 36 : 12)); i++){
+      const c = document.createElement("i"); c.className = "conf";
+      c.style.left = (Math.random()*100)+"vw"; c.style.background = colors[i % colors.length];
+      c.style.animationDelay = (Math.random()*.6)+"s"; c.style.animationDuration = (1.5+Math.random()*1.2)+"s";
+      document.body.appendChild(c);
+    }
+    setTimeout(() => document.querySelectorAll(".conf").forEach(n => n.remove()), 3500);
+  }
+}
+
+/* ===== 音の切り替えとフッター ===== */
+const $as = document.getElementById("asBtn");
+function paintAs(){ $as.textContent = "王手のしるし（点）：" + (assist ? "表示する" : "表示しない"); $as.setAttribute("aria-pressed", assist ? "true" : "false"); }
+$as.addEventListener("click", () => { setAssist(!assist); paintAs(); if(S.view === "train"){ S.sel = null; selectMsg(); renderTrain(); } });
+paintAs();
+const $snd = document.getElementById("sndBtn");
+function paintSnd(){ $snd.textContent = "効果音：" + (sound.on ? "オン" : "オフ"); $snd.setAttribute("aria-pressed", sound.on ? "true" : "false"); }
+$snd.addEventListener("click", () => { sound.set(!sound.on); paintSnd(); sound.good(); });
+paintSnd();
+document.getElementById("foot").innerHTML =
+  '<p>格言の意味は、次のページを参考に、作成者自身の言葉でまとめています。</p><ul>'+
+  '<li><a href="https://xn--pet04dr1n5x9a.com/%E6%A0%BC%E8%A8%80/%E7%8E%89%E3%81%AF%E4%B8%8B%E6%AE%B5%E3%81%AB%E8%90%BD%E3%81%A8%E3%81%9B.html" target="_blank" rel="noopener">将棋講座ドットコム「玉は下段に落とせ」</a></li>'+
+  '<li><a href="https://shogi-joutatsu.com/archives/1783" target="_blank" rel="noopener">ゼロから始める将棋研究所「金はトドメに残せ」</a></li>'+
+  '<li><a href="https://xn--pet04dr1n5x9a.com/%E6%89%8B%E7%AD%8B/%E9%A0%AD%E9%87%91.html" target="_blank" rel="noopener">将棋講座ドットコム「頭金」</a></li></ul>'+
+  '<p>各問題は、合駒（あいこま）を含む正式な規則で、詰むこと・手数・余詰（ほかの詰まし方）がないことを、探索プログラムで確認しています。問題は、プログラムが自動で作って検証したもので、プロの作家の作品ではありません。格言に当てはまるかどうかの判定条件は作成者が決めたもので、書籍によって解釈が異なる場合があります。</p>';
+
+renderHome();
+</script>
+</body>
+</html>
