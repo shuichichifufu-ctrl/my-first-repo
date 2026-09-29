@@ -1,0 +1,42 @@
+name: elliott-replay
+# 過去チャートでの検証（実データ）。通知は送らない。
+# このブランチで elliott-scanner/replay-request.txt を更新してプッシュするたびに実行される。
+on:
+  push:
+    branches: ["claude/eager-feynman-qb6o1e"]
+    paths:
+      - ".github/workflows/elliott-replay.yml"
+      - "elliott-scanner/replay-request.txt"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  replay:
+    runs-on: ubuntu-latest
+    timeout-minutes: 40
+    defaults:
+      run:
+        working-directory: elliott-scanner
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - run: pip install -r requirements.txt
+      - name: データ取得の疎通確認
+        run: python -c "from scanner.data import fetch_one; d=fetch_one('USDJPY=X','5y',retries=2); print(len(d), d.index[0], d.index[-1])"
+      - name: 過去チャートで検証
+        run: |
+          mkdir -p out
+          for s in "USDJPY=X" "EURUSD=X" "GBPJPY=X" "GC=F" "CL=F" "^N225" "^GSPC" "AAPL" "NVDA" "7203.T"; do
+            echo "=================== $s"
+            python -m scanner.replay --symbol "$s" --period 10y | tee "out/replay_${s//[^A-Za-z0-9]/_}.txt" || echo "失敗: $s"
+          done
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: replay
+          path: elliott-scanner/out
+          retention-days: 14

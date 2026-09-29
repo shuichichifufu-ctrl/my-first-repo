@@ -1,0 +1,2 @@
+このファイルを更新してプッシュすると、GitHub Actions で過去チャート検証（elliott-replay）が走ります。
+回数: 1
