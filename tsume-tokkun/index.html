@@ -180,7 +180,7 @@ footer{margin-top:32px;font-size:.8rem;color:var(--muted)} footer a{color:var(--
 </defs></svg>
 <div class="wrap">
   <div class="topline"><button class="btn toggle" id="asBtn" aria-pressed="true">王手のしるし（点）：表示する</button><button class="btn toggle" id="sndBtn" aria-pressed="false">効果音：オフ</button></div>
-  <main id="app"></main>
+  <main id="app"><noscript><div class="card" style="margin-top:16px"><b>この画面では、プログラムが動きません。</b><br>ファイルをブラウザ（Safari や Chrome など）で開くか、公開ページのリンクから開いてください。</div></noscript></main>
   <footer id="foot"></footer>
 </div>
 <script>
@@ -381,8 +381,10 @@ function renderHome(){
   document.querySelectorAll(".dojo[data-cat]").forEach(b => b.addEventListener("click", () => { sound.tick(); startCat(b.dataset.cat); }));
   const wb = document.getElementById("weakBtn"); if(wb) wb.addEventListener("click", () => startCat("weak"));
   const ob = document.getElementById("oldBtn"); if(ob) ob.addEventListener("click", () => startCat("old"));
-  document.getElementById("resetBtn").addEventListener("click", () => {
-    if(window.confirm("学習の記録をすべて消します。よろしいですか？")){ store.save({}); renderHome(); }
+  const rb = document.getElementById("resetBtn"); let armed = false, tm = null;   // 確認画面（confirm）は使えない環境があるため、二度押しで確認する
+  rb.addEventListener("click", () => {
+    if(!armed){ armed = true; rb.textContent = "本当に消しますか？ もう一度押すと、すべて消えます"; tm = setTimeout(() => { armed = false; rb.textContent = "学習の記録を消す"; }, 4000); return; }
+    clearTimeout(tm); store.save({}); renderHome();
   });
 }
 
