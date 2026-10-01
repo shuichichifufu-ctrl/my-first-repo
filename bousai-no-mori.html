@@ -35,9 +35,12 @@ button{font-family:inherit}
 #world .bridge{background:repeating-linear-gradient(90deg,#b98a4e 0 12px,#8d6531 12px 14px);border-top:4px solid #7a5628;border-bottom:4px solid #7a5628}
 #world .tree{width:64px;height:64px}
 #world .tree u{left:24px;top:34px;width:16px;height:30px;background:#7a4f28;border-radius:4px}
-#world .tree b{left:-8px;top:-22px;width:80px;height:70px;border-radius:50%;background:#3f9a45;box-shadow:inset -8px -8px 0 #348a3b}
+#world .tree b{transform-origin:50% 100%;left:-8px;top:-22px;width:80px;height:70px;border-radius:50%;background:#3f9a45;box-shadow:inset -8px -8px 0 #348a3b}
 #world .tree.v1 b{background:#4aa84f;width:74px;left:-5px}
 #world .tree.v2 b{background:#378f3e;height:76px;top:-28px}
+#world .tree.sw b{animation:sway 3.2s ease-in-out infinite;animation-delay:var(--d,0s)}
+@keyframes sway{50%{transform:rotate(2.5deg) translateX(1px)}}
+#world .outer{left:-1600px;top:-1600px;z-index:0;background-color:#2f7d3a;background-image:radial-gradient(circle at 50% 50%,#3d9647 0 28%,transparent 30%),radial-gradient(circle at 50% 50%,#246a30 0 24%,transparent 26%);background-size:64px 64px,64px 64px;background-position:0 0,32px 32px}
 #world .rock{width:64px;height:64px}
 #world .rock b{left:6px;top:24px;width:52px;height:36px;border-radius:50% 50% 30% 30%;background:#a9adb4;box-shadow:inset -6px -6px 0 #8c9097}
 #world .fl{width:8px;height:8px;border-radius:50%;background:#ffd43b;box-shadow:-8px 0 0 #fff,8px 0 0 #fff,0 -8px 0 #fff,0 8px 0 #fff}
@@ -49,7 +52,7 @@ button{font-family:inherit}
 #world .house .door{left:72px;top:124px;width:48px;height:68px;background:#8a5a2b;border-radius:24px 24px 0 0;box-shadow:inset 0 0 0 4px #6e4520}
 #world .house .win{top:100px;width:34px;height:34px;background:#bfe6ff;border:4px solid #d9b87a;border-radius:6px}
 #world .house .win.l{left:28px}#world .house .win.r{left:130px}
-#world .house .sign{left:36px;top:-6px;width:120px;height:34px;line-height:34px;background:#fffbe8;border:3px solid #d9b87a;border-radius:10px;text-align:center;font-weight:800;font-size:20px;color:#5a3b1f}
+#world .house .sign{left:50%;top:60px;transform:translateX(-50%);height:32px;line-height:28px;padding:0 12px;white-space:nowrap;background:#fffbe8;border:3px solid #d9b87a;border-radius:10px;text-align:center;font-weight:800;font-size:19px;color:#5a3b1f}
 /* ひと・ねこ */
 #world .ent{left:0;top:0;width:64px;height:80px;pointer-events:none}
 #world .ent .flip{position:absolute;inset:0;transform:scaleX(var(--f,1))}
@@ -134,6 +137,21 @@ button{font-family:inherit}
   #packbox .bigbtn{min-height:13vmin}
 }
 /* ---------- HUD ---------- */
+#hudbar{position:absolute;left:0;right:0;bottom:0;height:22vmin;background:linear-gradient(transparent,rgba(0,0,0,.28));z-index:19;pointer-events:none}
+#goal{position:absolute;left:50%;top:2vmin;transform:translateX(-50%);z-index:18;display:flex;align-items:center;gap:1.2vmin;padding:1.2vmin 2vmin;background:rgba(255,251,232,.94);border:.8vmin solid var(--line);border-radius:5vmin;box-shadow:0 .8vmin 0 #0003;pointer-events:none;white-space:nowrap}
+#game[data-mode=room] #goal{top:18vmin}
+#goal .lb{font-size:3.8vmin;font-weight:800;line-height:1.1;text-align:center;margin-right:.6vmin}
+#goal .lb b{display:block;font-size:6vmin;color:var(--accent)}
+#goal .g{position:relative;width:9.4vmin;height:9.4vmin;border-radius:2.4vmin;background:#e9e2c8;border:.6vmin solid #d6c99a;display:flex;align-items:center;justify-content:center;font-size:6vmin;line-height:1}
+#goal .g i{font-style:normal;filter:grayscale(1) brightness(.55);opacity:.45}
+#goal .g.held{background:var(--c);border:.6vmin dashed #fff}
+#goal .g.held i{filter:none;opacity:1}
+#goal .g.done{background:var(--c);border-color:#4a9f45}
+#goal .g.done i{filter:none;opacity:1}
+#goal .g.done::after{content:"✓";position:absolute;right:-1vmin;top:-1.6vmin;width:4vmin;height:4vmin;border-radius:50%;background:#4a9f45;color:#fff;font-size:3vmin;line-height:4vmin;font-weight:800;text-align:center}
+#arrow{position:absolute;z-index:17;width:13vmin;height:13vmin;margin:-6.5vmin 0 0 -6.5vmin;border-radius:50%;background:rgba(255,251,232,.94);border:.8vmin solid var(--accent);display:flex;align-items:center;justify-content:center;font-size:7vmin;color:var(--accent);pointer-events:none;animation:nudge .8s infinite ease-in-out}
+#arrow span{display:block;transform:rotate(var(--a,0rad))}
+@keyframes nudge{50%{opacity:.7}}
 #hud{position:absolute;left:0;right:0;bottom:2vmin;display:flex;justify-content:center;gap:1.6vmin;z-index:20;pointer-events:none}
 #hud .slot{pointer-events:auto;width:14vmin;height:14vmin;border-radius:3vmin;background:rgba(255,251,232,.92);border:.8vmin solid var(--line);
   display:flex;align-items:center;justify-content:center;font-size:8.4vmin;line-height:1;box-shadow:0 .8vmin 0 #0003;transition:transform .12s}
@@ -154,6 +172,7 @@ button{font-family:inherit}
 #msg .nx{position:absolute;right:4vmin;bottom:1.6vmin;font-size:5vmin;color:var(--accent);animation:hop .9s infinite}
 #modal{position:absolute;inset:0;z-index:60;background:rgba(0,0,0,.72);display:flex;flex-direction:column;align-items:center;justify-content:center;gap:2vmin;touch-action:none}
 #modal .scene{perspective:120vmin;width:46vmin;height:46vmin}
+@media (orientation:landscape){#modal .scene{width:34vmin;height:34vmin}#spin .l{font-size:19vmin}#modal .mname{font-size:6vmin}#modal .q{font-size:7vmin}#modal .btns .bigbtn{min-height:15vmin;font-size:7vmin}#modal{gap:1vmin}}
 #spin{position:relative;width:100%;height:100%;transform-style:preserve-3d;animation:spin 7s linear infinite}
 @keyframes spin{to{transform:rotateY(360deg)}}
 #spin .l{position:absolute;inset:0;border-radius:9vmin;background:var(--c);border:1vmin solid #fff9;display:flex;align-items:center;justify-content:center;font-size:26vmin;line-height:1;backface-visibility:hidden}
@@ -173,7 +192,7 @@ button{font-family:inherit}
 </style>
 </head>
 <body>
-<div id="game">
+<div id="game" data-mode="home">
   <!-- 外 -->
   <div id="outdoor" class="layer hidden"><div id="world"></div></div>
 
@@ -196,6 +215,9 @@ button{font-family:inherit}
     </div>
   </div>
 
+  <div id="hudbar"></div>
+  <div id="goal" class="hidden"></div>
+  <div id="arrow" class="hidden"><span>▶</span></div>
   <div id="hud"></div>
   <div id="toast"></div>
 
@@ -231,7 +253,7 @@ const MW = 40, MH = 30;  // マップのマス数
 const VIEW = 7;          // 短い辺に見えるマス数
 const SPEED = 3.0;       // 主人公の速さ(マス/秒)
 const R = 0.24;          // 主人公の当たり判定の半径(マス)
-const HOLD_MS = 220;     // これ以上押し続けたら「長押し(移動)」
+const HOLD_MS = 180;     // これ以上押し続けたら「長押し(移動)」
 const TAP_MOVE = 3;      // これ以上動いたら「ドラッグ(移動)」 (vmin単位)
 const HUD_MAX = 5;
 
@@ -294,6 +316,7 @@ const hero = {x:HOME.tx + 1.5, y:HOME.roadY + 0.6, moving:false, f:1};
 let vw = innerWidth, vh = innerHeight, vmin = Math.min(vw, vh), ppt = vmin / VIEW;
 function resize() {
   vw = innerWidth; vh = innerHeight; vmin = Math.min(vw, vh); ppt = vmin / VIEW;
+  if (S.bubble) hideBubble();
   if (S.mode === 'outdoor') camera();
 }
 addEventListener('resize', resize);
@@ -318,6 +341,7 @@ function tone(f, d = .15, type = 'sine', v = .08, delay = 0) {
   o.connect(g); g.connect(a.destination); o.start(t); o.stop(t + d + .05);
 }
 const sfx = {
+  step(){ tone(150 + Math.random() * 30, .06, 'triangle', .035); },
   tap(){ tone(660, .08, 'triangle', .06); },
   pop(){ tone(520, .1, 'sine', .08); tone(780, .12, 'sine', .06, .07); },
   get(){ tone(660, .1, 'triangle', .07); tone(880, .1, 'triangle', .07, .09); tone(1175, .18, 'triangle', .07, .18); },
@@ -376,14 +400,15 @@ const FLOWERS = [];
 const world = $('world');
 let heroEl, catEls = {};
 (function buildWorld() {
-  let h = `<i class="ground" style="width:${MW * T}px;height:${MH * T}px"></i>`;
+  let h = `<i class="outer" style="width:${MW * T + 3200}px;height:${MH * T + 3200}px"></i>`;
+  h += `<i class="ground" style="width:${MW * T}px;height:${MH * T}px"></i>`;
   const pos = (x, y, z) => `style="left:${x * T}px;top:${y * T}px;${z !== undefined ? 'z-index:' + z : ''}"`;
   for (let y = 0; y < MH; y++) for (let x = 0; x < MW; x++) {
     const v = G[gi(x, y)];
     if (v === 1 || v === 5) h += `<i class="t water" ${pos(x, y, 1)}></i>`;
     if (v === 4) h += `<i class="t path" ${pos(x, y, 1)}></i>`;
     if (v === 5) h += `<i class="t bridge" ${pos(x, y, 2)}></i>`;
-    if (v === 2) h += `<i class="tree v${(x * 7 + y * 13) % 3}" ${pos(x, y, Math.round((y + .95) * 10))}><u></u><b></b></i>`;
+    if (v === 2) h += `<i class="tree v${(x * 7 + y * 13) % 3}${(x + y) % 3 === 0 ? ' sw' : ''}" ${pos(x, y, Math.round((y + .95) * 10))}><u></u><b></b></i>`;
     if (v === 3) h += `<i class="rock" ${pos(x, y, Math.round((y + .9) * 10))}><b></b></i>`;
   }
   FLOWERS.forEach(f => { h += `<i class="fl${f.p ? ' p' : ''}" style="left:${f.x}px;top:${f.y}px;z-index:2"></i>`; });
@@ -415,6 +440,35 @@ function camera() {
   heroEl.style.setProperty('--f', hero.f);
   heroEl.classList.toggle('walk', hero.moving);
   NPCS.forEach(n => catEls[n.h.id].style.setProperty('--f', hero.x < n.x ? -1 : 1));
+  updateArrow();
+}
+const catDone = n => n.h.items.find(it => it.kind === n.h.kind).state !== 'house';
+function updateArrow() {
+  const ar = $('arrow');
+  let tgt = null, bd = 1e9;
+  NPCS.forEach(n => { if (catDone(n)) return; const d = Math.hypot(n.x - hero.x, n.y - hero.y); if (d < bd) { bd = d; tgt = n; } });
+  if (!tgt || S.mode !== 'outdoor' || S.bubble || S.ending) { ar.classList.add('hidden'); return; }
+  const dx = tgt.x - hero.x, dy = tgt.y - hero.y, sx = vw / 2 + dx * ppt, sy = vh / 2 + dy * ppt;
+  if (sx > vmin * .08 && sx < vw - vmin * .08 && sy > vmin * .2 && sy < vh - vmin * .24) { ar.classList.add('hidden'); return; }
+  const a = Math.atan2(dy, dx), c = Math.cos(a), s = Math.sin(a);
+  const hw = vw / 2 - vmin * .1, hy = s > 0 ? vh / 2 - vmin * .27 : vh / 2 - vmin * .2;
+  const k = Math.min(hw / Math.max(Math.abs(c), 1e-3), hy / Math.max(Math.abs(s), 1e-3));
+  ar.style.left = (vw / 2 + c * k) + 'px'; ar.style.top = (vh / 2 + s * k) + 'px';
+  ar.firstElementChild.style.setProperty('--a', a + 'rad');
+  ar.classList.remove('hidden');
+}
+function refreshCats() {
+  NPCS.forEach(n => { const h = catEls[n.h.id].querySelector('.hint'); h.textContent = catDone(n) ? '✅' : '💬'; });
+}
+function renderGoal() {
+  const g = $('goal'); let done = 0, html = '';
+  ALL_OK.forEach(k => {
+    const it = Object.values(INST).find(x => x.kind === k), d = DEF[k];
+    const cls = it.state === 'desk' || it.state === 'bag' ? 'done' : it.state === 'hud' ? 'held' : '';
+    if (cls === 'done') done++;
+    html += `<div class="g ${cls}" style="--c:${d.col}"><i>${d.icon}</i></div>`;
+  });
+  g.innerHTML = `<div class="lb">あと<b>${6 - done}</b></div>` + html;
 }
 
 /* ---------- 当たり判定 ---------- */
@@ -431,6 +485,9 @@ const locked = () => S.bubble || S.modal || msgOn || S.ending || S.mode !== 'out
 /* ---------- 画面（レイヤー）切り替え ---------- */
 function setMode(m) {
   S.mode = m; ptr = null;
+  $('game').dataset.mode = m;
+  $('goal').classList.toggle('hidden', m === 'home');
+  if (m !== 'outdoor') $('arrow').classList.add('hidden');
   $('outdoor').classList.toggle('hidden', m !== 'outdoor');
   $('room').classList.toggle('hidden', m !== 'room');
   $('home').classList.toggle('hidden', m !== 'home');
@@ -476,7 +533,7 @@ function toast(t) {
 /* ---------- 吹き出し（住人の頭上。タップで消える） ---------- */
 function showBubble(n) {
   const b = $('bubble');
-  b.textContent = `わたしのいえに ”${DEF[n.h.kind].name}” があるからもっていってニャ🎵`;
+  b.textContent = catDone(n) ? 'もう わたしたよ。ありがとニャ🎵' : `わたしのいえに ”${DEF[n.h.kind].name}” があるからもっていってニャ🎵`;
   b.style.removeProperty('--tx');
   $('bcatch').classList.remove('hidden');
   S.bubble = true; ptr = null;
@@ -528,7 +585,7 @@ function onTap(sx, sy) {
 }
 
 /* ---------- メインループ ---------- */
-let last = performance.now();
+let last = performance.now(), lastStep = 0;
 function frame(now) {
   const dt = Math.min(.05, (now - last) / 1000); last = now;
   if (S.mode === 'outdoor') {
@@ -544,6 +601,7 @@ function frame(now) {
           if (canStand(nx, hero.y)) { hero.x = nx; moved = true; }
           if (canStand(hero.x, ny)) { hero.y = ny; moved = true; }
           hero.moving = moved;
+          if (moved && now - lastStep > 330) { lastStep = now; sfx.step(); }
           if (Math.abs(ux) > .15) hero.f = ux < 0 ? -1 : 1;
         }
       }
@@ -556,6 +614,7 @@ requestAnimationFrame(frame);
 
 /* ---------- HUD ---------- */
 function renderHud() {
+  refreshCats(); renderGoal();
   const h = $('hud'); h.innerHTML = '';
   for (let i = 0; i < HUD_MAX; i++) {
     const it = S.hud[i], d = document.createElement('div');
