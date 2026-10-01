@@ -95,7 +95,7 @@ button{font-family:inherit}
 .rdesk{display:flex;gap:2.4vmin}
 .ritem{display:flex;flex-direction:column;align-items:center;gap:1vmin;cursor:pointer;animation:wob 1.8s infinite ease-in-out}
 .ritem:nth-child(2){animation-delay:.3s}.ritem:nth-child(3){animation-delay:.6s}
-.ritem span{font-size:3.6vmin;font-weight:800;background:#fffbe8;border-radius:2vmin;padding:.4vmin 1.4vmin}
+.ritem span{font-size:4.6vmin;font-weight:800;background:#fffbe8;border-radius:2vmin;padding:.4vmin 1.4vmin}
 @keyframes wob{50%{transform:translateY(-1.4vmin)}}
 .rempty{font-size:5.4vmin;font-weight:800;color:#fffbe8;padding:6vmin 8vmin}
 .hdesk{display:grid;grid-template-columns:repeat(3,22vmin);gap:2vmin}
@@ -112,7 +112,7 @@ button{font-family:inherit}
 .mom .eye.a{left:7vmin}.mom .eye.b{left:11.4vmin}
 .mom .body{left:2vmin;top:13vmin;width:16vmin;height:13vmin;background:#f48fb1;border-radius:4vmin 4vmin 2vmin 2vmin}
 .mom .apron{left:5vmin;top:15vmin;width:10vmin;height:11vmin;background:#fffbe8;border-radius:2vmin}
-.mom .lbl{left:0;right:0;bottom:-4.4vmin;text-align:center;font-size:3.4vmin;font-weight:800}
+.mom .lbl{left:-4vmin;right:-4vmin;bottom:-5.4vmin;text-align:center;font-size:4.4vmin;font-weight:800}
 .mom .hint{left:7vmin;top:-7vmin;font-size:6vmin;animation:hop 1s infinite}
 #packbox{position:absolute;z-index:6;display:flex;align-items:center;gap:3vmin}
 .bag{position:relative;width:24vmin;height:26vmin;background:#4aa3df;border:.8vmin solid #2f77a8;border-radius:5vmin 5vmin 7vmin 7vmin;display:flex;align-items:center;justify-content:center;font-size:6vmin;font-weight:800;color:#fff;margin-top:6vmin}
@@ -120,6 +120,9 @@ button{font-family:inherit}
 .bag::after{content:"";position:absolute;top:7vmin;left:2vmin;right:2vmin;height:1vmin;background:#ffffff66}
 .bag.pop{animation:pop .45s}
 @keyframes pop{40%{transform:scale(1.18) rotate(-4deg)}}
+@keyframes pulse{50%{transform:scale(1.04)}}
+.rip{position:absolute;z-index:16;width:10vmin;height:10vmin;margin:-5vmin 0 0 -5vmin;border-radius:50%;border:1vmin solid #fff;opacity:.9;pointer-events:none;animation:rip .45s ease-out forwards}
+@keyframes rip{to{transform:scale(2.2);opacity:0}}
 @media (orientation:portrait){
   .mom{top:15vmin;right:5vmin}
   .stage{padding-top:40vmin}
@@ -138,11 +141,12 @@ button{font-family:inherit}
 }
 /* ---------- HUD ---------- */
 #hudbar{position:absolute;left:0;right:0;bottom:0;height:22vmin;background:linear-gradient(transparent,rgba(0,0,0,.28));z-index:19;pointer-events:none}
-#goal{position:absolute;left:50%;top:2vmin;transform:translateX(-50%);z-index:18;display:flex;align-items:center;gap:1.2vmin;padding:1.2vmin 2vmin;background:rgba(255,251,232,.94);border:.8vmin solid var(--line);border-radius:5vmin;box-shadow:0 .8vmin 0 #0003;pointer-events:none;white-space:nowrap}
+#goal{position:absolute;left:50%;top:2vmin;transform:translateX(-50%);z-index:18;display:flex;align-items:center;gap:1vmin;padding:1vmin 1.6vmin;background:rgba(255,251,232,.94);border:.8vmin solid var(--line);border-radius:5vmin;box-shadow:0 .8vmin 0 #0003;pointer-events:none;white-space:nowrap}
 #game[data-mode=room] #goal{top:18vmin}
-#goal .lb{font-size:3.8vmin;font-weight:800;line-height:1.1;text-align:center;margin-right:.6vmin}
-#goal .lb b{display:block;font-size:6vmin;color:var(--accent)}
-#goal .g{position:relative;width:9.4vmin;height:9.4vmin;border-radius:2.4vmin;background:#e9e2c8;border:.6vmin solid #d6c99a;display:flex;align-items:center;justify-content:center;font-size:6vmin;line-height:1}
+#game.modalon #goal,#game.modalon .exit,#game.modalon .title{visibility:hidden}
+#goal .lb{font-size:4.4vmin;font-weight:800;line-height:1.1;text-align:center;margin-right:.6vmin}
+#goal .lb b{display:block;font-size:6.6vmin;color:var(--accent)}
+#goal .g{position:relative;width:10.6vmin;height:10.6vmin;border-radius:2.4vmin;background:#e9e2c8;border:.6vmin solid #d6c99a;display:flex;align-items:center;justify-content:center;font-size:7vmin;line-height:1}
 #goal .g i{font-style:normal;filter:grayscale(1) brightness(.55);opacity:.45}
 #goal .g.held{background:var(--c);border:.6vmin dashed #fff}
 #goal .g.held i{filter:none;opacity:1}
@@ -184,8 +188,8 @@ button{font-family:inherit}
 #modal .btns{display:flex;gap:5vmin;margin-top:2vmin}
 #modal .btns .bigbtn{min-width:34vmin;min-height:18vmin;font-size:8vmin}
 #ending{position:absolute;inset:0;z-index:70;background:linear-gradient(#bfe9ff,#ffeaa8);display:flex;flex-direction:column;align-items:center;justify-content:center;gap:5vmin;overflow:hidden}
-#ending .big{font-size:15vmin;font-weight:800;color:#e8564a;text-shadow:0 1vmin 0 #fff,0 2vmin 0 #0002;animation:pop 1.6s infinite}
-#ending .sub{font-size:6vmin;font-weight:800}
+#ending .big{font-size:13vmin;font-weight:800;color:#e8564a;text-align:center;padding:0 4vmin;max-width:100%;text-shadow:0 1vmin 0 #fff,0 2vmin 0 #0002;animation:pulse 1.6s infinite}
+#ending .sub{font-size:4.8vmin;font-weight:800;text-align:center;padding:0 4vmin}
 #ending .heart{font-size:18vmin;animation:hop 1.2s infinite}
 #ending .cf{position:absolute;top:-6vmin;width:3vmin;height:3vmin;border-radius:50%;animation:fall linear infinite}
 @keyframes fall{to{transform:translateY(120vh) rotate(720deg)}}
@@ -253,8 +257,10 @@ const MW = 40, MH = 30;  // マップのマス数
 const VIEW = 7;          // 短い辺に見えるマス数
 const SPEED = 3.0;       // 主人公の速さ(マス/秒)
 const R = 0.24;          // 主人公の当たり判定の半径(マス)
-const HOLD_MS = 180;     // これ以上押し続けたら「長押し(移動)」
-const TAP_MOVE = 3;      // これ以上動いたら「ドラッグ(移動)」 (vmin単位)
+const HOLD_FREE = 120;   // 何もない場所を押したとき、移動を始めるまでの時間(ms)
+const HOLD_HIT = 500;    // 住人・家を押したとき、「長押し(移動)」とみなすまでの時間(ms)
+const MOVE_FREE = 3;     // 何もない場所：これ以上動いたらドラッグ(vmin単位)
+const MOVE_HIT = 7;      // 住人・家の上：指のぶれを許す距離(vmin単位)
 const HUD_MAX = 5;
 
 /* ---------- アイテム定義（見た目は仮のCSS図形＋絵文字） ---------- */
@@ -432,6 +438,27 @@ let heroEl, catEls = {};
   });
 })();
 
+const wanderT = {};
+function wander(dt) {
+  if (S.bubble) return;
+  NPCS.forEach(n => {
+    const w = wanderT[n.h.id] || (wanderT[n.h.id] = {hx:n.x, hy:n.y, tx:n.x, ty:n.y, wait:Math.random() * 3});
+    if (Math.hypot(w.tx - n.x, w.ty - n.y) < .05) {
+      w.wait -= dt;
+      if (w.wait <= 0) {
+        const tx = w.hx + (Math.random() * 2 - 1) * 1.6, ty = w.hy + (Math.random() * 2 - 1) * .5;
+        if (canStand(tx, ty)) { w.tx = tx; w.ty = ty; }
+        w.wait = 1.5 + Math.random() * 3.5;
+      }
+      return;
+    }
+    const dx = w.tx - n.x, dy = w.ty - n.y, d = Math.hypot(dx, dy), st = Math.min(d, .55 * dt);
+    n.x += dx / d * st; n.y += dy / d * st;
+    const el = catEls[n.h.id];
+    el.style.transform = `translate(${n.x * T - 32}px,${n.y * T - 72}px)`;
+    el.style.zIndex = Math.round(n.y * 10);
+  });
+}
 function camera() {
   const s = ppt / T;
   world.style.transform = `translate(${vw / 2 - hero.x * ppt}px,${vh / 2 - hero.y * ppt}px) scale(${s})`;
@@ -447,6 +474,7 @@ function updateArrow() {
   const ar = $('arrow');
   let tgt = null, bd = 1e9;
   NPCS.forEach(n => { if (catDone(n)) return; const d = Math.hypot(n.x - hero.x, n.y - hero.y); if (d < bd) { bd = d; tgt = n; } });
+  if (S.hud.length > 0 && (S.hud.length >= HUD_MAX || !tgt)) tgt = {x:HOME.tx + 1.5, y:HOME.roadY - 1};   // もちものが満杯、または全員から受け取り済み → 家へ
   if (!tgt || S.mode !== 'outdoor' || S.bubble || S.ending) { ar.classList.add('hidden'); return; }
   const dx = tgt.x - hero.x, dy = tgt.y - hero.y, sx = vw / 2 + dx * ppt, sy = vh / 2 + dy * ppt;
   if (sx > vmin * .08 && sx < vw - vmin * .08 && sy > vmin * .2 && sy < vh - vmin * .24) { ar.classList.add('hidden'); return; }
@@ -556,32 +584,46 @@ let ptr = null;
 O.addEventListener('pointerdown', e => {
   if (!e.isPrimary || ptr || locked()) return;
   try { O.setPointerCapture(e.pointerId); } catch (_) {}
-  ptr = {id:e.pointerId, x0:e.clientX, y0:e.clientY, x:e.clientX, y:e.clientY, t0:performance.now(), hold:false};
+  const hit = hitTest(e.clientX, e.clientY);
+  ptr = {id:e.pointerId, x0:e.clientX, y0:e.clientY, x:e.clientX, y:e.clientY, t0:performance.now(), hold:false,
+         holdMs:hit ? HOLD_HIT : HOLD_FREE, moveLim:vmin * (hit ? MOVE_HIT : MOVE_FREE) / 100, hit};
 });
 O.addEventListener('pointermove', e => {
   if (!ptr || e.pointerId !== ptr.id) return;
   ptr.x = e.clientX; ptr.y = e.clientY;
-  if (!ptr.hold && Math.hypot(ptr.x - ptr.x0, ptr.y - ptr.y0) > vmin * TAP_MOVE / 100 * 1) ptr.hold = true;
+  if (!ptr.hold && Math.hypot(ptr.x - ptr.x0, ptr.y - ptr.y0) > ptr.moveLim) ptr.hold = true;
 });
 O.addEventListener('pointerup', e => {
   if (!ptr || e.pointerId !== ptr.id) return;
   const p = ptr; ptr = null;
-  const isTap = !p.hold && performance.now() - p.t0 < HOLD_MS && Math.hypot(e.clientX - p.x0, e.clientY - p.y0) <= vmin * TAP_MOVE / 100;
-  if (isTap && !locked()) onTap(e.clientX, e.clientY);
+  const isTap = !p.hold && performance.now() - p.t0 < p.holdMs && Math.hypot(e.clientX - p.x0, e.clientY - p.y0) <= p.moveLim;
+  if (isTap && !locked()) onTap(e.clientX, e.clientY, p.hit);
 });
 O.addEventListener('pointercancel', e => { if (ptr && e.pointerId === ptr.id) ptr = null; });
 O.addEventListener('contextmenu', e => e.preventDefault());
 
-function onTap(sx, sy) {
+// 画面の座標にある住人・家を返す（距離に関係なく、画面に見えていれば反応。指が大きくても当たるよう広めに判定）
+function hitTest(sx, sy) {
   const wx = hero.x + (sx - vw / 2) / ppt, wy = hero.y + (sy - vh / 2) / ppt;
-  // 住人（距離に関係なく反応。指が大きくてもあたるよう広めに判定）
   let best = null, bd = 1.1;
   NPCS.forEach(n => { const d = Math.hypot(wx - n.x, wy - (n.y - 0.6)); if (d < bd) { bd = d; best = n; } });
-  if (best) { showBubble(best); return; }
-  // 家
+  if (best) return {npc:best};
   for (const h of HDEF) {
-    if (wx >= h.tx - .2 && wx <= h.tx + 3.2 && wy >= h.ty - .7 && wy <= h.ty + 3.3) { enterHouse(h); return; }
+    if (wx >= h.tx - .2 && wx <= h.tx + 3.2 && wy >= h.ty - .7 && wy <= h.ty + 3.3) return {house:h};
   }
+  return null;
+}
+function onTap(sx, sy, hit0) {
+  const hit = hitTest(sx, sy) || hit0;
+  if (hit && hit.npc) { showBubble(hit.npc); return; }
+  if (hit && hit.house) { enterHouse(hit.house); return; }
+  ripple(sx, sy);
+}
+function ripple(x, y) {
+  const r = document.createElement('i'); r.className = 'rip';
+  r.style.left = x + 'px'; r.style.top = y + 'px';
+  $('game').appendChild(r); sfx.tap();
+  setTimeout(() => r.remove(), 500);
 }
 
 /* ---------- メインループ ---------- */
@@ -589,9 +631,10 @@ let last = performance.now(), lastStep = 0;
 function frame(now) {
   const dt = Math.min(.05, (now - last) / 1000); last = now;
   if (S.mode === 'outdoor') {
+    wander(dt);
     hero.moving = false;
     if (ptr && !locked()) {
-      if (!ptr.hold && now - ptr.t0 >= HOLD_MS) ptr.hold = true;
+      if (!ptr.hold && now - ptr.t0 >= ptr.holdMs) ptr.hold = true;
       if (ptr.hold) {
         const dx = ptr.x - vw / 2, dy = ptr.y - vh / 2, d = Math.hypot(dx, dy);
         if (d > vmin * .04) {
@@ -669,9 +712,9 @@ function openModal(it) {
   document.querySelector('#spin .l1').textContent = d.icon;
   document.querySelector('#spin .l3').textContent = d.icon;
   $('mname').textContent = d.name;
-  S.modal = true; $('modal').classList.remove('hidden'); sfx.pop();
+  S.modal = true; $('game').classList.add('modalon'); $('modal').classList.remove('hidden'); sfx.pop();
 }
-function closeModal() { S.modal = false; $('modal').classList.add('hidden'); }
+function closeModal() { S.modal = false; $('game').classList.remove('modalon'); $('modal').classList.add('hidden'); }
 $('no').addEventListener('click', () => { sfx.tap(); closeModal(); });
 $('yes').addEventListener('click', () => {
   const it = curInst; closeModal();
