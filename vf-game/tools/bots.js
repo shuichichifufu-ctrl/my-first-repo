@@ -44,7 +44,7 @@ function dist(a, b) { return Math.hypot(a.x - b.x, a.z - b.z); }
     const errs = []; p.on('pageerror', e => errs.push(e.message));
     await p.goto('file://' + require('path').resolve(file) + '?start=1&norender=1&speed=30');
     await p.evaluate(`(() => { ${BOTS}; window.__res = []; window.__vf.bot = mk['${name}'](); window.__last = null;
-      setInterval(() => { const g = window.__vf.game; if (g.phase === 'matchEnd' && window.__last !== g.matchWinner) { window.__last = g.matchWinner; window.__res.push({ w: g.matchWinner.idx, hp: window.__vf.F.map(f => f.wins) });
+      setInterval(() => { const g = window.__vf.game; if (g.phase !== 'matchEnd') window.__last = null; if (g.phase === 'matchEnd' && window.__last !== g.matchWinner) { window.__last = g.matchWinner; window.__res.push({ w: g.matchWinner.idx, hp: window.__vf.F.map(f => f.wins) });
         setTimeout(() => window.dispatchEvent(new KeyboardEvent('keydown', { code: 'Enter' })), 50); } }, 30); })()`);
     const t0 = Date.now(); let res = [];
     while (Date.now() - t0 < 150000) { await p.waitForTimeout(500); res = await p.evaluate('window.__res'); if (res.length >= n) break; }

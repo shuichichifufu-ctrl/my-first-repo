@@ -461,11 +461,11 @@ function updateFighter(f, o) {
   const rr = Math.hypot(f.x, f.z);
   if (rr > RING_R - 0.05) {
     const pushed = ['hitstun', 'blockstun', 'thrown', 'down'].includes(f.state) && game.phase === 'fight';
-    if (pushed && rr > RING_R + 0.15 && !f.dead) {
+    if (pushed && rr > RING_R + 0.15 && !f.dead && (f.state === 'thrown' || Math.hypot(f.vx, f.vz) > 0.06)) {
       f.state = 'falling'; f.vy = 0.02; f.ringOut = true; f.t = 0; f.vx *= 1.0; f.vz *= 1.0;
       endRound(o, 'RING OUT');
       if (!f.dead) { f.hp = Math.max(f.hp, 1); }
-    } else if (!pushed && f.state !== 'falling') {
+    } else if (f.state !== 'falling') {
       f.x *= (RING_R - 0.05) / rr; f.z *= (RING_R - 0.05) / rr;
     }
   }
@@ -485,8 +485,8 @@ function separate() {
 // ====== CPU ======
 function makeAI(f, o, level) {
   const ai = {
-    cd: 20, hold: 0, holdKeys: {}, react: null, lastOppState: '', plan: null, planT: 0, think: 0,
-    reset() { this.cd = 40; this.hold = 0; this.holdKeys = {}; this.react = null; this.plan = null; this.think = 0; },
+    fr: 0, atk: [], cd: 20, hold: 0, holdKeys: {}, react: null, lastOppState: '', plan: null, planT: 0, think: 0,
+    reset() { this.atk = []; this.cd = 40; this.hold = 0; this.holdKeys = {}; this.react = null; this.plan = null; this.think = 0; },
     set(k, frames) { this.holdKeys[k] = frames; },
     update() {
       const inp = f.input;
@@ -499,11 +499,15 @@ function makeAI(f, o, level) {
       const d = Math.hypot(o.x - f.x, o.z - f.z);
       // 投げ抜け
       if (f.state === 'grabbed' && f.t < 12 && Math.random() < 0.06 * level) { inp.pBuf = inp.gBuf = 5; inp.p = inp.g = true; return; }
-      // 相手の攻撃に反応
+      // 相手の攻撃に反応（攻撃を頻繁に出す相手ほど、ガードで受ける確率が上がる）
+      this.fr++;
+      if (o.state === 'attack' && o.move && o.t === 1) this.atk.push(this.fr);
+      const aggr = this.atk.filter(x => this.fr - x < 150).length;
+      const gp = Math.min(0.78, 0.45 + 0.1 * aggr);
       if (o.state === 'attack' && o.move && o.t === 1 && d < 2.4 && o.move.h !== 'throw') {
         const r = Math.random();
-        if (r < 0.55 * level) { this.react = { h:o.move.h }; }
-        else if (r < 0.88 * level) this.set(Math.random() < 0.5 ? 'sideIn' : 'sideOut', 14);
+        if (r < gp * level) { this.react = { h:o.move.h }; }
+        else if (r < Math.min(0.97, gp + 0.25) * level) this.set(Math.random() < 0.5 ? 'sideIn' : 'sideOut', 14);
         if (this.react) {
           if (o.move.h === 'low') this.set('crouch', 24);
           else if (o.move.h === 'high' && Math.random() < 0.35) this.set('crouch', 18);
@@ -527,6 +531,13 @@ function makeAI(f, o, level) {
       // ガード固め対策：立ちガードには下段か投げ、しゃがみガードには中段
       if (o.guardT > 10 && d >= 1.25 && d < 2.6 && Math.random() < 0.5 * level) { this.set('fwd', 5); this.cd = 3; return; }
       if (o.guardT > 10 && d < 1.3 && Math.random() < 0.6 * level) { this.useMove(o.crouching ? (Math.random() < 0.5 ? 'K' : 'EL') : (Math.random() < 0.5 ? 'TH' : 'LK')); this.cd = 14; return; }
+      // 縁に近いときは、中央側へ横移動で回り込む
+      const rr0 = Math.hypot(f.x, f.z);
+      if (rr0 > RING_R - 1.3 && Math.random() < 0.35) {
+        const sg = f.idx === 0 ? 1 : -1, nx = -f.fz * sg, nz = f.fx * sg;
+        const rIn = Math.hypot(f.x - nx * 0.5, f.z - nz * 0.5), rOut = Math.hypot(f.x + nx * 0.5, f.z + nz * 0.5);
+        this.set(rIn < rOut ? 'sideIn' : 'sideOut', 12); this.cd = Math.min(this.cd, 4); if (d > 1.4) { this.set('fwd', 6); }
+      }
       if (this.cd > 0) { this.cd--; return; }
       // 行動の決定
       const guardingOpp = o.input.g && oFree;
