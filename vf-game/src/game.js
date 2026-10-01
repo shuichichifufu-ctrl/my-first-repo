@@ -293,7 +293,7 @@ function tryHit(a, d) {
   const canGuard = (d.state === 'idle' || d.state === 'walk' || (d.state === 'blockstun')) && d.input.g;
   let blocked = false;
   if (canGuard) {
-    if (m.h === 'low') blocked = d.crouching; else blocked = true;
+    if (m.h === 'low') blocked = d.crouching; else if (m.h === 'mid') blocked = !d.crouching; else blocked = true;
   }
   const midX = (a.x + d.x) / 2, midZ = (a.z + d.z) / 2;
   const hitY = m.h === 'low' ? 0.35 : m.h === 'mid' ? 1.0 : 1.4;
@@ -509,13 +509,24 @@ function makeAI(f, o, level) {
         }
       }
       if (!isFree(f)) return;
+      const oFree = isFree(o);
+      o.guardT = (oFree && o.input.g) ? (o.guardT || 0) + 1 : 0;
+      const oRecover = o.state === 'attack' && o.move && o.t > o.move.su + o.move.ac;
+      const oStun0 = o.state === 'blockstun' || o.state === 'hitstun';
+      // 隙を突く（待ち時間を無視して即反撃）
+      if (oRecover && Math.random() < 0.6 * level) {
+        if (d < 1.5) { this.useMove('P'); this.cd = 14; return; }
+        if (d < 1.85) { this.useMove('K'); this.cd = 16; return; }
+        if (d < 2.6) { this.set('fwd', 7); this.cd = 4; return; }
+      }
+      if (o.state === 'attack' && o.move && o.move.h === 'throw' && o.t > o.move.su && d < 1.8 && Math.random() < 0.8) { this.useMove('P'); this.cd = 16; return; }
+      if (oStun0 && d < 1.7 && Math.random() < 0.5 * level) { this.useMove(Math.random() < 0.6 ? 'P' : 'K'); this.cd = 10; return; }
+      // ガード固め対策：立ちガードには下段か投げ、しゃがみガードには中段
+      if (o.guardT > 25 && d < 1.7 && Math.random() < 0.45 * level) { this.useMove(o.crouching ? (Math.random() < 0.5 ? 'K' : 'EL') : (Math.random() < 0.5 ? 'TH' : 'LK')); this.cd = 14; return; }
       if (this.cd > 0) { this.cd--; return; }
       // 行動の決定
-      // 空振り・攻撃後の隙を突く
-      if (o.state === 'attack' && o.move && o.t > o.move.su + o.move.ac && d < 1.9 && Math.random() < 0.8) { this.useMove(d < 1.5 ? 'P' : 'K'); this.cd = 14; return; }
-      if (o.state === 'attack' && o.move && o.move.h === 'throw' && o.t > o.move.su && d < 1.8 && Math.random() < 0.8) { this.useMove('P'); this.cd = 16; return; }
-      const guardingOpp = o.input.g && isFree(o);
-      const oppStunned = o.state === 'blockstun' || o.state === 'hitstun';
+      const guardingOpp = o.input.g && oFree;
+      const oppStunned = oStun0;
       if (d > 2.7) {
         const r = Math.random();
         if (r < 0.70) this.set('fwd', 14 + (Math.random() * 12 | 0));
