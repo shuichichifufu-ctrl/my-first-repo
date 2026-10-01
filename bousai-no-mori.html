@@ -31,6 +31,10 @@ button{font-family:inherit}
 #world .ground{left:0;top:0;background-color:#8fd16b;background-image:radial-gradient(#7cc15a 2px,transparent 3px);background-size:32px 32px}
 #world .t{width:65px;height:65px}
 #world .water{background:#59b4f0;background-image:repeating-linear-gradient(135deg,#ffffff22 0 6px,transparent 6px 16px)}
+#world .water.sp::after{content:"";position:absolute;left:18px;top:26px;width:26px;height:6px;border-radius:3px;background:#fffa;animation:spark 2.6s ease-in-out infinite}
+#world .water.sp:nth-child(3n)::after{animation-delay:.9s}
+#world .water.sp:nth-child(3n+1)::after{animation-delay:1.7s}
+@keyframes spark{0%,100%{opacity:0;transform:translateX(-6px)}50%{opacity:1;transform:translateX(6px)}}
 #world .path{background:#ecd9a0}
 #world .bridge{background:repeating-linear-gradient(90deg,#b98a4e 0 12px,#8d6531 12px 14px);border-top:4px solid #7a5628;border-bottom:4px solid #7a5628}
 #world .tree{width:64px;height:64px}
@@ -130,6 +134,9 @@ button{font-family:inherit}
   #packbox{left:0;right:0;bottom:21vmin;justify-content:center}
 }
 @media (orientation:landscape){
+  #msg .box{bottom:19vmin;min-height:17vmin;padding:1.6vmin 3.5vmin 2.2vmin}
+  #msg .txt{font-size:5vmin}
+  #msg .who{min-height:4vmin;font-size:4vmin}
   #room .stage{padding-top:33vmin}
   .mom{left:6vmin;top:50%;transform:translateY(-60%)}
   .stage{padding-top:14vmin}
@@ -161,6 +168,7 @@ button{font-family:inherit}
 #hud{position:absolute;left:0;right:0;bottom:2vmin;display:flex;justify-content:center;gap:1.6vmin;z-index:20;pointer-events:none}
 #hud .slot{pointer-events:auto;width:14vmin;height:14vmin;border-radius:3vmin;background:rgba(255,251,232,.92);border:.8vmin solid var(--line);
   display:flex;align-items:center;justify-content:center;font-size:8.4vmin;line-height:1;box-shadow:0 .8vmin 0 #0003;transition:transform .12s}
+#game[data-mode=outdoor] #hud .slot{pointer-events:none}
 #hud .slot.has{background:var(--c)}
 #hud .slot.sel{border-color:var(--accent);box-shadow:0 0 0 1vmin #ff6f6188,0 .8vmin 0 #0003;transform:translateY(-2.4vmin)}
 #hud .slot.new{border-style:dashed}
@@ -169,10 +177,11 @@ button{font-family:inherit}
 #bcatch{position:absolute;inset:0;z-index:40;touch-action:none}
 #bubble{position:absolute;width:max-content;max-width:78vmin;padding:3vmin 4vmin;background:#fff;border:.8vmin solid var(--line);border-radius:4vmin;font-size:5vmin;line-height:1.45;font-weight:800;text-align:center;box-shadow:0 1vmin 0 #0002;transform:translate(-50%,-100%)}
 #bubble{text-wrap:balance}
+#bubble .nw{white-space:nowrap}
 #bubble.below{transform:translate(-50%,0)}
 #bubble.below::after{bottom:auto;top:-2.6vmin;border-top:0;border-bottom:2.6vmin solid #fff}
 #bubble::after{content:"";position:absolute;left:var(--tx,50%);bottom:-2.6vmin;margin-left:-2vmin;border:2vmin solid transparent;border-top:2.6vmin solid #fff;border-bottom:0}
-#toast{position:absolute;left:50%;top:14vmin;transform:translateX(-50%);z-index:45;background:#fffbe8;border:.8vmin solid var(--line);border-radius:4vmin;padding:2vmin 4vmin;font-size:4.6vmin;font-weight:800;text-align:center;max-width:90vmin;pointer-events:none;opacity:0;transition:opacity .2s}
+#toast{position:absolute;left:50%;bottom:19vmin;transform:translateX(-50%);z-index:45;background:#fffbe8;border:.8vmin solid var(--line);border-radius:4vmin;padding:2vmin 4vmin;font-size:4.6vmin;font-weight:800;text-align:center;max-width:90vmin;pointer-events:none;opacity:0;transition:opacity .2s}
 #toast.on{opacity:1}
 #msg{position:absolute;inset:0;z-index:50;cursor:pointer}
 #msg .box{position:absolute;left:3vmin;right:3vmin;bottom:20vmin;min-height:24vmin;background:var(--paper);border:1vmin solid var(--line);border-radius:5vmin;padding:2.6vmin 4vmin 3vmin;box-shadow:0 1.2vmin 0 #0003}
@@ -264,7 +273,7 @@ const VIEW = 7;          // 短い辺に見えるマス数
 const SPEED = 3.0;       // 主人公の速さ(マス/秒)
 const R = 0.24;          // 主人公の当たり判定の半径(マス)
 const HOLD_FREE = 120;   // 何もない場所を押したとき、移動を始めるまでの時間(ms)
-const HOLD_HIT = 500;    // 住人・家を押したとき、「長押し(移動)」とみなすまでの時間(ms)
+const HOLD_HIT = 400;    // 住人・家を押したとき、「長押し(移動)」とみなすまでの時間(ms)
 const MOVE_FREE = 3;     // 何もない場所：これ以上動いたらドラッグ(vmin単位)
 const MOVE_HIT = 7;      // 住人・家の上：指のぶれを許す距離(vmin単位)
 const HUD_MAX = 5;
@@ -417,7 +426,7 @@ let heroEl, catEls = {};
   const pos = (x, y, z) => `style="left:${x * T}px;top:${y * T}px;${z !== undefined ? 'z-index:' + z : ''}"`;
   for (let y = 0; y < MH; y++) for (let x = 0; x < MW; x++) {
     const v = G[gi(x, y)];
-    if (v === 1 || v === 5) h += `<i class="t water" ${pos(x, y, 1)}></i>`;
+    if (v === 1 || v === 5) h += `<i class="t water${(x * 3 + y) % 4 === 0 ? ' sp' : ''}" ${pos(x, y, 1)}></i>`;
     if (v === 4) h += `<i class="t path" ${pos(x, y, 1)}></i>`;
     if (v === 5) h += `<i class="t bridge" ${pos(x, y, 2)}></i>`;
     if (v === 2) h += `<i class="tree v${(x * 7 + y * 13) % 3}${(x + y) % 3 === 0 ? ' sw' : ''}" ${pos(x, y, Math.round((y + .95) * 10))}><u></u><b></b></i>`;
@@ -514,11 +523,16 @@ function canStand(x, y) {
 /* ---------- ロック ---------- */
 // 吹き出し・モーダル・メッセージ・エンディング中、または家の中にいる間は移動できない
 let msgOn = false;
+// 画面を切り替えたタップの「クリック」が、切り替わった先のボタンに届いてしまうのを防ぐ（タッチ端末向け）
+let guardUntil = 0;
+document.addEventListener('click', e => {
+  if (e.pointerType !== 'mouse' && performance.now() < guardUntil) { e.preventDefault(); e.stopPropagation(); }
+}, true);
 const locked = () => S.bubble || S.modal || msgOn || S.ending || S.mode !== 'outdoor';
 
 /* ---------- 画面（レイヤー）切り替え ---------- */
 function setMode(m) {
-  S.mode = m; ptr = null;
+  S.mode = m; ptr = null; guardUntil = performance.now() + 350;
   $('game').dataset.mode = m;
   $('goal').classList.toggle('hidden', m === 'home');
   if (m !== 'outdoor') $('arrow').classList.add('hidden');
@@ -567,7 +581,7 @@ function toast(t) {
 /* ---------- 吹き出し（住人の頭上。タップで消える） ---------- */
 function showBubble(n) {
   const b = $('bubble');
-  b.innerHTML = catDone(n) ? 'もう わたしたよ。ありがとニャ🎵' : `わたしのいえに <span style="white-space:nowrap">”${DEF[n.h.kind].name}”</span> があるからもっていってニャ🎵`;
+  b.innerHTML = catDone(n) ? 'もう わたしたよ。ありがとニャ🎵' : `<span class="nw">わたしのいえに</span> <span class="nw">”${DEF[n.h.kind].name}”</span> <span class="nw">があるから</span><span class="nw">もっていってニャ🎵</span>`;
   b.style.removeProperty('--tx'); b.classList.remove('below');
   $('bcatch').classList.remove('hidden');
   S.bubble = true; ptr = null;
@@ -616,15 +630,18 @@ O.addEventListener('contextmenu', e => e.preventDefault());
 // 画面の座標にある住人・家を返す（距離に関係なく、画面に見えていれば反応。指が大きくても当たるよう広めに判定）
 function hitTest(sx, sy) {
   const wx = hero.x + (sx - vw / 2) / ppt, wy = hero.y + (sy - vh / 2) / ppt;
-  let best = null, bd = 1.4;
+  let best = null, bd = 1.0;
   NPCS.forEach(n => { const d = Math.hypot(wx - n.x, wy - (n.y - 0.6)); if (d < bd) { bd = d; best = n; } });
-  if (best) return {npc:best};
+  let house = null;
   for (const h of HDEF) {
-    if (wx >= h.tx - .2 && wx <= h.tx + 3.2 && wy >= h.ty - .7 && wy <= h.ty + 3.3) return {house:h};
+    if (wx >= h.tx - .2 && wx <= h.tx + 3.2 && wy >= h.ty - .7 && wy <= h.ty + 3.3) { house = h; break; }
   }
+  if (best && (!house || bd < .65)) return {npc:best};   // ねこの真上ならねこ。家の戸口まわりは家を優先
+  if (house) return {house};
   return null;
 }
 function onTap(sx, sy, hit0) {
+  guardUntil = performance.now() + 350;
   const hit = hitTest(sx, sy) || hit0;
   if (hit && hit.npc) { showBubble(hit.npc); return; }
   if (hit && hit.house) { enterHouse(hit.house); return; }
@@ -734,6 +751,14 @@ $('yes').addEventListener('click', () => {
   it.state = 'hud'; it.checked = false; S.hud.push(it);
   sfx.get(); renderHud(); renderRoom(); flyToHud(it);
 });
+function flyRect(from, to, it) {
+  const f = document.createElement('div');
+  f.className = 'fly'; f.innerHTML = DEF[it.kind].icon; f.style.setProperty('--c', DEF[it.kind].col);
+  f.style.cssText += `left:${from.left}px;top:${from.top}px;width:${from.width}px;height:${from.height}px;font-size:${from.width * .6}px`;
+  $('game').appendChild(f);
+  requestAnimationFrame(() => requestAnimationFrame(() => { f.style.left = to.left + 'px'; f.style.top = to.top + 'px'; f.style.width = to.width + 'px'; f.style.height = to.height + 'px'; f.style.fontSize = to.width * .6 + 'px'; }));
+  setTimeout(() => f.remove(), 520);
+}
 function flyToHud(it) {
   const el = $('hud').children[S.hud.length - 1]; if (!el) return;
   const r = el.getBoundingClientRect(), f = document.createElement('div'), s0 = vmin * .22;
@@ -805,6 +830,8 @@ function onSlot(i) {
 $('packBtn').addEventListener('click', () => {
   if (S.modal || msgOn || S.ending) return;
   const i = S.deskSel; if (i === null || !S.desk[i]) return;
+  const slotEl = document.querySelectorAll('#homeDesk .hslot')[i];
+  flyRect(slotEl.getBoundingClientRect(), $('bag').getBoundingClientRect(), S.desk[i]);
   S.desk[i].state = 'bag'; S.desk[i] = null; S.deskSel = null; S.bag++;
   sfx.pack(); renderHome();
   const bag = $('bag'); bag.classList.remove('pop'); void bag.offsetWidth; bag.classList.add('pop');
