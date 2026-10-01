@@ -5,7 +5,7 @@
 <title>ボクセルクラフト</title>
 <meta name="viewport" content="width=device-width,initial-scale=1">
 <style>
-:root{--slot:min(56px,5.4vw,9.2vh);--ui:#2b2b2b;--edge:#111;--hi:#8b8b8b;--txt:#fff}
+:root{--slot:max(34px,min(56px,5.4vw,9.2vh));--ui:#2b2b2b;--edge:#111;--hi:#8b8b8b;--txt:#fff}
 *{box-sizing:border-box;-webkit-user-select:none;user-select:none}
 html,body{margin:0;height:100%;overflow:hidden;background:#78a7ff;color:var(--txt);
  font-family:"Hiragino Kaku Gothic ProN","Meiryo","Noto Sans JP","IPAGothic","Yu Gothic",sans-serif;font-size:18px}
@@ -39,7 +39,7 @@ img.px,.px{image-rendering:pixelated;image-rendering:crisp-edges}
 #hearts,#hunger{display:flex;gap:1px}
 #hunger{flex-direction:row-reverse}
 #air{position:absolute;right:0;bottom:30px;display:flex;flex-direction:row-reverse;gap:1px}
-.ic{width:20px;height:20px;background-size:100% 100%;image-rendering:pixelated}
+.ic{width:calc(var(--slot)*.36);height:calc(var(--slot)*.36);max-width:22px;max-height:22px;min-width:12px;min-height:12px;background-size:100% 100%;image-rendering:pixelated}
 .ic.shake{animation:shake .25s infinite}
 @keyframes shake{0%{transform:translateY(0)}50%{transform:translateY(-2px)}100%{transform:translateY(0)}}
 #hotbar{display:flex;background:rgba(0,0,0,.45);border:3px solid #000;box-shadow:inset 0 0 0 2px #555}
@@ -111,7 +111,7 @@ img.px,.px{image-rendering:pixelated;image-rendering:crisp-edges}
 #tip{position:fixed;z-index:41;pointer-events:none;background:rgba(20,0,40,.92);border:2px solid #5a2d9c;padding:3px 9px;font-size:16px;display:none}
 #invhint{font-size:14px;color:#bbb;margin-top:8px}
 @media (max-height:720px){#title h1{font-size:clamp(34px,6vw,52px)}#title .sub{font-size:16px;margin-top:-10px}#title .help{font-size:15px;line-height:1.45}.btn{font-size:19px;padding:9px 14px;margin:7px 0}#title .panel{padding:14px 20px}}
-@media (max-width:700px),(max-aspect-ratio:1/1){#tl{max-width:calc(100vw - 28px)}#objtext{font-size:15px}#keyhint{font-size:12px}#clock{top:auto;bottom:calc(var(--slot) + 78px);right:8px;font-size:15px;padding:4px 8px}#clockicon{width:16px;height:16px}.toast{font-size:15px}}
+@media (max-width:700px),(max-aspect-ratio:1/1){#tl{max-width:calc(100vw - 28px)}#objtext{font-size:15px}#keyhint{font-size:12px}#clock{top:auto;bottom:calc(var(--slot) + 112px);right:8px;font-size:15px;padding:4px 8px}#clockicon{width:16px;height:16px}.toast{font-size:15px}}
 @media (max-width:900px){:root{--slot:44px}#inv .wrap{flex-direction:column;overflow-y:auto}#craftlist{width:auto;max-height:30vh}}
 </style>
 </head>
@@ -212,20 +212,22 @@ window.onerror=function(m,s,l,c){errors.push(String(m)+' @'+String(s||'').split(
 window.addEventListener('unhandledrejection',function(e){errors.push('promise: '+(e.reason&&e.reason.message||e.reason));});
 if(DEBUG)window.__mc={errors:errors};
 const $=id=>document.getElementById(id);
-const CS=16,CH=64,SEA=22;
+const CS=16,CH=128,SEA=40;
 const clamp=(v,a,b)=>v<a?a:v>b?b:v;
 const lerp=(a,b,t)=>a+(b-a)*t;
 const smooth=(a,b,x)=>{const t=clamp((x-a)/(b-a),0,1);return t*t*(3-2*t)};
 
 // ---------- ブロック / アイテム定義 ----------
-const B={AIR:0,GRASS:1,DIRT:2,STONE:3,SAND:4,WATER:5,LOG:6,LEAVES:7,PLANKS:8,COBBLE:9,COAL_ORE:10,IRON_ORE:11,TABLE:12,BEDROCK:13,TALLGRASS:14,FLOWER_R:15,FLOWER_Y:16,TORCH:17};
+const B={AIR:0,GRASS:1,DIRT:2,STONE:3,SAND:4,WATER:5,LOG:6,LEAVES:7,PLANKS:8,COBBLE:9,COAL_ORE:10,IRON_ORE:11,TABLE:12,BEDROCK:13,TALLGRASS:14,FLOWER_R:15,FLOWER_Y:16,TORCH:17,SNOW:18,ICE:19,CACTUS:20,BIRCH_LOG:21,BIRCH_LEAVES:22,SPRUCE_LOG:23,SPRUCE_LEAVES:24,SANDSTONE:25,GRASS_F:26,GRASS_D:27,GRASS_C:28,DEADBUSH:30};
 const I={STICK:101,COAL:102,IRON:103,APPLE:104,FLESH:105,PORK:106,COOKED:107,WPICK:110,SPICK:111,IPICK:112,WSWORD:113,SSWORD:114,ISWORD:115,WAXE:116,SAXE:117,IAXE:118};
 const SOLID=new Uint8Array(256),OPQ=new Uint8Array(256);
-[1,2,3,4,6,7,8,9,10,11,12,13].forEach(i=>{SOLID[i]=1;OPQ[i]=1;});
-const isPlant=id=>id===14||id===15||id===16;
-const isReplaceable=id=>id===0||id===5||id===14||id===15||id===16;
+[1,2,3,4,6,7,8,9,10,11,12,13,18,19,20,21,22,23,24,25,26,27,28].forEach(i=>{SOLID[i]=1;OPQ[i]=1;});
+const isPlant=id=>id===14||id===15||id===16||id===30;
+const isReplaceable=id=>id===0||id===5||id===14||id===15||id===16||id===30;
+const LEAF=new Uint8Array(256);LEAF[7]=LEAF[22]=LEAF[24]=1;
+const GRASSY=new Uint8Array(256);GRASSY[1]=GRASSY[26]=GRASSY[27]=GRASSY[28]=1;
 
-const TILE_NAMES=['grass_top','grass_side','dirt','stone','cobble','sand','water','log_side','log_top','leaves','planks','coal_ore','iron_ore','bedrock','table_top','table_side','table_front','tallgrass','flower_r','flower_y','torch','stick','coal','iron','apple','flesh','wpick','spick','ipick','wsword','ssword','isword','waxe','saxe','iaxe','pork','cooked'];
+const TILE_NAMES=['grass_top','grass_side','dirt','stone','cobble','sand','water','log_side','log_top','leaves','planks','coal_ore','iron_ore','bedrock','table_top','table_side','table_front','tallgrass','flower_r','flower_y','torch','stick','coal','iron','apple','flesh','wpick','spick','ipick','wsword','ssword','isword','waxe','saxe','iaxe','pork','cooked','grass_top_f','grass_side_f','grass_top_d','grass_side_d','grass_top_c','grass_side_c','snow','snow_side','ice','cactus_side','cactus_top','birch_side','spruce_side','leaves_birch','leaves_spruce','sandstone','deadbush'];
 const TILE={};TILE_NAMES.forEach((n,i)=>TILE[n]=i);
 
 const BT={};// ブロックの面ごとのタイル [+x,-x,+y,-y,+z,-z]
@@ -242,6 +244,11 @@ bt(B.COAL_ORE,TILE.coal_ore,TILE.coal_ore,TILE.coal_ore);
 bt(B.IRON_ORE,TILE.iron_ore,TILE.iron_ore,TILE.iron_ore);
 bt(B.TABLE,TILE.table_top,TILE.planks,TILE.table_side,TILE.table_front);
 bt(B.BEDROCK,TILE.bedrock,TILE.bedrock,TILE.bedrock);
+bt(B.SNOW,TILE.snow,TILE.snow,TILE.snow);bt(B.ICE,TILE.ice,TILE.ice,TILE.ice);bt(B.CACTUS,TILE.cactus_top,TILE.cactus_top,TILE.cactus_side);
+bt(B.BIRCH_LOG,TILE.log_top,TILE.log_top,TILE.birch_side);bt(B.SPRUCE_LOG,TILE.log_top,TILE.log_top,TILE.spruce_side);
+bt(B.BIRCH_LEAVES,TILE.leaves_birch,TILE.leaves_birch,TILE.leaves_birch);bt(B.SPRUCE_LEAVES,TILE.leaves_spruce,TILE.leaves_spruce,TILE.leaves_spruce);
+bt(B.SANDSTONE,TILE.sandstone,TILE.sandstone,TILE.sandstone);
+bt(B.GRASS_F,TILE.grass_top_f,TILE.dirt,TILE.grass_side_f);bt(B.GRASS_D,TILE.grass_top_d,TILE.dirt,TILE.grass_side_d);bt(B.GRASS_C,TILE.grass_top_c,TILE.dirt,TILE.grass_side_c);
 
 const ITEMS={};
 function defItem(id,name,tile,o){ITEMS[id]=Object.assign({id,name,tile,max:64},o||{});}
@@ -264,6 +271,18 @@ defBlock(B.TALLGRASS,'草',TILE.tallgrass,{hard:0.02,snd:'grass',drop:0});
 defBlock(B.FLOWER_R,'赤い花',TILE.flower_r,{hard:0.02,snd:'grass'});
 defBlock(B.FLOWER_Y,'黄色い花',TILE.flower_y,{hard:0.02,snd:'grass'});
 defBlock(B.TORCH,'たいまつ',TILE.torch,{hard:0.02,snd:'wood'});
+defBlock(B.SNOW,'雪ブロック',TILE.snow,{hard:.3,snd:'sand'});
+defBlock(B.ICE,'氷',TILE.ice,{hard:.5,snd:'stone',drop:0});
+defBlock(B.CACTUS,'サボテン',TILE.cactus_side,{hard:.5,snd:'grass'});
+defBlock(B.BIRCH_LOG,'白樺の丸太',TILE.birch_side,{hard:2,tool:'axe',snd:'wood',drop:B.LOG});
+defBlock(B.SPRUCE_LOG,'もみの丸太',TILE.spruce_side,{hard:2,tool:'axe',snd:'wood',drop:B.LOG});
+defBlock(B.BIRCH_LEAVES,'白樺の葉',TILE.leaves_birch,{hard:.2,snd:'grass',drop:0});
+defBlock(B.SPRUCE_LEAVES,'もみの葉',TILE.leaves_spruce,{hard:.2,snd:'grass',drop:0});
+defBlock(B.SANDSTONE,'砂岩',TILE.sandstone,{hard:.8,snd:'stone'});
+defBlock(B.GRASS_F,'草ブロック',TILE.grass_side_f,{hard:.6,snd:'grass',drop:B.DIRT});
+defBlock(B.GRASS_D,'草ブロック',TILE.grass_side_d,{hard:.6,snd:'grass',drop:B.DIRT});
+defBlock(B.GRASS_C,'草ブロック',TILE.grass_side_c,{hard:.6,snd:'grass',drop:B.DIRT});
+defBlock(B.DEADBUSH,'枯れ木',TILE.deadbush,{hard:0.02,snd:'grass',drop:0});
 defItem(I.STICK,'棒',TILE.stick);
 defItem(I.COAL,'石炭',TILE.coal);
 defItem(I.IRON,'鉄インゴット',TILE.iron);
@@ -392,6 +411,23 @@ function buildAtlas(){
     set(12,4,[230,225,215]);set(13,3,[230,225,215]);set(12,5,[200,195,185]);});
   paint('pork',set=>{for(let y=0;y<16;y++)for(let x=0;x<16;x++){const d=Math.hypot((x-7.5)*.85,(y-8)*1.05)+Math.sin(x*1.3+y*.8)*.6;if(d<5.8){let c=vr([232,120,128],8);if(d>4.7)c=vr([190,86,98],6);else if(R()<.2)c=vr([248,170,170],6);set(x,y,c);}}set(5,6,[255,215,215]);set(6,5,[255,215,215]);});
   paint('cooked',set=>{for(let y=0;y<16;y++)for(let x=0;x<16;x++){const d=Math.hypot((x-7.5)*.85,(y-8)*1.05)+Math.sin(x*1.3+y*.8)*.6;if(d<5.8){let c=vr([172,98,52],8);if(d>4.7)c=vr([110,56,28],6);else if(R()<.2)c=vr([206,138,78],6);set(x,y,c);}}set(5,6,[230,180,120]);set(6,5,[230,180,120]);set(11,11,[238,232,220]);set(12,12,[238,232,220]);});
+  const gtop=(name,base,hl,dk)=>paint(name,set=>{for(let y=0;y<16;y++)for(let x=0;x<16;x++){let c=vr(base,12);const r=R();if(r<.12)c=vr(hl,8);else if(r<.2)c=vr(dk,8);set(x,y,c);}});
+  const gside=(name,base,hl)=>paint(name,set=>{for(let y=0;y<16;y++)for(let x=0;x<16;x++){let c=vr([134,96,66],8);const r=R();if(r<.18)c=vr([108,76,50],8);else if(r<.28)c=vr([154,114,80],8);set(x,y,c);}
+    for(let x=0;x<16;x++){const hh=3+((R()*3)|0);for(let y=0;y<hh;y++){let c=vr(base,12);if(R()<.15)c=vr(hl,8);set(x,y,c);}}});
+  gtop('grass_top_f',[58,128,44],[78,150,56],[40,100,34]);gside('grass_side_f',[58,128,44],[78,150,56]);
+  gtop('grass_top_d',[150,156,70],[176,176,84],[124,132,58]);gside('grass_side_d',[150,156,70],[176,176,84]);
+  gtop('grass_top_c',[84,132,100],[104,152,116],[64,108,82]);gside('grass_side_c',[84,132,100],[104,152,116]);
+  paint('snow',set=>{for(let y=0;y<16;y++)for(let x=0;x<16;x++){let c=vr([244,248,252],6);if(R()<.12)c=vr([218,230,244],6);set(x,y,c);}});
+  paint('snow_side',set=>{for(let y=0;y<16;y++)for(let x=0;x<16;x++){let c=vr([134,96,66],8);if(R()<.2)c=vr([108,76,50],8);set(x,y,c);}for(let x=0;x<16;x++){const hh=4+((R()*3)|0);for(let y=0;y<hh;y++)set(x,y,vr([244,248,252],5));}});
+  paint('ice',set=>{for(let y=0;y<16;y++)for(let x=0;x<16;x++){let c=vr([150,200,240],10);if(((x+y)%7===0)||R()<.06)c=vr([210,234,252],8);set(x,y,c);}});
+  paint('cactus_side',set=>{for(let y=0;y<16;y++)for(let x=0;x<16;x++){let c=vr([22,112,40],8);if(x%5===2)c=vr([14,84,28],5);if((x%5===2)&&y%3===0)c=[230,236,200];set(x,y,c);}});
+  paint('cactus_top',set=>{for(let y=0;y<16;y++)for(let x=0;x<16;x++){let c=vr([34,134,52],8);if(x<2||y<2||x>13||y>13)c=vr([20,96,34],5);set(x,y,c);}});
+  paint('birch_side',set=>{for(let y=0;y<16;y++)for(let x=0;x<16;x++){let c=vr([226,224,214],8);set(x,y,c);}for(let i=0;i<9;i++){const x=(R()*13)|0,y=(R()*16)|0;for(let k=0;k<3;k++)set(x+k,y,[40,38,36]);}});
+  paint('spruce_side',set=>{for(let x=0;x<16;x++){const cv_=(R()-.5)*16;for(let y=0;y<16;y++){let c=vr([70,50,32],5);c=[cl(c[0]+cv_),cl(c[1]+cv_),cl(c[2]+cv_)];if(x%4===1&&R()<.7)c=vr([44,30,18],5);set(x,y,c);}}});
+  paint('leaves_birch',set=>{for(let y=0;y<16;y++)for(let x=0;x<16;x++){let c=vr([104,160,64],8);const r=R();if(r<.3)c=vr([78,132,48],6);else if(r<.5)c=vr([128,184,80],8);set(x,y,c);}});
+  paint('leaves_spruce',set=>{for(let y=0;y<16;y++)for(let x=0;x<16;x++){let c=vr([34,84,52],7);const r=R();if(r<.3)c=vr([22,62,38],5);else if(r<.5)c=vr([52,108,66],7);else if(r<.56)c=vr([236,244,248],4);set(x,y,c);}});
+  paint('sandstone',set=>{for(let y=0;y<16;y++)for(let x=0;x<16;x++){let c=vr([214,198,146],6);if(y%5===4)c=vr([190,172,120],5);set(x,y,c);}});
+  paint('deadbush',set=>{const br=[[8,15],[8,12],[7,10],[6,8],[5,6],[9,10],[10,8],[11,6],[8,9],[8,7],[7,13],[10,12],[11,11]];br.forEach(p=>set(p[0],p[1],vr([120,88,48],10)));set(4,5,[110,80,44]);set(12,5,[110,80,44]);});
   const TC={w:[[164,124,64],[130,96,46]],s:[[142,142,146],[100,100,106]],i:[[232,232,238],[170,172,182]]};
   const handle=(set,x0,y0,len)=>{for(let i=0;i<len;i++){set(x0+i,y0-i,[132,92,44]);if(i>0)set(x0+i-1,y0-i,[96,66,30]);}};
   ['w','s','i'].forEach(k=>{
@@ -423,7 +459,7 @@ function makeCrackCanvas(){const cv=document.createElement('canvas');cv.width=16
 
 // ---------- アイコン生成 ----------
 const iconCache={};
-const CUBE_IDS={1:1,2:1,3:1,4:1,6:1,7:1,8:1,9:1,10:1,11:1,12:1,13:1};
+const CUBE_IDS={1:1,2:1,3:1,4:1,6:1,7:1,8:1,9:1,10:1,11:1,12:1,13:1,18:1,19:1,20:1,21:1,22:1,23:1,24:1,25:1,26:1,27:1,28:1};
 function itemIcon(id){
   if(iconCache[id])return iconCache[id];
   const cv=document.createElement('canvas');cv.width=cv.height=40;const g=cv.getContext('2d');g.imageSmoothingEnabled=false;
@@ -544,7 +580,7 @@ const VS='attribute vec3 aL;varying vec2 vUv;varying vec3 vL;varying float vDist
 const FS='uniform sampler2D uMap;uniform float uDay,uAlpha,uMinLight,uFogNear,uFogFar,uHeld;uniform vec3 uSkyTint,uFogColor;'+
  'varying vec2 vUv;varying vec3 vL;varying float vDist;'+
  'void main(){vec4 t=texture2D(uMap,vUv);if(t.a<0.5)discard;'+
- 'vec3 sk=uSkyTint*(vL.x*uDay);float hl=uHeld*clamp(1.0-vDist/13.0,0.0,1.0);hl=hl*hl*1.15;vec3 bl=vec3(1.0,0.8,0.55)*max(vL.y,hl);vec3 l=max(max(sk,bl),vec3(uMinLight*0.9,uMinLight*1.0,uMinLight*1.4));'+
+ 'vec3 sk=uSkyTint*(vL.x*uDay);float hl=uHeld*clamp(1.0-vDist/20.0,0.0,1.0);hl=pow(hl,1.4)*1.3;vec3 bl=vec3(1.0,0.8,0.55)*max(vL.y,hl);vec3 l=max(max(sk,bl),vec3(uMinLight*0.9,uMinLight*1.0,uMinLight*1.4));'+
  'vec3 c=t.rgb*l*vL.z;float f=clamp((vDist-uFogNear)/(uFogFar-uFogNear),0.0,1.0);c=mix(c,uFogColor,f);gl_FragColor=vec4(c,uAlpha);}';
 function makeWorldMat(map,alpha,transparent,side){
   return new THREE.ShaderMaterial({uniforms:{uMap:{value:map},uAlpha:{value:alpha},uOff:{value:new THREE.Vector2(0,0)},
@@ -558,31 +594,58 @@ const waterMat=makeWorldMat(waterTex,0.72,true,THREE.DoubleSide);
 //  ワールド生成
 // ============================================================
 let SEED=1;
-let nCont,nHill,nDet,nMtn,nRough,nForest,nCA,nCB,nCC,nEnt;
-function setSeed(s){SEED=s|0;nCont=makeNoise(s+1);nHill=makeNoise(s+2);nDet=makeNoise(s+3);nMtn=makeNoise(s+4);nRough=makeNoise(s+5);nForest=makeNoise(s+6);nCA=makeNoise(s+7);nCB=makeNoise(s+8);nCC=makeNoise(s+9);nEnt=makeNoise(s+10);}
+let nCont,nHill,nDet,nMtn,nRough,nForest,nCA,nCB,nCC,nEnt,nTemp,nHum,nRiver,nLake,nCliff,nRidge;
+function setSeed(s){SEED=s|0;nCont=makeNoise(s+1);nHill=makeNoise(s+2);nDet=makeNoise(s+3);nMtn=makeNoise(s+4);nRough=makeNoise(s+5);nForest=makeNoise(s+6);nCA=makeNoise(s+7);nCB=makeNoise(s+8);nCC=makeNoise(s+9);nEnt=makeNoise(s+10);
+  nTemp=makeNoise(s+11);nHum=makeNoise(s+12);nRiver=makeNoise(s+13);nLake=makeNoise(s+14);nCliff=makeNoise(s+15);nRidge=makeNoise(s+16);}
 function fbm2(n,x,z,o){let s=0,a=1,f=1,t=0;for(let i=0;i<o;i++){s+=a*n.n2(x*f,z*f);t+=a;a*=.5;f*=2;}return s/t;}
 function heightAt(x,z){
-  const cont=fbm2(nCont,x*.0042,z*.0042,3);
-  const rough=.28+.72*smooth(-.2,.35,fbm2(nRough,x*.007,z*.007,2));
-  const hills=fbm2(nHill,x*.018,z*.018,4);
+  const cont=fbm2(nCont,x*.0032,z*.0032,3);
+  const rough=.3+.7*smooth(-.2,.35,fbm2(nRough,x*.007,z*.007,2));
+  const hills=fbm2(nHill,x*.016,z*.016,4);
   const det=nDet.n2(x*.09,z*.09);
-  const mt=Math.max(0,fbm2(nMtn,x*.0055,z*.0055,3)-.03);
-  const h=SEA+3+cont*44+hills*26*rough+det*1.6+mt*mt*320;
-  const hh=h>44?44+(h-44)*.62:h;
-  return clamp(Math.floor(hh),3,CH-6);
+  let h=SEA+9+cont*46+hills*22*rough+det*1.6;
+  // 尖った山脈（リッジノイズ）
+  const mm=smooth(.02,.34,fbm2(nMtn,x*.0042,z*.0042,3));
+  if(mm>0){const rg=1-Math.abs(nRidge.n2(x*.0068,z*.0068)*1.7+nRidge.n2(x*.015+9,z*.015)*.5);h+=mm*(Math.pow(Math.max(0,rg),1.7)*74+nDet.n2(x*.05,z*.05)*4);}
+  // 崖・段丘
+  const cl=nCliff.n2(x*.011,z*.011);h+=smooth(.12,.24,cl)*7+smooth(.4,.5,cl)*7;
+  // 川と湖
+  const rv=Math.abs(nRiver.n2(x*.0052,z*.0052));
+  const rk=clamp(1.8*(1-smooth(0,.05,rv)),0,1)*(1-smooth(SEA+16,SEA+46,h));
+  if(rk>0)h=lerp(h,SEA-3,rk);
+  const lk=nLake.n2(x*.009,z*.009)+nLake.n2(x*.02,z*.02)*.4;
+  if(lk>.4&&h<SEA+16)h=lerp(h,SEA-4,smooth(.4,.58,lk));
+  const hh=h>96?96+(h-96)*.45:h;
+  return clamp(Math.floor(hh),3,CH-4);
+}
+// 0=平原 1=森 2=砂漠 3=雪
+let _te=0,_hu=0;
+function biomeAt(x,z,h){
+  const jt=nDet.n2(x*.21+5,z*.21)*.05;
+  _te=fbm2(nTemp,x*.0013,z*.0013,2)*1.7-Math.max(0,h-SEA-12)*.0024+jt;
+  _hu=fbm2(nHum,x*.0015+40,z*.0015,2)*1.7-jt;
+  if(_te<-.26)return 3;
+  if(_te>.13&&_hu<.1)return 2;
+  if(_hu>.14)return 1;
+  return 0;
 }
 function caveAt(x,y,z){
-  const a=nCA.n3(x*.05,y*.075,z*.05),b=nCB.n3(x*.05+31.7,y*.075+11.3,z*.05+7.1);
-  if(a*a+b*b<.017)return true;
-  const a2=nCB.n3(x*.021+71,y*.034+5,z*.021+19),b2=nCA.n3(x*.021+13,y*.034+41,z*.021+3);
-  if(a2*a2+b2*b2<.012)return true;
-  if(y<40){const c=nCC.n3(x*.03,y*.05,z*.03);if(c>(y<22?.3:.4))return true;}
+  const a=nCA.n3(x*.05,y*.075,z*.05);
+  if(a*a<.017){const b=nCB.n3(x*.05+31.7,y*.075+11.3,z*.05+7.1);if(a*a+b*b<.017)return true;}
+  const a2=nCB.n3(x*.021+71,y*.034+5,z*.021+19);
+  if(a2*a2<.012){const b2=nCA.n3(x*.021+13,y*.034+41,z*.021+3);if(a2*a2+b2*b2<.012)return true;}
+  if(y<84){const c=nCC.n3(x*.022,y*.04,z*.022);if(c>(y<34?.27:.36))return true;}
   return false;
 }
 function caveMax(wx,wz,h){
   if(h<SEA)return h-4;
-  if(h>=SEA+3&&nEnt.n2(wx*.03,wz*.03)>.52)return h;
-  return h-2;
+  if(h>=SEA+3&&nEnt.n2(wx*.02,wz*.02)>.26)return h;
+  return h-3;
+}
+function ravineAt(wx,y,wz,h){
+  if(h<=SEA+3||y<18||y>h)return false;
+  if(nCB.n2(wx*.0045,wz*.0045)<.18)return false;
+  return Math.abs(nRidge.n2(wx*.011+333,wz*.011))<.017*(1+.7*Math.sin(y*.21+wx*.05));
 }
 
 const chunks=new Map();
@@ -594,60 +657,97 @@ const cidx=(x,y,z)=>((y*16+(z&15))<<4)+(x&15);
 function genChunk(cx,cz){
   const c={cx,cz,blocks:new Uint8Array(CS*CS*CH),sky:new Uint8Array(CS*CS*CH),blk:new Uint8Array(CS*CS*CH),lightOK:false,needMesh:true,mesh:null,wmesh:null,tris:0,hasGeo:false};
   const b=c.blocks,ox=cx*CS,oz=cz*CS,GP=3,GW=CS+2*GP;
-  const hm=new Int16Array(GW*GW);
-  for(let z=0;z<GW;z++)for(let x=0;x<GW;x++)hm[z*GW+x]=heightAt(ox+x-GP,oz+z-GP);
+  const hm=new Int16Array(GW*GW),bm=new Uint8Array(GW*GW),gv=new Uint8Array(GW*GW);
+  for(let z=0;z<GW;z++)for(let x=0;x<GW;x++){const wx=ox+x-GP,wz=oz+z-GP,h=heightAt(wx,wz),i=z*GW+x;hm[i]=h;bm[i]=biomeAt(wx,wz,h);
+    gv[i]=_hu>.14?B.GRASS_F:_te>.1?B.GRASS_D:_te<-.08?B.GRASS_C:B.GRASS;}
   for(let z=0;z<CS;z++)for(let x=0;x<CS;x++){
-    const wx=ox+x,wz=oz+z,h=hm[(z+GP)*GW+x+GP];
-    const hi=(z+GP)*GW+x+GP;const slope=h-Math.min(hm[hi-1],hm[hi+1],hm[hi-GW],hm[hi+GW]);
-    const rocky=h>SEA+2&&(slope>=4||h>=SEA+22+((hash3(wx,3,wz,SEED)*3)|0));
-    const sandy=h<=SEA+1&&h>=SEA-4;
-    const dirtD=3+((hash3(wx,0,wz,SEED)*2)|0);
+    const wx=ox+x,wz=oz+z,hi=(z+GP)*GW+x+GP,h=hm[hi],bio=bm[hi];
+    const slope=h-Math.min(hm[hi-1],hm[hi+1],hm[hi-GW],hm[hi+GW]);
+    const alpine=h>=SEA+52+((hash3(wx,4,wz,SEED)*5)|0);
+    const rocky=h>SEA+2&&(slope>=5||h>=SEA+42+((hash3(wx,3,wz,SEED)*4)|0));
+    const beach=h<=SEA+1&&h>=SEA-4;
+    const fillD=3+((hash3(wx,0,wz,SEED)*2)|0);
     const cm=caveMax(wx,wz,h);
+    const pool=nHum.n2(wx*.03+50,wz*.03)>.42?30:11;
+    const rvOn=h>SEA+3&&nCB.n2(wx*.0045,wz*.0045)>=.18;const rr=rvOn?nRidge.n2(wx*.011+333,wz*.011):9;
+    const pv=h>SEA+2?nCA.n2(wx*.02+77,wz*.02):-1;
+    let topId,fillId;
+    if(alpine){topId=B.SNOW;fillId=B.STONE;}
+    else if(rocky){topId=B.STONE;fillId=B.STONE;}
+    else if(bio===2||(beach&&bio!==3)){topId=B.SAND;fillId=B.SAND;}
+    else if(h<SEA-4){topId=B.DIRT;fillId=B.DIRT;}
+    else if(bio===3){topId=B.SNOW;fillId=B.DIRT;}
+    else{topId=gv[hi];fillId=B.DIRT;}
     for(let y=0;y<=h;y++){
       let id;
       if(y===0)id=B.BEDROCK;
       else if(y===1&&hash3(wx,1,wz,SEED)<.5)id=B.BEDROCK;
-      else if(y===h)id=rocky?B.STONE:sandy?B.SAND:(h<SEA-4?B.DIRT:B.GRASS);
-      else if(y>h-dirtD&&!rocky)id=sandy?B.SAND:B.DIRT;
+      else if(y===h)id=topId;
+      else if(y>h-fillD&&topId!==B.STONE&&!alpine)id=fillId;
+      else if(bio===2&&!rocky&&y>h-7&&y>SEA-8)id=(y>h-4?B.SAND:B.SANDSTONE);
       else{
         id=B.STONE;
-        if(y<48&&hash3(Math.floor(wx/3),Math.floor(y/3),Math.floor(wz/3),SEED+11)<.04&&hash3(wx,y,wz,SEED+12)<.5)id=B.COAL_ORE;
-        else if(y<34&&hash3(Math.floor(wx/3),Math.floor(y/3),Math.floor(wz/3),SEED+21)<.03&&hash3(wx,y,wz,SEED+22)<.5)id=B.IRON_ORE;
+        if(y<100&&hash3(Math.floor(wx/3),Math.floor(y/3),Math.floor(wz/3),SEED+11)<.04&&hash3(wx,y,wz,SEED+12)<.5)id=B.COAL_ORE;
+        else if(y<64&&hash3(Math.floor(wx/3),Math.floor(y/3),Math.floor(wz/3),SEED+21)<.032&&hash3(wx,y,wz,SEED+22)<.5)id=B.IRON_ORE;
       }
-      if(y>=3&&y<=cm&&id!==B.BEDROCK&&caveAt(wx,y,wz))id=(y<=11?B.WATER:0);
+      if(y>=3&&id!==B.BEDROCK){
+        let cv=false;
+        if(y<=cm&&caveAt(wx,y,wz))cv=true;
+        else if(rr<.03&&y>=18&&Math.abs(rr)<.017*(1+.7*Math.sin(y*.21+wx*.05)))cv=true;
+        else if(pv>.28&&((y>=h-30&&pv>.36+(h-y)*.0035)||(y>=h-44&&y<=h-24)))cv=true;
+        if(cv)id=(y<=pool&&y<SEA-6)?B.WATER:0;
+      }
       b[cidx(x,y,z)]=id;
     }
-    for(let y=h+1;y<=SEA;y++)b[cidx(x,y,z)]=B.WATER;
+    for(let y=h+1;y<=SEA;y++)b[cidx(x,y,z)]=(bio===3&&y===SEA)?B.ICE:B.WATER;
   }
-  // 木
+  const put=(lx,y,lz,id,onlyAir)=>{if(lx<0||lz<0||lx>=CS||lz>=CS||y<0||y>=CH)return;const i=cidx(lx,y,lz);const cur=b[i];if(onlyAir&&cur!==0&&!isPlant(cur))return;b[i]=id;};
+  // 木・サボテン
   for(let z=-2;z<CS+2;z++)for(let x=-2;x<CS+2;x++){
-    const wx=ox+x,wz=oz+z,h=hm[(z+GP)*GW+x+GP];
-    if(h<=SEA+1||h>SEA+20)continue;
-    {const hi=(z+GP)*GW+x+GP;if(h-Math.min(hm[hi-1],hm[hi+1],hm[hi-GW],hm[hi+GW])>=4)continue;if(h>=SEA+22)continue;}
+    const wx=ox+x,wz=oz+z,hi=(z+GP)*GW+x+GP,h=hm[hi],bio=bm[hi];
+    if(h<=SEA+1||h>SEA+38)continue;
+    if(h-Math.min(hm[hi-1],hm[hi+1],hm[hi-GW],hm[hi+GW])>=4)continue;
+    const r=hash3(wx,7,wz,SEED);
+    if(bio===2){
+      if(r<.004&&x>=0&&x<CS&&z>=0&&z<CS){const k=1+((hash3(wx,8,wz,SEED)*3)|0);for(let q=1;q<=k;q++)put(x,h+q,z,B.CACTUS,false);}
+      continue;
+    }
     const f=nForest.n2(wx*.013,wz*.013);
-    const chance=.0018+Math.max(0,f-.02)*.045;
-    if(hash3(wx,7,wz,SEED)>=chance)continue;
+    let chance;
+    if(bio===1)chance=.016+Math.max(0,f)*.05;else if(bio===3)chance=.006+Math.max(0,f+.1)*.03;else chance=.0016+Math.max(0,f-.02)*.04;
+    if(r>=chance)continue;
     if(h<=caveMax(wx,wz,h)&&caveAt(wx,h,wz))continue;
-    const th=4+((hash3(wx,8,wz,SEED)*3)|0);
-    const put=(lx,y,lz,id,onlyAir)=>{if(lx<0||lz<0||lx>=CS||lz>=CS||y<0||y>=CH)return;const i=cidx(lx,y,lz);const cur=b[i];if(onlyAir&&cur!==0&&!isPlant(cur))return;b[i]=id;};
-    for(let ty=1;ty<=th;ty++)put(x,h+ty,z,B.LOG,false);
+    if(ravineAt(wx,h,wz,h)||nCA.n2(wx*.02+77,wz*.02)>.3)continue;
+    const hv=hash3(wx,8,wz,SEED);
+    if(bio===3){
+      const th=6+((hv*4)|0);
+      for(let ty=1;ty<=th;ty++)put(x,h+ty,z,B.SPRUCE_LOG,false);
+      for(let ly=2;ly<=th+1;ly++){const t=th+1-ly;const rad=t===0?0:(t%2===1?1:2);
+        for(let dz=-rad;dz<=rad;dz++)for(let dx=-rad;dx<=rad;dx++){if(dx===0&&dz===0&&ly<=th)continue;if(rad===2&&Math.abs(dx)===2&&Math.abs(dz)===2)continue;put(x+dx,h+ly,z+dz,B.SPRUCE_LEAVES,true);}}
+      continue;
+    }
+    const birch=bio===1&&hv<.35,th=birch?5+((hv*8)|0)%3:4+((hv*3)|0);
+    const logId=birch?B.BIRCH_LOG:B.LOG,lvId=birch?B.BIRCH_LEAVES:B.LEAVES;
+    for(let ty=1;ty<=th;ty++)put(x,h+ty,z,logId,false);
     for(let dy=th-2;dy<=th+1;dy++){
-      const r=dy>=th?1:2;
-      for(let dz=-r;dz<=r;dz++)for(let dx=-r;dx<=r;dx++){
+      const rad=dy>=th?1:2;
+      for(let dz=-rad;dz<=rad;dz++)for(let dx=-rad;dx<=rad;dx++){
         if(dx===0&&dz===0&&dy<=th)continue;
-        if(r===2&&Math.abs(dx)===2&&Math.abs(dz)===2&&hash3(wx+dx,dy,wz+dz,SEED+5)<.55)continue;
+        if(rad===2&&Math.abs(dx)===2&&Math.abs(dz)===2&&hash3(wx+dx,dy,wz+dz,SEED+5)<.55)continue;
         if(dy===th+1&&Math.abs(dx)+Math.abs(dz)>1)continue;
-        put(x+dx,h+dy,z+dz,B.LEAVES,true);
+        put(x+dx,h+dy,z+dz,lvId,true);
       }
     }
   }
-  // 草花
+  // 草花・枯れ木
   for(let z=0;z<CS;z++)for(let x=0;x<CS;x++){
-    const wx=ox+x,wz=oz+z,h=hm[(z+GP)*GW+x+GP];
+    const wx=ox+x,wz=oz+z,hi=(z+GP)*GW+x+GP,h=hm[hi];
     if(h<=SEA+1||h>=CH-2)continue;
-    if(b[cidx(x,h,z)]!==B.GRASS||b[cidx(x,h+1,z)]!==0)continue;
+    const top=b[cidx(x,h,z)];if(b[cidx(x,h+1,z)]!==0)continue;
     const r=hash3(wx,9,wz,SEED);
-    if(r<.14)b[cidx(x,h+1,z)]=B.TALLGRASS;else if(r<.153)b[cidx(x,h+1,z)]=B.FLOWER_R;else if(r<.166)b[cidx(x,h+1,z)]=B.FLOWER_Y;
+    if(GRASSY[top]){const dens=top===B.GRASS_F?.2:top===B.GRASS_D?.1:top===B.GRASS_C?.06:.14;
+      if(r<dens)b[cidx(x,h+1,z)]=B.TALLGRASS;else if(top!==B.GRASS_C&&r<dens+.013)b[cidx(x,h+1,z)]=B.FLOWER_R;else if(top!==B.GRASS_C&&r<dens+.026)b[cidx(x,h+1,z)]=B.FLOWER_Y;}
+    else if(top===B.SAND&&bm[hi]===2&&r<.012)b[cidx(x,h+1,z)]=B.DEADBUSH;
   }
   const m=mods.get(ckey(cx,cz));
   if(m)m.m.forEach((id,i)=>{b[i]=id;});
@@ -689,7 +789,7 @@ function setBlock(x,y,z,id,silent){
 const needSync=new Set();
 
 // ---------- 光 ----------
-const LOPQ=new Uint8Array(256);for(let i=0;i<256;i++)LOPQ[i]=(OPQ[i]&&i!==B.LEAVES)?1:0;
+const LOPQ=new Uint8Array(256);for(let i=0;i<256;i++)LOPQ[i]=(OPQ[i]&&!LEAF[i])?1:0;
 const lq=new Int32Array(CS*CS*CH*5);
 const tops=new Int16Array(256);
 function bfs(L,b,qt){
@@ -718,14 +818,14 @@ function seedEdges(c,which,qt){
 }
 function computeLight(c){
   const b=c.blocks,S=c.sky,K=c.blk,q=lq;S.fill(0);K.fill(0);let qt=0;
-  for(let z=0;z<16;z++)for(let x=0;x<16;x++){const col=(z<<4)+x;let y=CH-1,lv=15;while(y>=0){const bb=b[(y<<8)+col];if(LOPQ[bb])break;if(bb===B.LEAVES)lv=Math.max(1,lv-1);S[(y<<8)+col]=lv;if(lv<15)q[qt++]=(y<<8)+col;y--;}tops[col]=y;}
+  for(let z=0;z<16;z++)for(let x=0;x<16;x++){const col=(z<<4)+x;let y=CH-1,lv=15;while(y>=0){const bb=b[(y<<8)+col];if(LOPQ[bb])break;if(LEAF[bb])lv=Math.max(1,lv-1);S[(y<<8)+col]=lv;if(lv<15)q[qt++]=(y<<8)+col;y--;}tops[col]=y;}
   
   for(let z=0;z<16;z++)for(let x=0;x<16;x++){const col=(z<<4)+x;let m=tops[col];
     if(x>0)m=Math.max(m,tops[col-1]);if(x<15)m=Math.max(m,tops[col+1]);if(z>0)m=Math.max(m,tops[col-16]);if(z<15)m=Math.max(m,tops[col+16]);
     for(let y=tops[col]+1;y<=m&&y<CH;y++)q[qt++]=(y<<8)+col;}
   qt=seedEdges(c,true,qt);bfs(S,b,qt);
   qt=0;
-  for(let i=0;i<b.length;i++){if(b[i]===B.TORCH){K[i]=14;q[qt++]=i;}}
+  for(let i=0;i<b.length;i++){if(b[i]===B.TORCH){K[i]=15;q[qt++]=i;}}
   qt=seedEdges(c,false,qt);bfs(K,b,qt);
   c.lightOK=true;
 }
@@ -741,7 +841,7 @@ const PW=18,PH=CH+2,PSY=PW*PW;
 const PB=new Uint8Array(PW*PW*PH),PS=new Uint8Array(PW*PW*PH),PL=new Uint8Array(PW*PW*PH);
 const pI=(x,y,z)=>(((y+1)*PW)+(z+1))*PW+(x+1);
 const LUT=new Float32Array(31);for(let i=0;i<31;i++)LUT[i]=Math.pow(.8,15-i/2);
-const LUTB=new Float32Array(31);for(let i=1;i<31;i++)LUTB[i]=Math.pow(.86,15-i/2);
+const LUTB=new Float32Array(31);for(let i=1;i<31;i++)LUTB[i]=Math.pow(.88,15-i/2);
 const brLight=a=>LUT[Math.round(a*2)];
 const brLightB=a=>LUTB[Math.round(a*2)];
 const AOF=[.5,.7,.85,1];
@@ -777,7 +877,8 @@ function buildChunkMesh(c){
   const quad=(P,UV,l0,l1,l2,flip)=>{// 汎用の四角形(植物・たいまつ)
     for(let k=0;k<4;k++){pos.push(P[k*3],P[k*3+1],P[k*3+2]);uvs.push(UV[k*2],UV[k*2+1]);als.push(l0,l1,l2);}
     idx.push(vc,vc+1,vc+2,vc,vc+2,vc+3);vc+=4;};
-  for(let y=0;y<CH;y++)for(let z=0;z<16;z++)for(let x=0;x<16;x++){
+  let maxY=0;{const bk=c.blocks;let i=bk.length-1;while(i>0&&bk[i]===0)i--;maxY=Math.min(CH-1,(i>>8)+1);}
+  for(let y=0;y<=maxY;y++)for(let z=0;z<16;z++)for(let x=0;x<16;x++){
     const p=pI(x,y,z),id=PB[p];if(id===0)continue;
     if(id===B.WATER){
       const up=PB[p+PSY];const topH=(up===B.WATER)?1:.875;
@@ -837,7 +938,7 @@ function buildChunkMesh(c){
   const scene_=scene;
   const disposeMesh=m=>{if(m){scene_.remove(m);m.geometry.dispose();}};
   disposeMesh(c.mesh);disposeMesh(c.wmesh);c.mesh=c.wmesh=null;
-  const bs=new THREE.Sphere(new THREE.Vector3(8,CH/2,8),38);
+  const bs=new THREE.Sphere(new THREE.Vector3(8,maxY/2,8),Math.sqrt(128+(maxY/2+1)*(maxY/2+1))+1);
   const mk=(P,UV,A,IX,mat,ro)=>{const g=new THREE.BufferGeometry();
     g.setAttribute('position',new THREE.BufferAttribute(new Float32Array(P),3));
     g.setAttribute('uv',new THREE.BufferAttribute(new Float32Array(UV),2));
@@ -924,7 +1025,7 @@ const starGeo=new THREE.BufferGeometry();
 const starMat=new THREE.PointsMaterial({size:2.4,sizeAttenuation:false,color:0xffffff,transparent:true,opacity:0,fog:false,depthWrite:false});
 const stars=new THREE.Points(starGeo,starMat);stars.frustumCulled=false;stars.renderOrder=-9;scene.add(stars);
 // 雲
-const CLOUD_Y=78,CLOUD_W=1000,CLOUD_CELL=240;
+const CLOUD_Y=150,CLOUD_W=1000,CLOUD_CELL=240;
 const cloudTex=(function(){const cv=document.createElement('canvas');cv.width=cv.height=32;const g=cv.getContext('2d');const nz=makeNoise(31);
   for(let y=0;y<32;y++)for(let x=0;x<32;x++){const v=nz.n2(x*.16,y*.16)+nz.n2(x*.32+9,y*.32)*.5;if(v>.2){g.fillStyle='rgba(255,255,255,1)';g.fillRect(x,y,1,1);}}
   const t=new THREE.CanvasTexture(cv);t.magFilter=THREE.NearestFilter;t.minFilter=THREE.NearestFilter;t.generateMipmaps=false;t.wrapS=t.wrapT=THREE.RepeatWrapping;t.repeat.set(CLOUD_W/CLOUD_CELL,CLOUD_W/CLOUD_CELL);return t;})();
@@ -1129,6 +1230,19 @@ function shootArrow(ex,ey,ez,tx,ty,tz){
   const m=new THREE.Mesh(arrowGeo,arrowMat);scene.add(m);
   arrows.push({x:ex,y:ey,z:ez,vx:dx/d*sp,vy:dy/d*sp+d*.18,vz:dz/d*sp,m,life:5});Sfx.play('swing');
 }
+function separateMobs(dt){
+  const all=zombies.concat(animals);
+  for(let i=0;i<all.length;i++){const a=all[i];if(a.dead)continue;
+    for(let j=i+1;j<all.length;j++){const b=all[j];if(b.dead)continue;
+      const dx=b.position.x-a.position.x,dz=b.position.z-a.position.z;if(Math.abs(dy(a,b))>1.5)continue;
+      const d=Math.hypot(dx,dz),r=(a.w+b.w)*.5+.1;
+      if(d<r){const l=d||1,push=(r-d)*6;const nx=d?dx/l:1,nz=d?dz/l:0;a.velocity.x-=nx*push*dt*8;a.velocity.z-=nz*push*dt*8;b.velocity.x+=nx*push*dt*8;b.velocity.z+=nz*push*dt*8;}}}
+}
+function dy(a,b){return a.position.y-b.position.y;}
+function cactusCheck(){
+  const p=player.position,hw=.4;
+  for(let y=Math.floor(p.y);y<=Math.floor(p.y+1.7);y++)for(let z=Math.floor(p.z-hw);z<=Math.floor(p.z+hw);z++)for(let x=Math.floor(p.x-hw);x<=Math.floor(p.x+hw);x++)if(getBlock(x,y,z)===B.CACTUS){hurtPlayer(1,undefined,undefined,false);return;}
+}
 function updateArrows(dt){
   for(let i=arrows.length-1;i>=0;i--){const a=arrows[i];a.life-=dt;a.vy-=11*dt;
     const nx=a.x+a.vx*dt,ny=a.y+a.vy*dt,nz=a.z+a.vz*dt;
@@ -1140,7 +1254,7 @@ function updateArrows(dt){
 }
 function groundYAt(x,z,fromY){
   const ix=Math.floor(x),iz=Math.floor(z);
-  for(let y=Math.min(CH-2,Math.floor(fromY));y>0;y--){const id=getBlock(ix,y,iz);if(SOLID[id])return id!==B.LEAVES&&(getBlock(ix,y+1,iz)===0||isPlant(getBlock(ix,y+1,iz)))&&!SOLID[getBlock(ix,y+2,iz)]?y+1:-1;if(id===B.WATER)return-1;}
+  for(let y=Math.min(CH-2,Math.floor(fromY));y>0;y--){const id=getBlock(ix,y,iz);if(SOLID[id])return !LEAF[id]&&(getBlock(ix,y+1,iz)===0||isPlant(getBlock(ix,y+1,iz)))&&!SOLID[getBlock(ix,y+2,iz)]?y+1:-1;if(id===B.WATER)return-1;}
   return-1;
 }
 
@@ -1172,7 +1286,7 @@ function removeAnimal(a){scene.remove(a.model);a.model.userData.mats.forEach(m=>
 // ============================================================
 //  設定・インベントリ・目標
 // ============================================================
-const SAVE_KEY='voxelcraft_save_v1',SET_KEY='voxelcraft_settings_v1';
+const SAVE_KEY='voxelcraft_save_v2',SET_KEY='voxelcraft_settings_v1';
 const settings={mute:false,rd:6,sens:5};
 try{const s=JSON.parse(localStorage.getItem(SET_KEY)||'null');if(s){settings.mute=!!s.mute;settings.rd=[4,6,8].includes(s.rd)?s.rd:6;settings.sens=clamp(+s.sens||5,1,10);}}catch(e){}
 function saveSettings(){try{localStorage.setItem(SET_KEY,JSON.stringify(settings));}catch(e){}}
@@ -1375,7 +1489,7 @@ function breakInfo(id){
   const bi=BI[id];if(!bi||bi.hard<0)return{t:Infinity,harvest:false};
   const tool=heldTool();let mult=1,harvest=true;
   if(bi.tool){if(tool&&tool.type===bi.tool){if(tool.tier>=bi.tier)mult=tool.mult;else harvest=false;}else if(bi.tier>0)harvest=false;}
-  else if(tool&&tool.type==='sword'&&id===B.LEAVES)mult=3;
+  else if(tool&&tool.type==='sword'&&LEAF[id])mult=3;
   if(!harvest)return{t:Math.max(.05,bi.hard*5),harvest:false};
   return{t:Math.max(.04,bi.hard*1.5/mult),harvest:true};
 }
@@ -1392,7 +1506,7 @@ function breakBlockAt(x,y,z){
   const above=getBlock(x,y+1,z);if(isPlant(above)){setBlock(x,y+1,z,0);if(above!==B.TALLGRASS)spawnDrop(above,1,x+.5,y+1.5,z+.5);}
   if(info.harvest){
     let dropId=bi.drop;
-    if(id===B.LEAVES){const r=Math.random();dropId=r<.075?I.APPLE:r<.19?I.STICK:0;}
+    if(LEAF[id]){const r=Math.random();dropId=(id===B.LEAVES&&r<.075)?I.APPLE:r<.19?I.STICK:0;}
     if(dropId)spawnDrop(dropId,1,x+.5,y+.5,z+.5,(Math.random()-.5)*2,3,(Math.random()-.5)*2);
   }
   blockBreakParticles(x,y,z,id,14);
@@ -1464,7 +1578,7 @@ function updateTarget(){
   const p=player.position,cp=Math.cos(player.pitch);
   const ox=p.x,oy=p.y+1.62,oz=p.z,dx=-Math.sin(player.yaw)*cp,dy=Math.sin(player.pitch),dz=-Math.cos(player.yaw)*cp;
   hit=raycast(ox,oy,oz,dx,dy,dz,5.2);
-  zHit=(zombies.length||animals.length)?targetZombie(3.6):null;
+  zHit=(zombies.length||animals.length)?targetZombie(3.0):null;
   if(hit&&hit.id===B.BEDROCK)hit.unbreakable=true;
 }
 function updateMining(dt){
@@ -1572,7 +1686,7 @@ function updatePlayer(dt){
 //  ゾンビ更新・出現
 // ============================================================
 let spawnT=4;
-function lightFactor(x,y,z){const l=lightAt(Math.floor(x),Math.floor(y),Math.floor(z));let h=0;if(U.uHeld.value>0){const P=player.position,d=Math.hypot(x-P.x,y-P.y-1.5,z-P.z);h=Math.pow(Math.max(0,1-d/13),2)*1.1;}return Math.max(LUT[l[0]*2]*U.uDay.value,LUTB[l[1]*2]*.95,h,.12);}
+function lightFactor(x,y,z){const l=lightAt(Math.floor(x),Math.floor(y),Math.floor(z));let h=0;if(U.uHeld.value>0){const P=player.position,d=Math.hypot(x-P.x,y-P.y-1.5,z-P.z);h=Math.pow(Math.max(0,1-d/20),1.4)*1.3;}return Math.max(LUT[l[0]*2]*U.uDay.value,LUTB[l[1]*2]*.95,h,.12);}
 function updateZombies(dt){
   const P=player.position;
   for(let i=zombies.length-1;i>=0;i--){
@@ -1587,7 +1701,9 @@ function updateZombies(dt){
     let speed=0;
     if(chase){z.yaw=Math.atan2(dx,dz);if(z.skel)speed=d2>11?2.3:(d2<5?-2:0);else speed=d2>.9?2.7:0;}
     else{z.wander-=dt;if(z.wander<=0){z.wander=2+Math.random()*3;z.moving=Math.random()<.5;z.wanderYaw=Math.random()*6.283;}if(z.moving){z.yaw=z.wanderYaw;speed=1;}}
-    if(z.kbT<=0){const k=Math.min(1,10*dt);v.x+=(Math.sin(z.yaw)*speed-v.x)*k;v.z+=(Math.cos(z.yaw)*speed-v.z)*k;}
+    if(z.kbT<=0){const k=Math.min(1,10*dt);let tvx=Math.sin(z.yaw)*speed,tvz=Math.cos(z.yaw)*speed;
+      if(z.skel&&chase&&d2<16){z.strafeT=(z.strafeT||0)-dt;if(z.strafeT<=0){z.strafeT=1+Math.random()*2;z.strafe=Math.random()<.5?-1:1;}tvx+=Math.cos(z.yaw)*z.strafe*2;tvz-=Math.sin(z.yaw)*z.strafe*2;}
+      v.x+=(tvx-v.x)*k;v.z+=(tvz-v.z)*k;}
     if(z.inWater){v.y-=8*dt;v.y*=1-Math.min(1,2*dt);v.y=Math.max(v.y,1.2*0+v.y);if(chase||z.hitX||z.hitZ)v.y=Math.min(3,v.y+22*dt);}
     else v.y-=GRAV*dt;
     if(speed>0&&(z.hitX||z.hitZ)&&z.onGround&&z.kbT<=0)v.y=8.8;
@@ -1657,9 +1773,9 @@ function trySpawnPig(){
     const a=Math.random()*6.283,r=14+Math.random()*24,x=P.x+Math.cos(a)*r,z=P.z+Math.sin(a)*r;
     if(!getChunk(Math.floor(x/CS),Math.floor(z/CS)))continue;
     const y=groundYAt(x,z,P.y+14);if(y<0)continue;
-    if(getBlock(Math.floor(x),y-1,Math.floor(z))!==B.GRASS)continue;
+    if(!GRASSY[getBlock(Math.floor(x),y-1,Math.floor(z))])continue;
     const g=1+((Math.random()*2)|0);
-    for(let j=0;j<g;j++){const px=Math.floor(x)+.5+j*1.2,pz=Math.floor(z)+.5;const yy=groundYAt(px,pz,y+3);if(yy>=0&&getBlock(Math.floor(px),yy-1,Math.floor(pz))===B.GRASS)spawnPigAt(px,yy+.01,pz);}
+    for(let j=0;j<g;j++){const px=Math.floor(x)+.5+j*1.2,pz=Math.floor(z)+.5;const yy=groundYAt(px,pz,y+3);if(yy>=0&&GRASSY[getBlock(Math.floor(px),yy-1,Math.floor(pz))])spawnPigAt(px,yy+.01,pz);}
     return true;
   }
   return false;
@@ -1699,8 +1815,8 @@ function buildHandObj(id){
   const g=new THREE.Group();if(!id)return g;
   const cube=!!CUBE_IDS[id];
   const m=new THREE.Mesh(itemGeometry(id),cube?handBlockMat:handFlatMat);
-  if(cube){m.scale.setScalar(.5);m.rotation.set(-.9,-.6,0);m.position.set(0,.12,-.05);}
-  else{m.scale.setScalar(.78);m.rotation.set(-.95,-.5,.7);m.position.set(.02,.2,-.08);}
+  if(cube){m.scale.setScalar(.3);m.rotation.set(-.9,-.6,0);m.position.set(0,.1,-.04);}
+  else{m.scale.setScalar(.4);m.rotation.set(-.95,-.22,.7);m.position.set(.02,.12,-.06);}
   g.add(m);return g;
 }
 function updateHand(dt){
@@ -1781,9 +1897,9 @@ function findSpawn(){
     const n=r===0?1:Math.max(6,Math.floor(r/4));
     for(let k=0;k<n;k++){
       const a=k/n*6.2832+r*.7,x=Math.floor(8+Math.cos(a)*r),z=Math.floor(8+Math.sin(a)*r);
-      const h=heightAt(x,z);if(h<SEA+2||h>SEA+9)continue;
+      const h=heightAt(x,z);if(h<SEA+2||h>SEA+16)continue;
       const cx=x>>4,cz=z>>4;for(let dz=-1;dz<=1;dz++)for(let dx=-1;dx<=1;dx++)ensure(cx+dx,cz+dz);
-      if(getBlock(x,h,z)!==B.GRASS)continue;
+      if(!GRASSY[getBlock(x,h,z)])continue;
       const u=getBlock(x,h+1,z);if(u&&!isPlant(u))continue;
       if(SOLID[getBlock(x,h+2,z)]||SOLID[getBlock(x,h+3,z)])continue;
       let clear=true;for(let dz=-2;dz<=2&&clear;dz++)for(let dx=-2;dx<=2;dx++){const hh=heightAt(x+dx,z+dz);if(hh>h+2||hh<h-3||SOLID[getBlock(x+dx,h+1,z+dz)]||SOLID[getBlock(x+dx,h+2,z+dz)]){clear=false;break;}}
@@ -1925,7 +2041,7 @@ function update(dt){
   if(sim){
     advanceTime(dt);
     updatePlayer(dt);for(const k in tapKeys)delete tapKeys[k];
-    updateTarget();updateMining(dt);updateZombies(dt);updateArrows(dt);updateAnimals(dt);updateDrops(dt);updateParticles(dt);
+    updateTarget();updateMining(dt);updateZombies(dt);updateAnimals(dt);separateMobs(dt);updateArrows(dt);cactusCheck();updateDrops(dt);updateParticles(dt);
     streamChunks(P.x,P.z,3,5);if((frameNo&63)===0)unloadFar(P.x,P.z);
     flushSync();
     autosaveT+=dt;if(autosaveT>20){autosaveT=0;saveGame();}
@@ -2025,7 +2141,7 @@ if(DEBUG){
     selectSlot:selectSlot,
     craft:(i)=>craft(RECIPES[i]),
     openInventory:(t)=>openInventory(!!t),closeInventory,pauseGame,resumeGame,
-    heightAt,raycast,chunksMap:chunks,
+    heightAt,biomeAt:(x,z)=>biomeAt(x,z,heightAt(x,z)),raycast,chunksMap:chunks,
     setFly:(on)=>{player.fly=!!on;return player.fly;},
     hurt:(n)=>hurtPlayer(n,undefined,undefined,true),
     input:()=>({l:mouse.l,r:mouse.r,locked,state,prog:mine.prog,key:mine.key,zHit:!!zHit,hit:!!hit}),
