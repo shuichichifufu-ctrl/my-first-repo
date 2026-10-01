@@ -4,6 +4,7 @@
 const Q = new URLSearchParams(location.search);
 const AUTO = Q.get('auto') === '1';          // 1P側もCPUにする（動作確認用）
 const SPEED = Math.max(1, +(Q.get('speed') || 1)); // 1描画で進めるフレーム数（動作確認用）
+const NORENDER = Q.get('norender') === '1'; // 描画を省略して高速に試合を回す（検証用）
 const RING_R = 5.0, BODY_R = 0.38, MIN_SEP = 0.78;
 const WIN_ROUNDS = 2, ROUND_TIME = 60;
 
@@ -212,8 +213,10 @@ F[0].dispHp = F[1].dispHp = 100;
 
 // ====== 効果エフェクト ======
 const sparks = [];
-function spark(x, y, z, color, size) {
-  const m = new THREE.Mesh(new THREE.SphereGeometry(1, 10, 8), new THREE.MeshBasicMaterial({ color, transparent:true, opacity:0.95 }));
+function spark(x, y, z, color, size, shape) {
+  const geo = shape === 'ring' ? new THREE.TorusGeometry(1, 0.16, 6, 20) : shape === 'star' ? new THREE.OctahedronGeometry(1.1) : new THREE.SphereGeometry(1, 10, 8);
+  const m = new THREE.Mesh(geo, new THREE.MeshBasicMaterial({ color, transparent:true, opacity:0.95 }));
+  m.rotation.set(Math.random() * 3, Math.random() * 3, Math.random() * 3);
   m.position.set(x, y, z); m.scale.setScalar(size * 0.3); scene.add(m);
   sparks.push({ m, life:0, max:14, size });
 }
@@ -227,7 +230,7 @@ function updateSparks() {
 
 // ====== ゲーム状態 ======
 const game = { phase:'title', timer:ROUND_TIME * 60, round:1, pt:0, shake:0, slow:0, flash:0, matchWinner:null, lastCamD:7 };
-window.__vf = { game, F, MOVES, get fighters() { return F; } };
+window.__vf = { game, F, MOVES, keys, bot:null, get fighters() { return F; } };
 
 function resetRound() {
   F[0].x = -1.8; F[0].z = 0; F[1].x = 1.8; F[1].z = 0;
@@ -303,7 +306,7 @@ function tryHit(a, d) {
     d.vx = a.ax * m.kb * 0.9; d.vz = a.az * m.kb * 0.9;
     a.vx = -a.ax * m.kb * 0.35; a.vz = -a.az * m.kb * 0.35;
     a.freeze = d.freeze = 3; game.shake = 2;
-    spark(midX, hitY, midZ, 0x9ad0ff, 0.28); SFX.block(); sub('ガード', 400);
+    spark(midX, hitY, midZ, 0x9ad0ff, 0.3, 'ring'); SFX.block(); sub('ガード', 400);
   } else {
     let dmg = m.dmg, hs = m.hs, kb = m.kb, counter = false;
     if (wasAttacking && d.t < d.move.su) { counter = true; dmg = Math.round(dmg * 1.3); hs += 6; kb *= 1.4; }
@@ -311,7 +314,7 @@ function tryHit(a, d) {
     d.hitLow = m.h === 'low' || m.pose === 'elbow';
     d.vx = a.ax * kb; d.vz = a.az * kb;
     a.freeze = d.freeze = counter ? 8 : 6; game.shake = counter ? 6 : 4;
-    { const col = counter ? 0xffe14d : m.pose === 'kick' ? 0xff9a3d : m.pose === 'lowkick' ? 0x7dffb0 : m.pose === 'elbow' ? 0xff4d4d : 0xffffff; const sz = (counter ? 0.7 : 0.45) * (m.pose === 'kick' ? 1.25 : m.pose === 'elbow' ? 1.4 : m.pose === 'punch' ? 0.85 : 1); spark(midX, hitY, midZ, col, sz); spark(midX, hitY, midZ, 0xffffff, sz * 0.5); }
+    { const col = counter ? 0xffe14d : m.pose === 'kick' ? 0xff9a3d : m.pose === 'lowkick' ? 0x7dffb0 : m.pose === 'elbow' ? 0xff4d4d : 0xffffff; const sz = (counter ? 0.7 : 0.45) * (m.pose === 'kick' ? 1.25 : m.pose === 'elbow' ? 1.4 : m.pose === 'punch' ? 0.85 : 1); spark(midX, hitY, midZ, col, sz, 'star'); spark(midX, hitY, midZ, 0xffffff, sz * 0.5, 'star'); }
     (counter || m.pose === 'elbow' ? SFX.heavy : SFX.hit)();
     if (counter) sub('カウンター！', 700);
     game.flash = counter ? 6 : 3;
@@ -495,12 +498,12 @@ function makeAI(f, o, level) {
       if (game.phase !== 'fight') return;
       const d = Math.hypot(o.x - f.x, o.z - f.z);
       // 投げ抜け
-      if (f.state === 'grabbed' && f.t < 12 && Math.random() < 0.12 * level) { inp.pBuf = inp.gBuf = 5; inp.p = inp.g = true; return; }
+      if (f.state === 'grabbed' && f.t < 12 && Math.random() < 0.06 * level) { inp.pBuf = inp.gBuf = 5; inp.p = inp.g = true; return; }
       // 相手の攻撃に反応
       if (o.state === 'attack' && o.move && o.t === 1 && d < 2.4 && o.move.h !== 'throw') {
         const r = Math.random();
-        if (r < 0.62 * level) { this.react = { h:o.move.h }; }
-        else if (r < 0.80 * level) this.set(Math.random() < 0.5 ? 'sideIn' : 'sideOut', 14);
+        if (r < 0.55 * level) { this.react = { h:o.move.h }; }
+        else if (r < 0.88 * level) this.set(Math.random() < 0.5 ? 'sideIn' : 'sideOut', 14);
         if (this.react) {
           if (o.move.h === 'low') this.set('crouch', 24);
           else if (o.move.h === 'high' && Math.random() < 0.35) this.set('crouch', 18);
@@ -519,10 +522,11 @@ function makeAI(f, o, level) {
         if (d < 1.85) { this.useMove('K'); this.cd = 16; return; }
         if (d < 2.6) { this.set('fwd', 7); this.cd = 4; return; }
       }
-      if (o.state === 'attack' && o.move && o.move.h === 'throw' && o.t > o.move.su && d < 1.8 && Math.random() < 0.8) { this.useMove('P'); this.cd = 16; return; }
+      if (o.state === 'attack' && o.move && o.move.h === 'throw' && o.t <= 5 && d < 1.5 && Math.random() < 0.7 * level) { this.useMove('P'); this.cd = 16; return; }
       if (oStun0 && d < 1.7 && Math.random() < 0.5 * level) { this.useMove(Math.random() < 0.6 ? 'P' : 'K'); this.cd = 10; return; }
       // ガード固め対策：立ちガードには下段か投げ、しゃがみガードには中段
-      if (o.guardT > 25 && d < 1.7 && Math.random() < 0.45 * level) { this.useMove(o.crouching ? (Math.random() < 0.5 ? 'K' : 'EL') : (Math.random() < 0.5 ? 'TH' : 'LK')); this.cd = 14; return; }
+      if (o.guardT > 10 && d >= 1.25 && d < 2.6 && Math.random() < 0.5 * level) { this.set('fwd', 5); this.cd = 3; return; }
+      if (o.guardT > 10 && d < 1.3 && Math.random() < 0.6 * level) { this.useMove(o.crouching ? (Math.random() < 0.5 ? 'K' : 'EL') : (Math.random() < 0.5 ? 'TH' : 'LK')); this.cd = 14; return; }
       if (this.cd > 0) { this.cd--; return; }
       // 行動の決定
       const guardingOpp = o.input.g && oFree;
@@ -651,7 +655,8 @@ function logicStep() {
   const [a, b] = F;
   // 入力の読み取り
   const K1 = KEYMAP.p1;
-  if (!a.ai) {
+  if (!a.ai && window.__vf.bot) window.__vf.bot(a, b);
+  else if (!a.ai) {
     const i = a.input;
     i.fwd = !!(keys[K1.right] || keys.ArrowRight); i.back = !!(keys[K1.left] || keys.ArrowLeft);
     i.crouch = !!(keys[K1.crouch] || keys.ArrowDown);
@@ -709,11 +714,12 @@ function frame(now) {
   const rate = game.slow > 0 ? 0.35 : 1;
   acc += dt * 60 * rate * SPEED;
   let guard = 0;
-  while (acc >= 1 && guard++ < 12) {
+  while (acc >= 1 && guard++ < 12 * SPEED) {
     if (game.phase !== 'title') logicStep();
     acc -= 1;
   }
   if (game.slow > 0) game.slow--;
+  if (NORENDER) { for (const f of F) { if (f.dispHp > f.hp) f.dispHp = f.hp; } return; }
   for (const f of F) applyPose(f);
   updateSparks(); updateCamera(); updateHud();
   $('flash').style.opacity = game.flash > 0 ? 0.25 : 0;
