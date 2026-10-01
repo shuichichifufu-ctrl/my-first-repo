@@ -3,14 +3,72 @@
 <head>
 <meta charset="utf-8">
 <title>ボクセルクラフト</title>
-<meta name="viewport" content="width=device-width,initial-scale=1">
+<meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no,viewport-fit=cover">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="ボクセルクラフト">
+<meta name="format-detection" content="telephone=no">
 <style>
-:root{--slot:max(24px,min(56px,5.4vw,9.2vh));--ui:#2b2b2b;--edge:#111;--hi:#8b8b8b;--txt:#fff}
-*{box-sizing:border-box;-webkit-user-select:none;user-select:none}
-html,body{margin:0;height:100%;overflow:hidden;background:#78a7ff;color:var(--txt);
+:root{--slot:max(24px,min(56px,5.4vw,calc(var(--vh,1vh)*9.2)));--ui:#2b2b2b;--edge:#111;--hi:#8b8b8b;--txt:#fff}
+*{box-sizing:border-box;-webkit-user-select:none;user-select:none;-webkit-touch-callout:none;-webkit-tap-highlight-color:transparent}
+html,body{margin:0;height:100%;overflow:hidden;position:fixed;inset:0;width:100%;overscroll-behavior:none;touch-action:none;-webkit-text-size-adjust:100%;background:#78a7ff;color:var(--txt);
  font-family:"Hiragino Kaku Gothic ProN","Meiryo","Noto Sans JP","IPAGothic","Yu Gothic",sans-serif;font-size:18px}
 canvas#c{position:fixed;inset:0;width:100%;height:100%;display:block;image-rendering:pixelated;outline:none}
 .hidden{display:none!important}
+.screen,.scrollok,#craftlist,#inv .wrap{touch-action:pan-y}
+.tonly{display:none}
+body.touch .tonly{display:block}
+body.touch .kb{display:none!important}
+.tc{display:none}
+body.touch .tc{display:revert}
+#touchui{position:fixed;inset:0;pointer-events:none;z-index:5;touch-action:none}
+#lookpad{position:absolute;inset:0;pointer-events:auto;touch-action:none}
+#stickbase{position:absolute;left:calc(26px + env(safe-area-inset-left,0px));bottom:calc(var(--cb) + 6px);width:120px;height:120px;border-radius:50%;background:rgba(255,255,255,.12);border:3px solid rgba(255,255,255,.35);pointer-events:none;opacity:.7}
+#stickbase.on{opacity:1;background:rgba(255,255,255,.2)}
+#stickknob{position:absolute;left:33px;top:33px;width:54px;height:54px;border-radius:50%;background:rgba(255,255,255,.55);border:3px solid rgba(0,0,0,.45)}
+.tbtn{position:absolute;pointer-events:auto;touch-action:none;border-radius:50%;background:rgba(40,40,50,.55);border:3px solid rgba(255,255,255,.55);color:#fff;font:bold 17px/1 inherit;display:flex;align-items:center;justify-content:center;text-align:center;text-shadow:2px 2px 0 #000;font-family:inherit}
+.tbtn.down,.tbtn.on{background:rgba(127,224,74,.65)}
+#tbBreak{width:92px;height:92px;right:calc(16px + env(safe-area-inset-right,0px));bottom:var(--cb);font-size:20px;background:rgba(200,60,50,.5)}
+#tbPlace{width:80px;height:80px;right:calc(120px + env(safe-area-inset-right,0px));bottom:var(--cb);font-size:20px;background:rgba(60,120,200,.5)}
+#tbJump{width:74px;height:74px;right:calc(24px + env(safe-area-inset-right,0px));bottom:calc(var(--cb) + 106px);font-size:15px}
+#tbDash{width:64px;height:48px;border-radius:14px;left:calc(26px + env(safe-area-inset-left,0px));bottom:calc(var(--cb) + 142px);font-size:14px}
+#topbtns{position:absolute;right:calc(10px + env(safe-area-inset-right,0px));top:calc(8px + env(safe-area-inset-top,0px));display:flex;gap:8px;pointer-events:none}
+#topbtns .tbtn{position:static;width:50px;height:50px;border-radius:12px;font-size:12px}
+#tbDash,#tbInv,#tbPause{pointer-events:auto}
+body.touch{--cb:calc(16px + env(safe-area-inset-bottom,0px))}
+body.touch #hud{z-index:6}
+body.touch #hotbar{pointer-events:auto;touch-action:none}
+body.touch #crosshair{opacity:.8}
+body.touch :root,body.touch{--slot:min(46px,10.4vw,calc(var(--vh,1vh)*11))}
+body.touch #bottom{bottom:calc(10px + env(safe-area-inset-bottom,0px))}
+body.touch #tl{left:calc(10px + env(safe-area-inset-left,0px));top:calc(8px + env(safe-area-inset-top,0px));max-width:calc(100vw - 190px - env(safe-area-inset-left,0px))}
+body.touch #objtext{font-size:14px;line-height:1.35}
+body.touch #objective{padding:5px 8px}
+body.touch #clock{bottom:auto!important;top:calc(64px + env(safe-area-inset-top,0px));right:calc(10px + env(safe-area-inset-right,0px));font-size:12px;padding:3px 7px;gap:6px}
+body.touch #clockicon{width:12px;height:12px}
+body.touch #snd{display:none}
+body.touch #toasts{top:calc(70px + env(safe-area-inset-top,0px))}
+body.touch .toast{font-size:14px}
+body.touch #target{font-size:13px}
+body.touch .btn{min-height:46px}
+body.touch .btn.sm{min-height:44px;min-width:56px}
+body.touch #clickhint,body.touch #keyhint{display:none!important}
+@media (orientation:portrait){body.touch{--cb:calc(118px + env(safe-area-inset-bottom,0px))}
+ body.touch #tbPlace{right:calc(118px + env(safe-area-inset-right,0px));width:74px;height:74px}
+ body.touch #stickbase{width:112px;height:112px}
+ body.touch #tl{max-width:calc(100vw - 150px)}}
+body.touch #invgrid,body.touch .cgrid{grid-template-columns:repeat(9,minmax(0,1fr));width:calc(var(--slot)*9 + 28px)}
+body.touch #invgrid .slot,body.touch .cgrid .slot{width:auto;height:auto;aspect-ratio:1}
+@media (orientation:portrait){body.touch #invgrid,body.touch .cgrid{width:100%}}
+body.touch #invgrid{margin-top:34px}
+#invtools{margin-top:8px}
+#invtools .btn.sm{margin:3px 3px 0 0}
+#invtools .btn.on{outline:3px solid #fff}
+#invClose{position:absolute;right:8px;top:8px}
+#inv .panel{position:relative}
+#portraitnote{display:none;font-size:15px;color:#ffe066}
+@media (orientation:portrait){body.touch #portraitnote{display:block}}
 img.px,.px{image-rendering:pixelated;image-rendering:crisp-edges}
 #hud{position:fixed;inset:0;pointer-events:none}
 #crosshair{position:absolute;left:50%;top:50%;width:26px;height:26px;margin:-13px 0 0 -13px;mix-blend-mode:difference}
@@ -86,10 +144,10 @@ img.px,.px{image-rendering:pixelated;image-rendering:crisp-edges}
 #loading .bar i{display:block;height:100%;width:30%;background:#7fe04a;animation:ld 1s infinite alternate}
 @keyframes ld{from{margin-left:0}to{margin-left:70%}}
 #inv{background:rgba(0,0,0,.45)}
-#inv .wrap{overflow:auto;display:flex;gap:18px;align-items:stretch;max-width:98vw;max-height:94vh}
+#inv .wrap{overflow:auto;display:flex;gap:18px;align-items:stretch;max-width:98vw;max-height:calc(var(--vh,1vh)*94)}
 #inv .panel{padding:14px 16px}
 #inv h3{margin:0 0 8px;font-size:22px}
-#craftlist{width:min(380px,38vw);overflow-y:auto;max-height:calc(94vh - 90px);padding-right:6px}
+#craftlist{width:min(380px,36vw);overflow-y:auto;max-height:calc(calc(var(--vh,1vh)*94) - 90px);padding-right:6px}
 .rec{display:flex;align-items:center;gap:10px;padding:6px 8px;margin:4px 0;border:3px solid #333;background:rgba(60,60,60,.6);cursor:pointer}
 .rec img{width:38px;height:38px;image-rendering:pixelated;flex:none}
 .rec .rn{font-size:18px;font-weight:bold}
@@ -123,7 +181,7 @@ img.px,.px{image-rendering:pixelated;image-rendering:crisp-edges}
 @media (max-height:720px){#title h1{font-size:clamp(34px,6vw,52px)}#title .sub{font-size:16px;margin-top:-10px}#title .help{font-size:15px;line-height:1.45}.btn{font-size:19px;padding:9px 14px;margin:7px 0}#title .panel{padding:14px 20px}}
 @media (max-width:700px),(max-aspect-ratio:1/1){#tl{max-width:calc(100vw - 28px)}#objtext{font-size:15px}#keyhint{font-size:12px}#clock{top:auto;bottom:calc(var(--slot) + 112px);right:8px;font-size:15px;padding:4px 8px}#clockicon{width:16px;height:16px}.toast{font-size:15px}}
 @media (max-height:420px){.panel{padding:10px 14px}.btn{font-size:15px;padding:6px 10px;margin:5px 0}#pause h2{font-size:20px;margin:0}.row{font-size:14px;margin:4px 0}.btn.sm{font-size:14px;padding:3px 8px}#death h2{font-size:32px}#death p{font-size:15px}}
-@media (max-width:900px){#inv .wrap{overflow:auto;flex-direction:column;overflow-y:auto}#craftlist{width:auto;max-height:30vh}}
+@media (max-width:900px) and (orientation:portrait){#inv .wrap{overflow:auto;flex-direction:column;overflow-y:auto}#craftlist{width:auto;max-height:calc(var(--vh,1vh)*30)}}
 </style>
 </head>
 <body>
@@ -146,6 +204,15 @@ img.px,.px{image-rendering:pixelated;image-rendering:crisp-edges}
   <div id="dbg" class="hidden"></div>
 </div>
 
+<div id="touchui" class="hidden">
+  <div id="lookpad"></div>
+  <div id="stickbase"><div id="stickknob"></div></div>
+  <div id="tbDash" class="tbtn">ダッシュ</div>
+  <div id="tbJump" class="tbtn">ジャンプ</div>
+  <div id="tbPlace" class="tbtn">置く</div>
+  <div id="tbBreak" class="tbtn">壊す</div>
+  <div id="topbtns"><div id="tbInv" class="tbtn">持ち物</div><div id="tbPause" class="tbtn">ポーズ</div></div>
+</div>
 <div id="title" class="screen">
   <h1>ボクセル<span>クラフト</span></h1>
   <div class="sub">ブロックを掘って、集めて、作って、夜を生きのびよう</div>
@@ -159,7 +226,7 @@ img.px,.px{image-rendering:pixelated;image-rendering:crisp-edges}
     </div>
     <div class="panel help">
       <h3>そうさ方法</h3>
-      <table>
+      <table class="kb">
         <tr><td>W A S D</td><td>歩く</td></tr>
         <tr><td>マウス</td><td>見まわす（画面をクリックで操作開始）</td></tr>
         <tr><td>スペース</td><td>ジャンプ ／ 水の中では泳ぐ</td></tr>
@@ -170,6 +237,19 @@ img.px,.px{image-rendering:pixelated;image-rendering:crisp-edges}
         <tr><td>E</td><td>持ち物・クラフト画面</td></tr>
         <tr><td>M ／ Esc</td><td>音ON・OFF ／ ポーズ</td></tr>
       </table>
+      <div class="tc">
+        <div id="portraitnote">※ 横向きにすると遊びやすいよ（縦でも遊べます）</div>
+        <table>
+          <tr><td>左下スティック</td><td>歩く（大きく倒すとダッシュ）</td></tr>
+          <tr><td>画面の右側をなぞる</td><td>見まわす</td></tr>
+          <tr><td>壊す（長押し）</td><td>ブロックをこわす・敵をたたく</td></tr>
+          <tr><td>置く（タップ）</td><td>ブロックを置く・食べる・作業台を開く</td></tr>
+          <tr><td>ジャンプ</td><td>ジャンプ ／ 水の中では泳ぐ</td></tr>
+          <tr><td>下の枠をタップ</td><td>アイテム切りかえ</td></tr>
+          <tr><td>持ち物 / ポーズ</td><td>右上のボタン</td></tr>
+        </table>
+        <div style="font-size:13px;color:#bbb;margin-top:6px">Safariの共有ボタン →「ホーム画面に追加」で全画面で遊べます</div>
+      </div>
     </div>
   </div>
 </div>
@@ -189,6 +269,8 @@ img.px,.px{image-rendering:pixelated;image-rendering:crisp-edges}
   <div class="wrap">
     <div class="panel"><h3 id="craftTitle">クラフト</h3><div id="craftlist"></div><div id="contpanel" class="hidden"></div></div>
     <div class="panel"><h3>持ち物</h3><div id="invgrid"></div>
+      <div id="invtools" class="tonly"><button class="btn sm on" data-m="n">ふつう</button><button class="btn sm" data-m="h">半分・1個ずつ</button><button class="btn sm" data-m="m">まとめて移動</button></div>
+      <button class="btn sm tonly" id="invClose">閉じる ✕</button>
       <div id="invhint">左クリック：持つ・置く／右クリック：半分・1個ずつ／Shift+クリック：移動<br>左のリストをクリックでクラフト（作業台のそばなら道具も作れる）　Eで閉じる</div></div>
   </div>
 </div>

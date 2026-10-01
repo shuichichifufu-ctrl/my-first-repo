@@ -3,14 +3,72 @@
 <head>
 <meta charset="utf-8">
 <title>ボクセルクラフト</title>
-<meta name="viewport" content="width=device-width,initial-scale=1">
+<meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no,viewport-fit=cover">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="ボクセルクラフト">
+<meta name="format-detection" content="telephone=no">
 <style>
-:root{--slot:max(24px,min(56px,5.4vw,9.2vh));--ui:#2b2b2b;--edge:#111;--hi:#8b8b8b;--txt:#fff}
-*{box-sizing:border-box;-webkit-user-select:none;user-select:none}
-html,body{margin:0;height:100%;overflow:hidden;background:#78a7ff;color:var(--txt);
+:root{--slot:max(24px,min(56px,5.4vw,calc(var(--vh,1vh)*9.2)));--ui:#2b2b2b;--edge:#111;--hi:#8b8b8b;--txt:#fff}
+*{box-sizing:border-box;-webkit-user-select:none;user-select:none;-webkit-touch-callout:none;-webkit-tap-highlight-color:transparent}
+html,body{margin:0;height:100%;overflow:hidden;position:fixed;inset:0;width:100%;overscroll-behavior:none;touch-action:none;-webkit-text-size-adjust:100%;background:#78a7ff;color:var(--txt);
  font-family:"Hiragino Kaku Gothic ProN","Meiryo","Noto Sans JP","IPAGothic","Yu Gothic",sans-serif;font-size:18px}
 canvas#c{position:fixed;inset:0;width:100%;height:100%;display:block;image-rendering:pixelated;outline:none}
 .hidden{display:none!important}
+.screen,.scrollok,#craftlist,#inv .wrap{touch-action:pan-y}
+.tonly{display:none}
+body.touch .tonly{display:block}
+body.touch .kb{display:none!important}
+.tc{display:none}
+body.touch .tc{display:revert}
+#touchui{position:fixed;inset:0;pointer-events:none;z-index:5;touch-action:none}
+#lookpad{position:absolute;inset:0;pointer-events:auto;touch-action:none}
+#stickbase{position:absolute;left:calc(26px + env(safe-area-inset-left,0px));bottom:calc(var(--cb) + 6px);width:120px;height:120px;border-radius:50%;background:rgba(255,255,255,.12);border:3px solid rgba(255,255,255,.35);pointer-events:none;opacity:.7}
+#stickbase.on{opacity:1;background:rgba(255,255,255,.2)}
+#stickknob{position:absolute;left:33px;top:33px;width:54px;height:54px;border-radius:50%;background:rgba(255,255,255,.55);border:3px solid rgba(0,0,0,.45)}
+.tbtn{position:absolute;pointer-events:auto;touch-action:none;border-radius:50%;background:rgba(40,40,50,.55);border:3px solid rgba(255,255,255,.55);color:#fff;font:bold 17px/1 inherit;display:flex;align-items:center;justify-content:center;text-align:center;text-shadow:2px 2px 0 #000;font-family:inherit}
+.tbtn.down,.tbtn.on{background:rgba(127,224,74,.65)}
+#tbBreak{width:92px;height:92px;right:calc(16px + env(safe-area-inset-right,0px));bottom:var(--cb);font-size:20px;background:rgba(200,60,50,.5)}
+#tbPlace{width:80px;height:80px;right:calc(120px + env(safe-area-inset-right,0px));bottom:var(--cb);font-size:20px;background:rgba(60,120,200,.5)}
+#tbJump{width:74px;height:74px;right:calc(24px + env(safe-area-inset-right,0px));bottom:calc(var(--cb) + 106px);font-size:15px}
+#tbDash{width:64px;height:48px;border-radius:14px;left:calc(26px + env(safe-area-inset-left,0px));bottom:calc(var(--cb) + 142px);font-size:14px}
+#topbtns{position:absolute;right:calc(10px + env(safe-area-inset-right,0px));top:calc(8px + env(safe-area-inset-top,0px));display:flex;gap:8px;pointer-events:none}
+#topbtns .tbtn{position:static;width:50px;height:50px;border-radius:12px;font-size:12px}
+#tbDash,#tbInv,#tbPause{pointer-events:auto}
+body.touch{--cb:calc(16px + env(safe-area-inset-bottom,0px))}
+body.touch #hud{z-index:6}
+body.touch #hotbar{pointer-events:auto;touch-action:none}
+body.touch #crosshair{opacity:.8}
+body.touch :root,body.touch{--slot:min(46px,10.4vw,calc(var(--vh,1vh)*11))}
+body.touch #bottom{bottom:calc(10px + env(safe-area-inset-bottom,0px))}
+body.touch #tl{left:calc(10px + env(safe-area-inset-left,0px));top:calc(8px + env(safe-area-inset-top,0px));max-width:calc(100vw - 190px - env(safe-area-inset-left,0px))}
+body.touch #objtext{font-size:14px;line-height:1.35}
+body.touch #objective{padding:5px 8px}
+body.touch #clock{bottom:auto!important;top:calc(64px + env(safe-area-inset-top,0px));right:calc(10px + env(safe-area-inset-right,0px));font-size:12px;padding:3px 7px;gap:6px}
+body.touch #clockicon{width:12px;height:12px}
+body.touch #snd{display:none}
+body.touch #toasts{top:calc(70px + env(safe-area-inset-top,0px))}
+body.touch .toast{font-size:14px}
+body.touch #target{font-size:13px}
+body.touch .btn{min-height:46px}
+body.touch .btn.sm{min-height:44px;min-width:56px}
+body.touch #clickhint,body.touch #keyhint{display:none!important}
+@media (orientation:portrait){body.touch{--cb:calc(118px + env(safe-area-inset-bottom,0px))}
+ body.touch #tbPlace{right:calc(118px + env(safe-area-inset-right,0px));width:74px;height:74px}
+ body.touch #stickbase{width:112px;height:112px}
+ body.touch #tl{max-width:calc(100vw - 150px)}}
+body.touch #invgrid,body.touch .cgrid{grid-template-columns:repeat(9,minmax(0,1fr));width:calc(var(--slot)*9 + 28px)}
+body.touch #invgrid .slot,body.touch .cgrid .slot{width:auto;height:auto;aspect-ratio:1}
+@media (orientation:portrait){body.touch #invgrid,body.touch .cgrid{width:100%}}
+body.touch #invgrid{margin-top:34px}
+#invtools{margin-top:8px}
+#invtools .btn.sm{margin:3px 3px 0 0}
+#invtools .btn.on{outline:3px solid #fff}
+#invClose{position:absolute;right:8px;top:8px}
+#inv .panel{position:relative}
+#portraitnote{display:none;font-size:15px;color:#ffe066}
+@media (orientation:portrait){body.touch #portraitnote{display:block}}
 img.px,.px{image-rendering:pixelated;image-rendering:crisp-edges}
 #hud{position:fixed;inset:0;pointer-events:none}
 #crosshair{position:absolute;left:50%;top:50%;width:26px;height:26px;margin:-13px 0 0 -13px;mix-blend-mode:difference}
@@ -86,10 +144,10 @@ img.px,.px{image-rendering:pixelated;image-rendering:crisp-edges}
 #loading .bar i{display:block;height:100%;width:30%;background:#7fe04a;animation:ld 1s infinite alternate}
 @keyframes ld{from{margin-left:0}to{margin-left:70%}}
 #inv{background:rgba(0,0,0,.45)}
-#inv .wrap{overflow:auto;display:flex;gap:18px;align-items:stretch;max-width:98vw;max-height:94vh}
+#inv .wrap{overflow:auto;display:flex;gap:18px;align-items:stretch;max-width:98vw;max-height:calc(var(--vh,1vh)*94)}
 #inv .panel{padding:14px 16px}
 #inv h3{margin:0 0 8px;font-size:22px}
-#craftlist{width:min(380px,38vw);overflow-y:auto;max-height:calc(94vh - 90px);padding-right:6px}
+#craftlist{width:min(380px,36vw);overflow-y:auto;max-height:calc(calc(var(--vh,1vh)*94) - 90px);padding-right:6px}
 .rec{display:flex;align-items:center;gap:10px;padding:6px 8px;margin:4px 0;border:3px solid #333;background:rgba(60,60,60,.6);cursor:pointer}
 .rec img{width:38px;height:38px;image-rendering:pixelated;flex:none}
 .rec .rn{font-size:18px;font-weight:bold}
@@ -123,7 +181,7 @@ img.px,.px{image-rendering:pixelated;image-rendering:crisp-edges}
 @media (max-height:720px){#title h1{font-size:clamp(34px,6vw,52px)}#title .sub{font-size:16px;margin-top:-10px}#title .help{font-size:15px;line-height:1.45}.btn{font-size:19px;padding:9px 14px;margin:7px 0}#title .panel{padding:14px 20px}}
 @media (max-width:700px),(max-aspect-ratio:1/1){#tl{max-width:calc(100vw - 28px)}#objtext{font-size:15px}#keyhint{font-size:12px}#clock{top:auto;bottom:calc(var(--slot) + 112px);right:8px;font-size:15px;padding:4px 8px}#clockicon{width:16px;height:16px}.toast{font-size:15px}}
 @media (max-height:420px){.panel{padding:10px 14px}.btn{font-size:15px;padding:6px 10px;margin:5px 0}#pause h2{font-size:20px;margin:0}.row{font-size:14px;margin:4px 0}.btn.sm{font-size:14px;padding:3px 8px}#death h2{font-size:32px}#death p{font-size:15px}}
-@media (max-width:900px){#inv .wrap{overflow:auto;flex-direction:column;overflow-y:auto}#craftlist{width:auto;max-height:30vh}}
+@media (max-width:900px) and (orientation:portrait){#inv .wrap{overflow:auto;flex-direction:column;overflow-y:auto}#craftlist{width:auto;max-height:calc(var(--vh,1vh)*30)}}
 </style>
 </head>
 <body>
@@ -146,6 +204,15 @@ img.px,.px{image-rendering:pixelated;image-rendering:crisp-edges}
   <div id="dbg" class="hidden"></div>
 </div>
 
+<div id="touchui" class="hidden">
+  <div id="lookpad"></div>
+  <div id="stickbase"><div id="stickknob"></div></div>
+  <div id="tbDash" class="tbtn">ダッシュ</div>
+  <div id="tbJump" class="tbtn">ジャンプ</div>
+  <div id="tbPlace" class="tbtn">置く</div>
+  <div id="tbBreak" class="tbtn">壊す</div>
+  <div id="topbtns"><div id="tbInv" class="tbtn">持ち物</div><div id="tbPause" class="tbtn">ポーズ</div></div>
+</div>
 <div id="title" class="screen">
   <h1>ボクセル<span>クラフト</span></h1>
   <div class="sub">ブロックを掘って、集めて、作って、夜を生きのびよう</div>
@@ -159,7 +226,7 @@ img.px,.px{image-rendering:pixelated;image-rendering:crisp-edges}
     </div>
     <div class="panel help">
       <h3>そうさ方法</h3>
-      <table>
+      <table class="kb">
         <tr><td>W A S D</td><td>歩く</td></tr>
         <tr><td>マウス</td><td>見まわす（画面をクリックで操作開始）</td></tr>
         <tr><td>スペース</td><td>ジャンプ ／ 水の中では泳ぐ</td></tr>
@@ -170,6 +237,19 @@ img.px,.px{image-rendering:pixelated;image-rendering:crisp-edges}
         <tr><td>E</td><td>持ち物・クラフト画面</td></tr>
         <tr><td>M ／ Esc</td><td>音ON・OFF ／ ポーズ</td></tr>
       </table>
+      <div class="tc">
+        <div id="portraitnote">※ 横向きにすると遊びやすいよ（縦でも遊べます）</div>
+        <table>
+          <tr><td>左下スティック</td><td>歩く（大きく倒すとダッシュ）</td></tr>
+          <tr><td>画面の右側をなぞる</td><td>見まわす</td></tr>
+          <tr><td>壊す（長押し）</td><td>ブロックをこわす・敵をたたく</td></tr>
+          <tr><td>置く（タップ）</td><td>ブロックを置く・食べる・作業台を開く</td></tr>
+          <tr><td>ジャンプ</td><td>ジャンプ ／ 水の中では泳ぐ</td></tr>
+          <tr><td>下の枠をタップ</td><td>アイテム切りかえ</td></tr>
+          <tr><td>持ち物 / ポーズ</td><td>右上のボタン</td></tr>
+        </table>
+        <div style="font-size:13px;color:#bbb;margin-top:6px">Safariの共有ボタン →「ホーム画面に追加」で全画面で遊べます</div>
+      </div>
     </div>
   </div>
 </div>
@@ -189,6 +269,8 @@ img.px,.px{image-rendering:pixelated;image-rendering:crisp-edges}
   <div class="wrap">
     <div class="panel"><h3 id="craftTitle">クラフト</h3><div id="craftlist"></div><div id="contpanel" class="hidden"></div></div>
     <div class="panel"><h3>持ち物</h3><div id="invgrid"></div>
+      <div id="invtools" class="tonly"><button class="btn sm on" data-m="n">ふつう</button><button class="btn sm" data-m="h">半分・1個ずつ</button><button class="btn sm" data-m="m">まとめて移動</button></div>
+      <button class="btn sm tonly" id="invClose">閉じる ✕</button>
       <div id="invhint">左クリック：持つ・置く／右クリック：半分・1個ずつ／Shift+クリック：移動<br>左のリストをクリックでクラフト（作業台のそばなら道具も作れる）　Eで閉じる</div></div>
   </div>
 </div>
@@ -224,6 +306,12 @@ window.onerror=function(m,s,l,c){errors.push(String(m)+' @'+String(s||'').split(
 window.addEventListener('unhandledrejection',function(e){errors.push('promise: '+(e.reason&&e.reason.message||e.reason));});
 if(DEBUG)window.__mc={errors:errors};
 const $=id=>document.getElementById(id);
+const TOUCH=(function(){try{if(/[?&]touch/.test(location.search))return true;if(/[?&]notouch/.test(location.search))return false;
+  const co=window.matchMedia&&matchMedia('(pointer:coarse)').matches,fi=window.matchMedia&&matchMedia('(pointer:fine)').matches;
+  if(co)return true;
+  if(/iPhone|iPad|iPod|Android/i.test(navigator.userAgent))return true;
+  return(('ontouchstart' in window)||navigator.maxTouchPoints>0)&&!fi;}catch(e){return false;}})();
+if(TOUCH)document.body.classList.add('touch');
 const CS=16,CH=128,SEA=40;
 const clamp=(v,a,b)=>v<a?a:v>b?b:v;
 const lerp=(a,b,t)=>a+(b-a)*t;
@@ -629,7 +717,7 @@ try{
   throw e;
 }
 renderer.outputColorSpace=THREE.LinearSRGBColorSpace;
-renderer.setPixelRatio(Math.min(window.devicePixelRatio||1,1.5));
+renderer.setPixelRatio(Math.min(window.devicePixelRatio||1,TOUCH?1.5:1.5));
 renderer.autoClear=false;
 renderer.info.autoReset=false;
 renderer.setClearColor(0x8ab4f8,1);
@@ -1402,8 +1490,8 @@ function removeAnimal(a){scene.remove(a.model);a.model.userData.mats.forEach(m=>
 //  設定・インベントリ・目標
 // ============================================================
 const SAVE_KEY='voxelcraft_save_v3',OLD_SAVE_KEYS=['voxelcraft_save_v2'],SET_KEY='voxelcraft_settings_v1';
-const settings={mute:false,rd:6,sens:5};
-try{const s=JSON.parse(localStorage.getItem(SET_KEY)||'null');if(s){settings.mute=!!s.mute;settings.rd=[4,6,8].includes(s.rd)?s.rd:6;settings.sens=clamp(+s.sens||5,1,10);}}catch(e){}
+const settings={mute:false,rd:TOUCH?4:6,sens:5};
+try{const s=JSON.parse(localStorage.getItem(SET_KEY)||'null');if(s){settings.mute=!!s.mute;settings.rd=[4,6,8].includes(s.rd)?s.rd:(TOUCH?4:6);settings.sens=clamp(+s.sens||5,1,10);}}catch(e){}
 function saveSettings(){try{localStorage.setItem(SET_KEY,JSON.stringify(settings));}catch(e){}}
 RD=settings.rd;buildOffsets();Sfx.setMuted(settings.mute);
 
@@ -1468,6 +1556,7 @@ function fillSlot(el,s){
   if(it.tool){dur.style.display='block';const f=clamp(s.d/it.tool.dur,0,1);const i=dur.firstChild;i.style.width=(f*100)+'%';i.style.background=f>.5?'#6fe04a':f>.2?'#e0c030':'#e04a30';}else dur.style.display='none';
 }
 let lastHP=-1,lastHunger=-1,lastAir=-1,nameT=0;
+const touchMove={x:0,y:0,mag:0},touchZero={x:0,y:0,mag:0},touchIds={stick:null,look:null};let touchJump=false,touchSprint=false;
 function refreshHotbar(){for(let i=0;i<9;i++){fillSlot(slotEls[i],inv[i]);slotEls[i].classList.toggle('sel',i===sel);}}
 function updateBars(){
   const hp=Math.ceil(player.health),hu=Math.ceil(player.hunger);
@@ -1494,12 +1583,16 @@ const invGrid=$('invgrid'),invSlotEls=[];
   order.forEach(o=>{if(o==='gap'){const g=document.createElement('div');g.className='gap';invGrid.appendChild(g);return;}
     const d=document.createElement('div');d.className='slot';d.innerHTML='<img class="px" alt=""><span class="cnt"></span><div class="dur"><i></i></div>';
     d.dataset.i=o;invSlotEls[o]=d;invGrid.appendChild(d);
-    d.addEventListener('mousedown',e=>{e.preventDefault();invClick(o,e.button,e.shiftKey);});
+    bindTap(d,(b,sh)=>invClick(o,b,sh));
     d.addEventListener('contextmenu',e=>e.preventDefault());
     d.addEventListener('mouseenter',e=>{hoverSlot=o;showTip(e);});d.addEventListener('mouseleave',()=>{hoverSlot=-1;$('tip').style.display='none';});
   });
 })();
 let hoverSlot=-1;
+function bindTap(el,act){
+  el.addEventListener('pointerdown',e=>{lastPT=e.pointerType;if(e.pointerType==='mouse'){e.preventDefault();act(e.button,e.shiftKey);}});
+  el.addEventListener('click',e=>{if(lastPT!=='mouse')act(invMode==='h'?2:0,invMode==='m');});
+}
 function showTip(e){const s=inv[hoverSlot];const t=$('tip');if(!s||cursorItem){t.style.display='none';return;}
   let txt=ITEMS[s.id].name;if(ITEMS[s.id].tool)txt+='（耐久 '+s.d+'/'+ITEMS[s.id].tool.dur+'）';
   t.textContent=txt;t.style.display='block';t.style.left=(e.clientX+14)+'px';t.style.top=(e.clientY+14)+'px';}
@@ -1569,7 +1662,7 @@ function openContainer(x,y,z,type){
 function renderCont(){
   const el=$('contpanel'),d=contMode.d;el.innerHTML='';
   const mk=(arr,i,label,out)=>{const w=document.createElement('div');w.className='cslot';const sl=document.createElement('div');sl.className='slot';sl.innerHTML='<img class="px" alt=""><span class="cnt"></span><div class="dur"><i></i></div>';fillSlot(sl,arr[i]);
-    sl.addEventListener('mousedown',e=>{e.preventDefault();slotClick(arr,i,e.button,e.shiftKey,out);});sl.addEventListener('contextmenu',e=>e.preventDefault());
+    bindTap(sl,(b,sh)=>slotClick(arr,i,b,sh,out));sl.addEventListener('contextmenu',e=>e.preventDefault());
     w.appendChild(sl);if(label){const l=document.createElement('div');l.className='clab';l.textContent=label;w.appendChild(l);}return w;};
   if(d.type==='chest'){const g=document.createElement('div');g.className='cgrid';for(let i=0;i<27;i++)g.appendChild(mk(d.s,i,'',false));el.appendChild(g);}
   else{
@@ -1614,7 +1707,7 @@ function renderInv(){
   rows.forEach(o=>{const r=o.r,it=ITEMS[r.out];const d=document.createElement('div');d.className='rec'+(o.ok?' ok':'')+((r.table&&!invTable)?' lock':'');
     const ing=r.ing.map(a=>{const c=countItem(a[0]);return(c>=a[1]?'<b>':'<u>')+ITEMS[a[0]].name+' '+Math.min(c,99)+'/'+a[1]+(c>=a[1]?'</b>':'</u>');}).join('　');
     d.innerHTML='<img class="px" src="'+itemIcon(r.out)+'" alt=""><div><div class="rn">'+it.name+(r.n>1?' ×'+r.n:'')+'</div><div class="ri">'+ing+'</div>'+(r.table?'<div class="tb">'+(invTable?'':'作業台のそばが必要')+(r.note?(invTable?'':'・')+r.note:'')+'</div>':'')+'</div>';
-    d.addEventListener('mousedown',e=>{e.preventDefault();Sfx.init();craft(r);markInv();});
+    d.addEventListener('click',e=>{e.preventDefault();Sfx.init();craft(r);markInv();});
     list.appendChild(d);});
 }
 
@@ -1876,20 +1969,20 @@ function updateAmbience(dt){
   if(darkEvT<=0){darkEvT=5+Math.random()*9;if(darkLvl>.5&&state==='playing'){const r=Math.random();if(r<.4)Sfx.play('drip');else if(r<.7)Sfx.play('zombie',.12);else Sfx.play('bones');}}
 }
 function updatePlayer(dt){
-  const p=player,v=p.velocity,pos=p.position;const K=state==='playing'?keys:NOKEYS,T=state==='playing'?tapKeys:NOKEYS;const dn=c=>!!(K[c]||T[c]);
+  const p=player,v=p.velocity,pos=p.position;const K=state==='playing'?keys:NOKEYS,T=state==='playing'?tapKeys:NOKEYS;const dn=c=>!!(K[c]||T[c]);const tm=state==='playing'?touchMove:touchZero;
   p.invuln=Math.max(0,p.invuln-dt);
   const wasWater=p.inWater;
   p.inLava=bf(pos.x,pos.y+.3,pos.z)===B.LAVA||bf(pos.x,pos.y+1,pos.z)===B.LAVA;
   p.inWater=p.inLava||bf(pos.x,pos.y+.4,pos.z)===B.WATER;p.headInWater=bf(pos.x,pos.y+1.62,pos.z)===B.WATER;
   if(p.inWater&&!wasWater&&v.y<-3){Sfx.play('splash');for(let i=0;i<14;i++)spawnParticle(pos.x,pos.y+.3,pos.z,(Math.random()-.5)*4,Math.random()*4+1,(Math.random()-.5)*4,[.55,.7,1],.6,.08);}
   if(p.inLava){p.lavaT=(p.lavaT||0)-dt;hurtFlash=Math.max(hurtFlash,.5);if(p.lavaT<=0){p.lavaT=.45;hurtPlayer(3,undefined,undefined,true,'溶岩');}}
-  const fw=((dn('KeyW')||dn('ArrowUp'))?1:0)-((dn('KeyS')||dn('ArrowDown'))?1:0),st=((dn('KeyD')||dn('ArrowRight'))?1:0)-((dn('KeyA')||dn('ArrowLeft'))?1:0);
-  const space=dn('Space');
+  const fw=clamp(((dn('KeyW')||dn('ArrowUp'))?1:0)-((dn('KeyS')||dn('ArrowDown'))?1:0)+tm.y,-1,1),st=clamp(((dn('KeyD')||dn('ArrowRight'))?1:0)-((dn('KeyA')||dn('ArrowLeft'))?1:0)+tm.x,-1,1);
+  const space=dn('Space')||(state==='playing'&&touchJump);
   const moving=fw!==0||st!==0;
-  p.sprinting=moving&&fw>=0&&(dn('ShiftLeft')||dn('ShiftRight'))&&p.hunger>5&&!p.inWater;
+  p.sprinting=moving&&fw>=0&&(dn('ShiftLeft')||dn('ShiftRight')||(state==='playing'&&(touchSprint||(tm.mag>.95&&tm.y>.6))))&&p.hunger>5&&!p.inWater;
   let speed=p.sprinting?7.1:4.5;if(p.inWater)speed*=.55;
   const sy=Math.sin(p.yaw),cy=Math.cos(p.yaw);
-  let wx=-sy*fw+cy*st,wz=-cy*fw-sy*st;const wl=Math.hypot(wx,wz);if(wl>0){wx/=wl;wz/=wl;}
+  let wx=-sy*fw+cy*st,wz=-cy*fw-sy*st;const wl=Math.hypot(wx,wz);if(wl>1){wx/=wl;wz/=wl;}
   const acc=p.onGround?16:(p.inWater?6:3.5);const k=Math.min(1,acc*dt);
   v.x+=(wx*speed-v.x)*k;v.z+=(wz*speed-v.z)*k;
   if(p.fly){v.y=(space?10:0)-(dn('KeyC')?10:0);v.x=wx*speed*1.6;v.z=wz*speed*1.6;}
@@ -2089,17 +2182,19 @@ function setState(s){
   $('death').classList.toggle('hidden',s!=='dead');
   $('hud').classList.toggle('hidden',s==='menu');
   if(s!=='inventory'){$('cursor').style.display='none';$('tip').style.display='none';}
+  $('touchui').classList.toggle('hidden',!(TOUCH&&s==='playing'));
+  if(s!=='playing')resetTouch();
   $('bottom').style.visibility=s==='inventory'?'hidden':'visible';$('tl').style.visibility=s==='inventory'?'hidden':'visible';$('clock').style.visibility=s==='inventory'?'hidden':'visible';
   for(const k in tapKeys)delete tapKeys[k];
   if(s!=='playing')unlockPointer();
   if(s!=='playing'){mouse.l=mouse.r=mouse.lP=mouse.rP=false;}
 }
-function lockPointer(){try{const r=canvas.requestPointerLock();if(r&&r.catch)r.catch(()=>{});}catch(e){}}
+function lockPointer(){if(TOUCH)return;try{const r=canvas.requestPointerLock();if(r&&r.catch)r.catch(()=>{});}catch(e){}}
 function unlockPointer(){try{if(document.pointerLockElement)document.exitPointerLock();}catch(e){}}
 document.addEventListener('pointerlockchange',()=>{const was=locked;locked=document.pointerLockElement===canvas;if(locked&&state!=='playing'){unlockPointer();return;}if(was&&!locked&&state==='playing')pauseGame();});
 function pauseGame(){if(state!=='playing')return;clearInput();setState('paused');saveGame();}
 function resumeGame(){if(state!=='paused')return;setState('playing');lockPointer();}
-function clearInput(){for(const k in keys)keys[k]=false;for(const k in tapKeys)delete tapKeys[k];mouse.l=mouse.r=false;}
+function clearInput(){resetTouch();for(const k in keys)keys[k]=false;for(const k in tapKeys)delete tapKeys[k];mouse.l=mouse.r=false;}
 function openInventory(table){
   if(state!=='playing')return;contMode=null;invTable=!!table||nearTable();cursorItem=null;clearInput();setState('inventory');unlockPointer();markInv();renderInv();
 }
@@ -2166,7 +2261,7 @@ function newGame(seed){
   timeOfDay=.3;dayCount=1;spawnT=8;hurtFlash=0;
   loadAroundSync(sp.x,sp.z,1);
   gameStarted=true;lastHP=-1;lastHunger=-1;markInv();refreshHotbar();
-  setState('playing');showKeyHint();
+  setState('playing');showKeyHint();if(TOUCH&&innerHeight>innerWidth)toast('横向きにすると遊びやすいよ（縦でも遊べます）');
 }
 function loadSave(){
   const o=readSave();if(!o)return false;
@@ -2219,6 +2314,55 @@ $('btnRespawn').addEventListener('click',()=>{Sfx.init();respawn();});
 //  入力
 // ============================================================
 const NOKEYS={};
+// ---------- タッチ操作 ----------
+let lastPT='mouse',invMode='n';
+function resetTouch(){touchMove.x=touchMove.y=touchMove.mag=0;touchJump=false;touchSprint=false;
+  if(!TOUCH)return;const b=$('stickbase');if(b){b.classList.remove('on');b.style.left='';b.style.top='';$('stickknob').style.transform='';}
+  ['tbBreak','tbPlace','tbJump','tbDash'].forEach(i=>$(i)&&$(i).classList.remove('down','on'));
+  if(typeof touchIds!=='undefined'){touchIds.stick=null;touchIds.look=null;}}
+function setupTouch(){
+  const pad=$('lookpad'),base=$('stickbase'),knob=$('stickknob');
+  const R=56;let so={x:0,y:0},lp={x:0,y:0};
+  const kLook=()=>.0046*(settings.sens/5);
+  pad.addEventListener('touchstart',e=>{e.preventDefault();Sfx.init();
+    for(const t of e.changedTouches){const W=innerWidth,H=innerHeight;
+      if(touchIds.stick===null&&t.clientX<W*.42&&t.clientY>H*.38){touchIds.stick=t.identifier;so={x:t.clientX,y:t.clientY};base.classList.add('on');base.style.left=(so.x-60)+'px';base.style.top=(so.y-60)+'px';knob.style.transform='translate(0,0)';}
+      else if(touchIds.look===null){touchIds.look=t.identifier;lp={x:t.clientX,y:t.clientY};}}},{passive:false});
+  pad.addEventListener('touchmove',e=>{e.preventDefault();
+    for(const t of e.changedTouches){
+      if(t.identifier===touchIds.stick){let dx=t.clientX-so.x,dy=t.clientY-so.y;const l=Math.hypot(dx,dy);if(l>R){dx*=R/l;dy*=R/l;}
+        knob.style.transform='translate('+dx+'px,'+dy+'px)';let x=dx/R,y=-dy/R;const m=Math.hypot(x,y);
+        if(m<.14){touchMove.x=touchMove.y=touchMove.mag=0;}else{touchMove.x=x;touchMove.y=y;touchMove.mag=Math.min(1,m);}}
+      else if(t.identifier===touchIds.look&&state==='playing'){const dx=t.clientX-lp.x,dy=t.clientY-lp.y;lp.x=t.clientX;lp.y=t.clientY;
+        player.yaw-=dx*kLook();player.pitch=clamp(player.pitch-dy*kLook(),-1.5533,1.5533);}}},{passive:false});
+  const end=e=>{e.preventDefault();for(const t of e.changedTouches){
+    if(t.identifier===touchIds.stick){touchIds.stick=null;touchMove.x=touchMove.y=touchMove.mag=0;touchSprint=false;$('tbDash').classList.remove('on');base.classList.remove('on');base.style.left='';base.style.top='';knob.style.transform='';}
+    if(t.identifier===touchIds.look)touchIds.look=null;}};
+  pad.addEventListener('touchend',end,{passive:false});pad.addEventListener('touchcancel',end,{passive:false});
+  const hold=(id,on,off)=>{const el=$(id);
+    el.addEventListener('touchstart',e=>{e.preventDefault();e.stopPropagation();Sfx.init();el.classList.add('down');on();},{passive:false});
+    const up=e=>{e.preventDefault();el.classList.remove('down');off();};
+    el.addEventListener('touchend',up,{passive:false});el.addEventListener('touchcancel',up,{passive:false});};
+  hold('tbBreak',()=>{if(state==='playing'){mouse.l=true;mouse.lP=true;}},()=>{mouse.l=false;});
+  hold('tbPlace',()=>{if(state==='playing'){mouse.r=true;mouse.rP=true;placeCD=0;}},()=>{mouse.r=false;});
+  hold('tbJump',()=>{touchJump=true;},()=>{touchJump=false;});
+  const tap=(id,fn)=>{const el=$(id);el.addEventListener('touchstart',e=>{e.preventDefault();e.stopPropagation();Sfx.init();el.classList.add('down');},{passive:false});
+    el.addEventListener('touchend',e=>{e.preventDefault();el.classList.remove('down');fn();},{passive:false});el.addEventListener('touchcancel',e=>{el.classList.remove('down');},{passive:false});};
+  tap('tbDash',()=>{touchSprint=!touchSprint;$('tbDash').classList.toggle('on',touchSprint);});
+  tap('tbInv',()=>{if(state==='playing')openInventory(false);});
+  tap('tbPause',()=>{if(state==='playing')pauseGame();});
+  // 持ち物画面ボタン
+  document.querySelectorAll('#invtools .btn').forEach(b=>b.addEventListener('click',()=>{invMode=b.dataset.m;document.querySelectorAll('#invtools .btn').forEach(x=>x.classList.toggle('on',x===b));Sfx.play('click');}));
+  $('invClose').addEventListener('click',()=>closeInventory());
+  $('invhint').innerHTML='タップ：持つ・置く　上のボタンで「半分・1個ずつ」「まとめて移動」に切りかえ<br>左のリストをタップでクラフト（作業台のそばなら道具も作れる）';
+  // 音・ジェスチャ
+  document.addEventListener('touchend',()=>{Sfx.init();Sfx.resume();},{passive:true});
+  document.addEventListener('touchmove',e=>{const t=e.target;if(!(t&&t.closest&&t.closest('.screen,.scrollok')))e.preventDefault();},{passive:false});
+  ['gesturestart','gesturechange','gestureend'].forEach(n=>document.addEventListener(n,e=>e.preventDefault()));
+  const hb=$('hotbar');slotEls.forEach((el,i)=>el.addEventListener('pointerdown',e=>{e.preventDefault();e.stopPropagation();Sfx.init();if(state==='playing')selectSlot(i);}));
+  document.addEventListener('pointerdown',e=>{if(state==='inventory'){const c=$('cursor');c.style.left=(e.clientX-22)+'px';c.style.top=(e.clientY-22)+'px';}});
+  document.addEventListener('pointermove',e=>{if(state==='inventory'&&e.pointerType!=='mouse'){const c=$('cursor');c.style.left=(e.clientX-22)+'px';c.style.top=(e.clientY-22)+'px';}});
+}
 window.addEventListener('keydown',e=>{
   const c=e.code;
   if(state==='playing'&&(c==='Space'||c==='Tab'||c.startsWith('Arrow')))e.preventDefault();
@@ -2241,13 +2385,14 @@ window.addEventListener('keydown',e=>{
 window.addEventListener('keyup',e=>{keys[e.code]=false;});
 window.addEventListener('blur',clearInput);
 canvas.addEventListener('mousedown',e=>{
+  if(TOUCH)return;
   Sfx.init();Sfx.resume();
   if(state!=='playing')return;
   e.preventDefault();
   if(!locked)lockPointer();
   if(e.button===0){mouse.l=true;mouse.lP=true;}else if(e.button===2){mouse.r=true;mouse.rP=true;placeCD=0;}
 });
-window.addEventListener('mouseup',e=>{if(e.button===0)mouse.l=false;else if(e.button===2)mouse.r=false;});
+window.addEventListener('mouseup',e=>{if(TOUCH)return;if(e.button===0)mouse.l=false;else if(e.button===2)mouse.r=false;});
 document.addEventListener('contextmenu',e=>e.preventDefault());
 document.addEventListener('mousemove',e=>{
   if(state==='inventory'){const cur=$('cursor');cur.style.left=(e.clientX-22)+'px';cur.style.top=(e.clientY-22)+'px';if(hoverSlot>=0)showTip(e);return;}
@@ -2256,14 +2401,14 @@ document.addEventListener('mousemove',e=>{
     player.yaw-=mx*s;player.pitch=clamp(player.pitch-my*s,-1.5533,1.5533);
   }
 });
-window.addEventListener('wheel',e=>{if(state==='playing'){selectSlot(sel+(e.deltaY>0?1:-1));}},{passive:true});
+window.addEventListener('wheel',e=>{if(!TOUCH&&state==='playing'){selectSlot(sel+(e.deltaY>0?1:-1));}},{passive:true});
 document.addEventListener('visibilitychange',()=>{if(document.hidden){clearInput();if(state==='playing')pauseGame();else saveGame();}else{lastT=performance.now();}});
 window.addEventListener('beforeunload',saveGame);
 function onResize(){
-  const w=window.innerWidth,h=window.innerHeight;renderer.setSize(w,h,false);
+  const w=window.innerWidth,h=window.innerHeight;document.documentElement.style.setProperty('--vh',(h/100)+'px');renderer.setSize(w,h,false);
   camera.aspect=w/h;camera.updateProjectionMatrix();handCam.aspect=w/h;handCam.updateProjectionMatrix();
 }
-window.addEventListener('resize',onResize);
+window.addEventListener('resize',onResize);window.addEventListener('orientationchange',()=>setTimeout(onResize,150));if(window.visualViewport)visualViewport.addEventListener('resize',onResize);
 
 // ============================================================
 //  メインループ
@@ -2318,6 +2463,7 @@ function update(dt){
   waterMat.uniforms.uOff.value.set((performance.now()*.00004)%1,(performance.now()*.00007)%1);
 }
 const hud_={vig:-1,wet:-1,ch:null};
+function touchText(t){return t.replace('左クリックを長押しして','「壊す」ボタンを長押しして').replace('Eキーで画面を開いて','「持ち物」ボタンで画面を開いて').replace('（右クリック）','（「置く」ボタン）').replace('夜に右クリックで眠ろう','夜に「置く」ボタンで眠ろう');}
 function updateHud(dt){
   if(state==='menu')return;
   if(invDirty){refreshHotbar();if(state==='inventory')renderInv();invDirty=false;}
@@ -2325,19 +2471,19 @@ function updateHud(dt){
   if(state==='inventory'&&contMode)updateFurnaceBars();
   {const v=Math.round(Math.max(hurtFlash*.9,player.health<=4&&state==='playing'?.35:0)*20)/20;if(v!==hud_.vig){hud_.vig=v;$('vig').style.opacity=v;}
    const w=player.headInWater?1:0;if(w!==hud_.wet){hud_.wet=w;$('wet').style.opacity=w;}
-   const ch=!(state==='playing'&&!locked&&!DEBUG);if(ch!==hud_.ch){hud_.ch=ch;$('clickhint').classList.toggle('hidden',ch);}}
+   const ch=!(state==='playing'&&!locked&&!DEBUG&&!TOUCH);if(ch!==hud_.ch){hud_.ch=ch;$('clickhint').classList.toggle('hidden',ch);}}
   hudT-=dt;if(hudT>0)return;hudT=.15;
   const h=Math.floor(timeOfDay*24),mi=Math.floor((timeOfDay*24%1)*60);
   const lab=sunH>.3?'昼':sunH>-.1?(timeOfDay<.5?'朝':'夕方'):'夜';
   const ct=lab+' '+h+':'+(mi<10?'0':'')+mi+'　'+dayCount+'日目';
   if(ct!==lastClock){lastClock=ct;$('clocktext').textContent=ct;$('clockicon').classList.toggle('night',sunH<-.05);}
-  const ob=currentObjective();if(ob!==lastObj){lastObj=ob;$('objtext').textContent=ob;}
+  const ob=currentObjective();if(ob!==lastObj){lastObj=ob;$('objtext').textContent=TOUCH?touchText(ob):ob;}
   let tt='';
   if(zHit&&state==='playing'&&(!hit||zHit.dist<=hit.dist))tt=zHit.z.label||'ゾンビ';
   else if(hit&&state==='playing'){const bi=BI[hit.id];tt=ITEMS[hit.id].name;
     if(bi&&bi.hard>=0){const info=breakInfo(hit.id);if(!info.harvest)tt+='　※'+(bi.tool==='pick'?(bi.tier>=2?'石のツルハシ以上':'ツルハシ'):'道具')+'が必要';}
     else if(bi&&bi.hard<0)tt+='（こわせない）';
-    if(hit.id===B.TABLE)tt+='　右クリックでクラフト';}
+    if(hit.id===B.TABLE)tt+=TOUCH?'　「置く」でクラフト':'　右クリックでクラフト';}
   
   if($('target').textContent!==tt)$('target').textContent=tt;
   if(!$('dbg').classList.contains('hidden')){
@@ -2400,6 +2546,7 @@ if(DEBUG){
     hurt:(n)=>hurtPlayer(n,undefined,undefined,true,'デバッグ'),
     input:()=>({l:mouse.l,r:mouse.r,locked,state,prog:mine.prog,key:mine.key,zHit:!!zHit,hit:!!hit}),
     perf:()=>PERF,spikes:spikeLog,
+    touch:TOUCH,touchState:()=>({move:touchMove,jump:touchJump,sprint:touchSprint,invMode}),
     timeInfo:'0=真夜中 0.25=日の出 0.5=正午 0.75=日没'
   });
 }
@@ -2410,6 +2557,7 @@ genChunk=wrapPerf('gen',genChunk);computeLight=wrapPerf('light',computeLight);bu
 //  起動
 // ============================================================
 (function boot(){
+  if(TOUCH)setupTouch();
   const save=readSave();
   setSeed(save?save.seed:20240915);
   const sp=findSpawn();menuCenter={x:sp.x,y:sp.y,z:sp.z};

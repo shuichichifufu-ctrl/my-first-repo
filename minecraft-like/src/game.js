@@ -9,6 +9,12 @@ window.onerror=function(m,s,l,c){errors.push(String(m)+' @'+String(s||'').split(
 window.addEventListener('unhandledrejection',function(e){errors.push('promise: '+(e.reason&&e.reason.message||e.reason));});
 if(DEBUG)window.__mc={errors:errors};
 const $=id=>document.getElementById(id);
+const TOUCH=(function(){try{if(/[?&]touch/.test(location.search))return true;if(/[?&]notouch/.test(location.search))return false;
+  const co=window.matchMedia&&matchMedia('(pointer:coarse)').matches,fi=window.matchMedia&&matchMedia('(pointer:fine)').matches;
+  if(co)return true;
+  if(/iPhone|iPad|iPod|Android/i.test(navigator.userAgent))return true;
+  return(('ontouchstart' in window)||navigator.maxTouchPoints>0)&&!fi;}catch(e){return false;}})();
+if(TOUCH)document.body.classList.add('touch');
 const CS=16,CH=128,SEA=40;
 const clamp=(v,a,b)=>v<a?a:v>b?b:v;
 const lerp=(a,b,t)=>a+(b-a)*t;
@@ -414,7 +420,7 @@ try{
   throw e;
 }
 renderer.outputColorSpace=THREE.LinearSRGBColorSpace;
-renderer.setPixelRatio(Math.min(window.devicePixelRatio||1,1.5));
+renderer.setPixelRatio(Math.min(window.devicePixelRatio||1,TOUCH?1.5:1.5));
 renderer.autoClear=false;
 renderer.info.autoReset=false;
 renderer.setClearColor(0x8ab4f8,1);
@@ -1187,8 +1193,8 @@ function removeAnimal(a){scene.remove(a.model);a.model.userData.mats.forEach(m=>
 //  設定・インベントリ・目標
 // ============================================================
 const SAVE_KEY='voxelcraft_save_v3',OLD_SAVE_KEYS=['voxelcraft_save_v2'],SET_KEY='voxelcraft_settings_v1';
-const settings={mute:false,rd:6,sens:5};
-try{const s=JSON.parse(localStorage.getItem(SET_KEY)||'null');if(s){settings.mute=!!s.mute;settings.rd=[4,6,8].includes(s.rd)?s.rd:6;settings.sens=clamp(+s.sens||5,1,10);}}catch(e){}
+const settings={mute:false,rd:TOUCH?4:6,sens:5};
+try{const s=JSON.parse(localStorage.getItem(SET_KEY)||'null');if(s){settings.mute=!!s.mute;settings.rd=[4,6,8].includes(s.rd)?s.rd:(TOUCH?4:6);settings.sens=clamp(+s.sens||5,1,10);}}catch(e){}
 function saveSettings(){try{localStorage.setItem(SET_KEY,JSON.stringify(settings));}catch(e){}}
 RD=settings.rd;buildOffsets();Sfx.setMuted(settings.mute);
 
@@ -1253,6 +1259,7 @@ function fillSlot(el,s){
   if(it.tool){dur.style.display='block';const f=clamp(s.d/it.tool.dur,0,1);const i=dur.firstChild;i.style.width=(f*100)+'%';i.style.background=f>.5?'#6fe04a':f>.2?'#e0c030':'#e04a30';}else dur.style.display='none';
 }
 let lastHP=-1,lastHunger=-1,lastAir=-1,nameT=0;
+const touchMove={x:0,y:0,mag:0},touchZero={x:0,y:0,mag:0},touchIds={stick:null,look:null};let touchJump=false,touchSprint=false;
 function refreshHotbar(){for(let i=0;i<9;i++){fillSlot(slotEls[i],inv[i]);slotEls[i].classList.toggle('sel',i===sel);}}
 function updateBars(){
   const hp=Math.ceil(player.health),hu=Math.ceil(player.hunger);
@@ -1279,12 +1286,16 @@ const invGrid=$('invgrid'),invSlotEls=[];
   order.forEach(o=>{if(o==='gap'){const g=document.createElement('div');g.className='gap';invGrid.appendChild(g);return;}
     const d=document.createElement('div');d.className='slot';d.innerHTML='<img class="px" alt=""><span class="cnt"></span><div class="dur"><i></i></div>';
     d.dataset.i=o;invSlotEls[o]=d;invGrid.appendChild(d);
-    d.addEventListener('mousedown',e=>{e.preventDefault();invClick(o,e.button,e.shiftKey);});
+    bindTap(d,(b,sh)=>invClick(o,b,sh));
     d.addEventListener('contextmenu',e=>e.preventDefault());
     d.addEventListener('mouseenter',e=>{hoverSlot=o;showTip(e);});d.addEventListener('mouseleave',()=>{hoverSlot=-1;$('tip').style.display='none';});
   });
 })();
 let hoverSlot=-1;
+function bindTap(el,act){
+  el.addEventListener('pointerdown',e=>{lastPT=e.pointerType;if(e.pointerType==='mouse'){e.preventDefault();act(e.button,e.shiftKey);}});
+  el.addEventListener('click',e=>{if(lastPT!=='mouse')act(invMode==='h'?2:0,invMode==='m');});
+}
 function showTip(e){const s=inv[hoverSlot];const t=$('tip');if(!s||cursorItem){t.style.display='none';return;}
   let txt=ITEMS[s.id].name;if(ITEMS[s.id].tool)txt+='（耐久 '+s.d+'/'+ITEMS[s.id].tool.dur+'）';
   t.textContent=txt;t.style.display='block';t.style.left=(e.clientX+14)+'px';t.style.top=(e.clientY+14)+'px';}
@@ -1354,7 +1365,7 @@ function openContainer(x,y,z,type){
 function renderCont(){
   const el=$('contpanel'),d=contMode.d;el.innerHTML='';
   const mk=(arr,i,label,out)=>{const w=document.createElement('div');w.className='cslot';const sl=document.createElement('div');sl.className='slot';sl.innerHTML='<img class="px" alt=""><span class="cnt"></span><div class="dur"><i></i></div>';fillSlot(sl,arr[i]);
-    sl.addEventListener('mousedown',e=>{e.preventDefault();slotClick(arr,i,e.button,e.shiftKey,out);});sl.addEventListener('contextmenu',e=>e.preventDefault());
+    bindTap(sl,(b,sh)=>slotClick(arr,i,b,sh,out));sl.addEventListener('contextmenu',e=>e.preventDefault());
     w.appendChild(sl);if(label){const l=document.createElement('div');l.className='clab';l.textContent=label;w.appendChild(l);}return w;};
   if(d.type==='chest'){const g=document.createElement('div');g.className='cgrid';for(let i=0;i<27;i++)g.appendChild(mk(d.s,i,'',false));el.appendChild(g);}
   else{
@@ -1399,7 +1410,7 @@ function renderInv(){
   rows.forEach(o=>{const r=o.r,it=ITEMS[r.out];const d=document.createElement('div');d.className='rec'+(o.ok?' ok':'')+((r.table&&!invTable)?' lock':'');
     const ing=r.ing.map(a=>{const c=countItem(a[0]);return(c>=a[1]?'<b>':'<u>')+ITEMS[a[0]].name+' '+Math.min(c,99)+'/'+a[1]+(c>=a[1]?'</b>':'</u>');}).join('　');
     d.innerHTML='<img class="px" src="'+itemIcon(r.out)+'" alt=""><div><div class="rn">'+it.name+(r.n>1?' ×'+r.n:'')+'</div><div class="ri">'+ing+'</div>'+(r.table?'<div class="tb">'+(invTable?'':'作業台のそばが必要')+(r.note?(invTable?'':'・')+r.note:'')+'</div>':'')+'</div>';
-    d.addEventListener('mousedown',e=>{e.preventDefault();Sfx.init();craft(r);markInv();});
+    d.addEventListener('click',e=>{e.preventDefault();Sfx.init();craft(r);markInv();});
     list.appendChild(d);});
 }
 
@@ -1661,20 +1672,20 @@ function updateAmbience(dt){
   if(darkEvT<=0){darkEvT=5+Math.random()*9;if(darkLvl>.5&&state==='playing'){const r=Math.random();if(r<.4)Sfx.play('drip');else if(r<.7)Sfx.play('zombie',.12);else Sfx.play('bones');}}
 }
 function updatePlayer(dt){
-  const p=player,v=p.velocity,pos=p.position;const K=state==='playing'?keys:NOKEYS,T=state==='playing'?tapKeys:NOKEYS;const dn=c=>!!(K[c]||T[c]);
+  const p=player,v=p.velocity,pos=p.position;const K=state==='playing'?keys:NOKEYS,T=state==='playing'?tapKeys:NOKEYS;const dn=c=>!!(K[c]||T[c]);const tm=state==='playing'?touchMove:touchZero;
   p.invuln=Math.max(0,p.invuln-dt);
   const wasWater=p.inWater;
   p.inLava=bf(pos.x,pos.y+.3,pos.z)===B.LAVA||bf(pos.x,pos.y+1,pos.z)===B.LAVA;
   p.inWater=p.inLava||bf(pos.x,pos.y+.4,pos.z)===B.WATER;p.headInWater=bf(pos.x,pos.y+1.62,pos.z)===B.WATER;
   if(p.inWater&&!wasWater&&v.y<-3){Sfx.play('splash');for(let i=0;i<14;i++)spawnParticle(pos.x,pos.y+.3,pos.z,(Math.random()-.5)*4,Math.random()*4+1,(Math.random()-.5)*4,[.55,.7,1],.6,.08);}
   if(p.inLava){p.lavaT=(p.lavaT||0)-dt;hurtFlash=Math.max(hurtFlash,.5);if(p.lavaT<=0){p.lavaT=.45;hurtPlayer(3,undefined,undefined,true,'溶岩');}}
-  const fw=((dn('KeyW')||dn('ArrowUp'))?1:0)-((dn('KeyS')||dn('ArrowDown'))?1:0),st=((dn('KeyD')||dn('ArrowRight'))?1:0)-((dn('KeyA')||dn('ArrowLeft'))?1:0);
-  const space=dn('Space');
+  const fw=clamp(((dn('KeyW')||dn('ArrowUp'))?1:0)-((dn('KeyS')||dn('ArrowDown'))?1:0)+tm.y,-1,1),st=clamp(((dn('KeyD')||dn('ArrowRight'))?1:0)-((dn('KeyA')||dn('ArrowLeft'))?1:0)+tm.x,-1,1);
+  const space=dn('Space')||(state==='playing'&&touchJump);
   const moving=fw!==0||st!==0;
-  p.sprinting=moving&&fw>=0&&(dn('ShiftLeft')||dn('ShiftRight'))&&p.hunger>5&&!p.inWater;
+  p.sprinting=moving&&fw>=0&&(dn('ShiftLeft')||dn('ShiftRight')||(state==='playing'&&(touchSprint||(tm.mag>.95&&tm.y>.6))))&&p.hunger>5&&!p.inWater;
   let speed=p.sprinting?7.1:4.5;if(p.inWater)speed*=.55;
   const sy=Math.sin(p.yaw),cy=Math.cos(p.yaw);
-  let wx=-sy*fw+cy*st,wz=-cy*fw-sy*st;const wl=Math.hypot(wx,wz);if(wl>0){wx/=wl;wz/=wl;}
+  let wx=-sy*fw+cy*st,wz=-cy*fw-sy*st;const wl=Math.hypot(wx,wz);if(wl>1){wx/=wl;wz/=wl;}
   const acc=p.onGround?16:(p.inWater?6:3.5);const k=Math.min(1,acc*dt);
   v.x+=(wx*speed-v.x)*k;v.z+=(wz*speed-v.z)*k;
   if(p.fly){v.y=(space?10:0)-(dn('KeyC')?10:0);v.x=wx*speed*1.6;v.z=wz*speed*1.6;}
@@ -1874,17 +1885,19 @@ function setState(s){
   $('death').classList.toggle('hidden',s!=='dead');
   $('hud').classList.toggle('hidden',s==='menu');
   if(s!=='inventory'){$('cursor').style.display='none';$('tip').style.display='none';}
+  $('touchui').classList.toggle('hidden',!(TOUCH&&s==='playing'));
+  if(s!=='playing')resetTouch();
   $('bottom').style.visibility=s==='inventory'?'hidden':'visible';$('tl').style.visibility=s==='inventory'?'hidden':'visible';$('clock').style.visibility=s==='inventory'?'hidden':'visible';
   for(const k in tapKeys)delete tapKeys[k];
   if(s!=='playing')unlockPointer();
   if(s!=='playing'){mouse.l=mouse.r=mouse.lP=mouse.rP=false;}
 }
-function lockPointer(){try{const r=canvas.requestPointerLock();if(r&&r.catch)r.catch(()=>{});}catch(e){}}
+function lockPointer(){if(TOUCH)return;try{const r=canvas.requestPointerLock();if(r&&r.catch)r.catch(()=>{});}catch(e){}}
 function unlockPointer(){try{if(document.pointerLockElement)document.exitPointerLock();}catch(e){}}
 document.addEventListener('pointerlockchange',()=>{const was=locked;locked=document.pointerLockElement===canvas;if(locked&&state!=='playing'){unlockPointer();return;}if(was&&!locked&&state==='playing')pauseGame();});
 function pauseGame(){if(state!=='playing')return;clearInput();setState('paused');saveGame();}
 function resumeGame(){if(state!=='paused')return;setState('playing');lockPointer();}
-function clearInput(){for(const k in keys)keys[k]=false;for(const k in tapKeys)delete tapKeys[k];mouse.l=mouse.r=false;}
+function clearInput(){resetTouch();for(const k in keys)keys[k]=false;for(const k in tapKeys)delete tapKeys[k];mouse.l=mouse.r=false;}
 function openInventory(table){
   if(state!=='playing')return;contMode=null;invTable=!!table||nearTable();cursorItem=null;clearInput();setState('inventory');unlockPointer();markInv();renderInv();
 }
@@ -1951,7 +1964,7 @@ function newGame(seed){
   timeOfDay=.3;dayCount=1;spawnT=8;hurtFlash=0;
   loadAroundSync(sp.x,sp.z,1);
   gameStarted=true;lastHP=-1;lastHunger=-1;markInv();refreshHotbar();
-  setState('playing');showKeyHint();
+  setState('playing');showKeyHint();if(TOUCH&&innerHeight>innerWidth)toast('横向きにすると遊びやすいよ（縦でも遊べます）');
 }
 function loadSave(){
   const o=readSave();if(!o)return false;
@@ -2004,6 +2017,55 @@ $('btnRespawn').addEventListener('click',()=>{Sfx.init();respawn();});
 //  入力
 // ============================================================
 const NOKEYS={};
+// ---------- タッチ操作 ----------
+let lastPT='mouse',invMode='n';
+function resetTouch(){touchMove.x=touchMove.y=touchMove.mag=0;touchJump=false;touchSprint=false;
+  if(!TOUCH)return;const b=$('stickbase');if(b){b.classList.remove('on');b.style.left='';b.style.top='';$('stickknob').style.transform='';}
+  ['tbBreak','tbPlace','tbJump','tbDash'].forEach(i=>$(i)&&$(i).classList.remove('down','on'));
+  if(typeof touchIds!=='undefined'){touchIds.stick=null;touchIds.look=null;}}
+function setupTouch(){
+  const pad=$('lookpad'),base=$('stickbase'),knob=$('stickknob');
+  const R=56;let so={x:0,y:0},lp={x:0,y:0};
+  const kLook=()=>.0046*(settings.sens/5);
+  pad.addEventListener('touchstart',e=>{e.preventDefault();Sfx.init();
+    for(const t of e.changedTouches){const W=innerWidth,H=innerHeight;
+      if(touchIds.stick===null&&t.clientX<W*.42&&t.clientY>H*.38){touchIds.stick=t.identifier;so={x:t.clientX,y:t.clientY};base.classList.add('on');base.style.left=(so.x-60)+'px';base.style.top=(so.y-60)+'px';knob.style.transform='translate(0,0)';}
+      else if(touchIds.look===null){touchIds.look=t.identifier;lp={x:t.clientX,y:t.clientY};}}},{passive:false});
+  pad.addEventListener('touchmove',e=>{e.preventDefault();
+    for(const t of e.changedTouches){
+      if(t.identifier===touchIds.stick){let dx=t.clientX-so.x,dy=t.clientY-so.y;const l=Math.hypot(dx,dy);if(l>R){dx*=R/l;dy*=R/l;}
+        knob.style.transform='translate('+dx+'px,'+dy+'px)';let x=dx/R,y=-dy/R;const m=Math.hypot(x,y);
+        if(m<.14){touchMove.x=touchMove.y=touchMove.mag=0;}else{touchMove.x=x;touchMove.y=y;touchMove.mag=Math.min(1,m);}}
+      else if(t.identifier===touchIds.look&&state==='playing'){const dx=t.clientX-lp.x,dy=t.clientY-lp.y;lp.x=t.clientX;lp.y=t.clientY;
+        player.yaw-=dx*kLook();player.pitch=clamp(player.pitch-dy*kLook(),-1.5533,1.5533);}}},{passive:false});
+  const end=e=>{e.preventDefault();for(const t of e.changedTouches){
+    if(t.identifier===touchIds.stick){touchIds.stick=null;touchMove.x=touchMove.y=touchMove.mag=0;touchSprint=false;$('tbDash').classList.remove('on');base.classList.remove('on');base.style.left='';base.style.top='';knob.style.transform='';}
+    if(t.identifier===touchIds.look)touchIds.look=null;}};
+  pad.addEventListener('touchend',end,{passive:false});pad.addEventListener('touchcancel',end,{passive:false});
+  const hold=(id,on,off)=>{const el=$(id);
+    el.addEventListener('touchstart',e=>{e.preventDefault();e.stopPropagation();Sfx.init();el.classList.add('down');on();},{passive:false});
+    const up=e=>{e.preventDefault();el.classList.remove('down');off();};
+    el.addEventListener('touchend',up,{passive:false});el.addEventListener('touchcancel',up,{passive:false});};
+  hold('tbBreak',()=>{if(state==='playing'){mouse.l=true;mouse.lP=true;}},()=>{mouse.l=false;});
+  hold('tbPlace',()=>{if(state==='playing'){mouse.r=true;mouse.rP=true;placeCD=0;}},()=>{mouse.r=false;});
+  hold('tbJump',()=>{touchJump=true;},()=>{touchJump=false;});
+  const tap=(id,fn)=>{const el=$(id);el.addEventListener('touchstart',e=>{e.preventDefault();e.stopPropagation();Sfx.init();el.classList.add('down');},{passive:false});
+    el.addEventListener('touchend',e=>{e.preventDefault();el.classList.remove('down');fn();},{passive:false});el.addEventListener('touchcancel',e=>{el.classList.remove('down');},{passive:false});};
+  tap('tbDash',()=>{touchSprint=!touchSprint;$('tbDash').classList.toggle('on',touchSprint);});
+  tap('tbInv',()=>{if(state==='playing')openInventory(false);});
+  tap('tbPause',()=>{if(state==='playing')pauseGame();});
+  // 持ち物画面ボタン
+  document.querySelectorAll('#invtools .btn').forEach(b=>b.addEventListener('click',()=>{invMode=b.dataset.m;document.querySelectorAll('#invtools .btn').forEach(x=>x.classList.toggle('on',x===b));Sfx.play('click');}));
+  $('invClose').addEventListener('click',()=>closeInventory());
+  $('invhint').innerHTML='タップ：持つ・置く　上のボタンで「半分・1個ずつ」「まとめて移動」に切りかえ<br>左のリストをタップでクラフト（作業台のそばなら道具も作れる）';
+  // 音・ジェスチャ
+  document.addEventListener('touchend',()=>{Sfx.init();Sfx.resume();},{passive:true});
+  document.addEventListener('touchmove',e=>{const t=e.target;if(!(t&&t.closest&&t.closest('.screen,.scrollok')))e.preventDefault();},{passive:false});
+  ['gesturestart','gesturechange','gestureend'].forEach(n=>document.addEventListener(n,e=>e.preventDefault()));
+  const hb=$('hotbar');slotEls.forEach((el,i)=>el.addEventListener('pointerdown',e=>{e.preventDefault();e.stopPropagation();Sfx.init();if(state==='playing')selectSlot(i);}));
+  document.addEventListener('pointerdown',e=>{if(state==='inventory'){const c=$('cursor');c.style.left=(e.clientX-22)+'px';c.style.top=(e.clientY-22)+'px';}});
+  document.addEventListener('pointermove',e=>{if(state==='inventory'&&e.pointerType!=='mouse'){const c=$('cursor');c.style.left=(e.clientX-22)+'px';c.style.top=(e.clientY-22)+'px';}});
+}
 window.addEventListener('keydown',e=>{
   const c=e.code;
   if(state==='playing'&&(c==='Space'||c==='Tab'||c.startsWith('Arrow')))e.preventDefault();
@@ -2026,13 +2088,14 @@ window.addEventListener('keydown',e=>{
 window.addEventListener('keyup',e=>{keys[e.code]=false;});
 window.addEventListener('blur',clearInput);
 canvas.addEventListener('mousedown',e=>{
+  if(TOUCH)return;
   Sfx.init();Sfx.resume();
   if(state!=='playing')return;
   e.preventDefault();
   if(!locked)lockPointer();
   if(e.button===0){mouse.l=true;mouse.lP=true;}else if(e.button===2){mouse.r=true;mouse.rP=true;placeCD=0;}
 });
-window.addEventListener('mouseup',e=>{if(e.button===0)mouse.l=false;else if(e.button===2)mouse.r=false;});
+window.addEventListener('mouseup',e=>{if(TOUCH)return;if(e.button===0)mouse.l=false;else if(e.button===2)mouse.r=false;});
 document.addEventListener('contextmenu',e=>e.preventDefault());
 document.addEventListener('mousemove',e=>{
   if(state==='inventory'){const cur=$('cursor');cur.style.left=(e.clientX-22)+'px';cur.style.top=(e.clientY-22)+'px';if(hoverSlot>=0)showTip(e);return;}
@@ -2041,14 +2104,14 @@ document.addEventListener('mousemove',e=>{
     player.yaw-=mx*s;player.pitch=clamp(player.pitch-my*s,-1.5533,1.5533);
   }
 });
-window.addEventListener('wheel',e=>{if(state==='playing'){selectSlot(sel+(e.deltaY>0?1:-1));}},{passive:true});
+window.addEventListener('wheel',e=>{if(!TOUCH&&state==='playing'){selectSlot(sel+(e.deltaY>0?1:-1));}},{passive:true});
 document.addEventListener('visibilitychange',()=>{if(document.hidden){clearInput();if(state==='playing')pauseGame();else saveGame();}else{lastT=performance.now();}});
 window.addEventListener('beforeunload',saveGame);
 function onResize(){
-  const w=window.innerWidth,h=window.innerHeight;renderer.setSize(w,h,false);
+  const w=window.innerWidth,h=window.innerHeight;document.documentElement.style.setProperty('--vh',(h/100)+'px');renderer.setSize(w,h,false);
   camera.aspect=w/h;camera.updateProjectionMatrix();handCam.aspect=w/h;handCam.updateProjectionMatrix();
 }
-window.addEventListener('resize',onResize);
+window.addEventListener('resize',onResize);window.addEventListener('orientationchange',()=>setTimeout(onResize,150));if(window.visualViewport)visualViewport.addEventListener('resize',onResize);
 
 // ============================================================
 //  メインループ
@@ -2103,6 +2166,7 @@ function update(dt){
   waterMat.uniforms.uOff.value.set((performance.now()*.00004)%1,(performance.now()*.00007)%1);
 }
 const hud_={vig:-1,wet:-1,ch:null};
+function touchText(t){return t.replace('左クリックを長押しして','「壊す」ボタンを長押しして').replace('Eキーで画面を開いて','「持ち物」ボタンで画面を開いて').replace('（右クリック）','（「置く」ボタン）').replace('夜に右クリックで眠ろう','夜に「置く」ボタンで眠ろう');}
 function updateHud(dt){
   if(state==='menu')return;
   if(invDirty){refreshHotbar();if(state==='inventory')renderInv();invDirty=false;}
@@ -2110,19 +2174,19 @@ function updateHud(dt){
   if(state==='inventory'&&contMode)updateFurnaceBars();
   {const v=Math.round(Math.max(hurtFlash*.9,player.health<=4&&state==='playing'?.35:0)*20)/20;if(v!==hud_.vig){hud_.vig=v;$('vig').style.opacity=v;}
    const w=player.headInWater?1:0;if(w!==hud_.wet){hud_.wet=w;$('wet').style.opacity=w;}
-   const ch=!(state==='playing'&&!locked&&!DEBUG);if(ch!==hud_.ch){hud_.ch=ch;$('clickhint').classList.toggle('hidden',ch);}}
+   const ch=!(state==='playing'&&!locked&&!DEBUG&&!TOUCH);if(ch!==hud_.ch){hud_.ch=ch;$('clickhint').classList.toggle('hidden',ch);}}
   hudT-=dt;if(hudT>0)return;hudT=.15;
   const h=Math.floor(timeOfDay*24),mi=Math.floor((timeOfDay*24%1)*60);
   const lab=sunH>.3?'昼':sunH>-.1?(timeOfDay<.5?'朝':'夕方'):'夜';
   const ct=lab+' '+h+':'+(mi<10?'0':'')+mi+'　'+dayCount+'日目';
   if(ct!==lastClock){lastClock=ct;$('clocktext').textContent=ct;$('clockicon').classList.toggle('night',sunH<-.05);}
-  const ob=currentObjective();if(ob!==lastObj){lastObj=ob;$('objtext').textContent=ob;}
+  const ob=currentObjective();if(ob!==lastObj){lastObj=ob;$('objtext').textContent=TOUCH?touchText(ob):ob;}
   let tt='';
   if(zHit&&state==='playing'&&(!hit||zHit.dist<=hit.dist))tt=zHit.z.label||'ゾンビ';
   else if(hit&&state==='playing'){const bi=BI[hit.id];tt=ITEMS[hit.id].name;
     if(bi&&bi.hard>=0){const info=breakInfo(hit.id);if(!info.harvest)tt+='　※'+(bi.tool==='pick'?(bi.tier>=2?'石のツルハシ以上':'ツルハシ'):'道具')+'が必要';}
     else if(bi&&bi.hard<0)tt+='（こわせない）';
-    if(hit.id===B.TABLE)tt+='　右クリックでクラフト';}
+    if(hit.id===B.TABLE)tt+=TOUCH?'　「置く」でクラフト':'　右クリックでクラフト';}
   
   if($('target').textContent!==tt)$('target').textContent=tt;
   if(!$('dbg').classList.contains('hidden')){
@@ -2185,6 +2249,7 @@ if(DEBUG){
     hurt:(n)=>hurtPlayer(n,undefined,undefined,true,'デバッグ'),
     input:()=>({l:mouse.l,r:mouse.r,locked,state,prog:mine.prog,key:mine.key,zHit:!!zHit,hit:!!hit}),
     perf:()=>PERF,spikes:spikeLog,
+    touch:TOUCH,touchState:()=>({move:touchMove,jump:touchJump,sprint:touchSprint,invMode}),
     timeInfo:'0=真夜中 0.25=日の出 0.5=正午 0.75=日没'
   });
 }
@@ -2195,6 +2260,7 @@ genChunk=wrapPerf('gen',genChunk);computeLight=wrapPerf('light',computeLight);bu
 //  起動
 // ============================================================
 (function boot(){
+  if(TOUCH)setupTouch();
   const save=readSave();
   setSeed(save?save.seed:20240915);
   const sp=findSpawn();menuCenter={x:sp.x,y:sp.y,z:sp.z};
