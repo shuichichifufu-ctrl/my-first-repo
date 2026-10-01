@@ -18,14 +18,15 @@ img.px,.px{image-rendering:pixelated;image-rendering:crisp-edges}
 #crosshair:before{left:11px;top:2px;width:4px;height:22px}
 #crosshair:after{left:2px;top:11px;width:22px;height:4px}
 #target{position:absolute;left:50%;top:calc(50% + 28px);transform:translateX(-50%);font-size:16px;text-shadow:2px 2px 0 #000;white-space:nowrap;opacity:.95}
-#objective{position:absolute;left:14px;top:14px;max-width:min(430px,60vw);background:rgba(0,0,0,.5);border:3px solid rgba(255,255,255,.25);padding:8px 12px;line-height:1.45}
+#tl{position:absolute;left:14px;top:14px;max-width:min(430px,calc(100vw - 260px))}
+#objective{background:rgba(0,0,0,.5);border:3px solid rgba(255,255,255,.25);padding:8px 12px;line-height:1.45}
 #objective .ot{font-size:14px;color:#ffe066;letter-spacing:.1em}
 #objtext{font-size:18px;text-shadow:2px 2px 0 #000}
 #clock{position:absolute;right:14px;top:14px;background:rgba(0,0,0,.5);border:3px solid rgba(255,255,255,.25);padding:6px 12px;display:flex;align-items:center;gap:10px;font-size:20px;text-shadow:2px 2px 0 #000}
 #clockicon{width:22px;height:22px;display:inline-block;border:3px solid #000;background:#ffd93b}
 #clockicon.night{background:#dfe6f2;box-shadow:inset -6px -4px 0 #9aa6bd}
-#keyhint{position:absolute;right:14px;top:78px;white-space:nowrap;background:rgba(0,0,0,.5);padding:8px 12px;font-size:15px;line-height:1.6;opacity:0;pointer-events:none;text-shadow:2px 2px 0 #000;border-left:4px solid #7fe04a}
-#keyhint.show{animation:kh 32s forwards}
+#keyhint{display:none;margin-top:6px;background:rgba(0,0,0,.5);padding:8px 12px;font-size:15px;line-height:1.6;opacity:0;pointer-events:none;text-shadow:2px 2px 0 #000;border-left:4px solid #7fe04a}
+#keyhint.show{display:block;animation:kh 32s forwards}
 @keyframes kh{0%{opacity:0}3%{opacity:1}85%{opacity:1}100%{opacity:0}}
 #clickhint{position:absolute;left:50%;top:38%;transform:translateX(-50%);background:rgba(0,0,0,.65);padding:10px 22px;font-size:22px;border:3px solid #ffe066;text-shadow:2px 2px 0 #000}
 #toasts{position:absolute;left:50%;top:84px;transform:translateX(-50%);display:flex;flex-direction:column;align-items:center;gap:6px}
@@ -110,6 +111,7 @@ img.px,.px{image-rendering:pixelated;image-rendering:crisp-edges}
 #tip{position:fixed;z-index:41;pointer-events:none;background:rgba(20,0,40,.92);border:2px solid #5a2d9c;padding:3px 9px;font-size:16px;display:none}
 #invhint{font-size:14px;color:#bbb;margin-top:8px}
 @media (max-height:720px){#title h1{font-size:clamp(34px,6vw,52px)}#title .sub{font-size:16px;margin-top:-10px}#title .help{font-size:15px;line-height:1.45}.btn{font-size:19px;padding:9px 14px;margin:7px 0}#title .panel{padding:14px 20px}}
+@media (max-width:700px),(max-aspect-ratio:1/1){#tl{max-width:calc(100vw - 28px)}#objtext{font-size:15px}#keyhint{font-size:12px}#clock{top:auto;bottom:calc(var(--slot) + 78px);right:8px;font-size:15px;padding:4px 8px}#clockicon{width:16px;height:16px}.toast{font-size:15px}}
 @media (max-width:900px){:root{--slot:44px}#inv .wrap{flex-direction:column;overflow-y:auto}#craftlist{width:auto;max-height:30vh}}
 </style>
 </head>
@@ -120,10 +122,10 @@ img.px,.px{image-rendering:pixelated;image-rendering:crisp-edges}
   <div id="vig"></div><div id="wet"></div>
   <div id="crosshair"></div>
   <div id="target"></div>
-  <div id="objective"><div class="ot">▶ もくひょう</div><div id="objtext"></div></div>
+  <div id="tl"><div id="objective"><div class="ot">▶ もくひょう</div><div id="objtext"></div></div>
+  <div id="keyhint">W A S D：歩く　Space：ジャンプ　Shift：ダッシュ<br>左クリック長押し：こわす　右クリック：置く　E：持ち物・クラフト</div></div>
   <div id="clock"><span id="clockicon"></span><span id="clocktext"></span><span id="snd" style="font-size:14px;color:#cde">音ON</span></div>
   <div id="toasts"></div>
-  <div id="keyhint">W A S D：歩く　Space：ジャンプ　Shift：ダッシュ<br>左クリック長押し：こわす　右クリック：置く　E：持ち物・クラフト</div>
   <div id="clickhint" class="hidden">画面をクリックして操作を始めよう</div>
   <div id="bottom">
     <div id="itemname"></div>
