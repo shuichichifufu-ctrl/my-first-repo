@@ -1,0 +1,197 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<title>ボクセルクラフト</title>
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<style>
+:root{--slot:min(56px,5.4vw,9.2vh);--ui:#2b2b2b;--edge:#111;--hi:#8b8b8b;--txt:#fff}
+*{box-sizing:border-box;-webkit-user-select:none;user-select:none}
+html,body{margin:0;height:100%;overflow:hidden;background:#78a7ff;color:var(--txt);
+ font-family:"Hiragino Kaku Gothic ProN","Meiryo","Noto Sans JP","IPAGothic","Yu Gothic",sans-serif;font-size:18px}
+canvas#c{position:fixed;inset:0;width:100%;height:100%;display:block;image-rendering:pixelated;outline:none}
+.hidden{display:none!important}
+img.px,.px{image-rendering:pixelated;image-rendering:crisp-edges}
+#hud{position:fixed;inset:0;pointer-events:none}
+#crosshair{position:absolute;left:50%;top:50%;width:26px;height:26px;margin:-13px 0 0 -13px;mix-blend-mode:difference}
+#crosshair:before,#crosshair:after{content:"";position:absolute;background:#fff}
+#crosshair:before{left:11px;top:2px;width:4px;height:22px}
+#crosshair:after{left:2px;top:11px;width:22px;height:4px}
+#target{position:absolute;left:50%;top:calc(50% + 28px);transform:translateX(-50%);font-size:16px;text-shadow:2px 2px 0 #000;white-space:nowrap;opacity:.95}
+#objective{position:absolute;left:14px;top:14px;max-width:min(430px,60vw);background:rgba(0,0,0,.5);border:3px solid rgba(255,255,255,.25);padding:8px 12px;line-height:1.45}
+#objective .ot{font-size:14px;color:#ffe066;letter-spacing:.1em}
+#objtext{font-size:18px;text-shadow:2px 2px 0 #000}
+#clock{position:absolute;right:14px;top:14px;background:rgba(0,0,0,.5);border:3px solid rgba(255,255,255,.25);padding:6px 12px;display:flex;align-items:center;gap:10px;font-size:20px;text-shadow:2px 2px 0 #000}
+#clockicon{width:22px;height:22px;display:inline-block;border:3px solid #000;background:#ffd93b}
+#clockicon.night{background:#dfe6f2;box-shadow:inset -6px -4px 0 #9aa6bd}
+#keyhint{position:absolute;right:14px;top:78px;white-space:nowrap;background:rgba(0,0,0,.5);padding:8px 12px;font-size:15px;line-height:1.6;opacity:0;pointer-events:none;text-shadow:2px 2px 0 #000;border-left:4px solid #7fe04a}
+#keyhint.show{animation:kh 32s forwards}
+@keyframes kh{0%{opacity:0}3%{opacity:1}85%{opacity:1}100%{opacity:0}}
+#clickhint{position:absolute;left:50%;top:38%;transform:translateX(-50%);background:rgba(0,0,0,.65);padding:10px 22px;font-size:22px;border:3px solid #ffe066;text-shadow:2px 2px 0 #000}
+#toasts{position:absolute;left:50%;top:84px;transform:translateX(-50%);display:flex;flex-direction:column;align-items:center;gap:6px}
+.toast{background:rgba(0,0,0,.6);padding:5px 14px;font-size:18px;text-shadow:2px 2px 0 #000;animation:fade 3.2s forwards;border-left:4px solid #ffe066}
+.toast.bad{border-left-color:#ff5a5a}
+@keyframes fade{0%{opacity:0;transform:translateY(-6px)}8%{opacity:1;transform:none}80%{opacity:1}100%{opacity:0}}
+#bottom{position:absolute;left:50%;bottom:12px;transform:translateX(-50%);width:calc(var(--slot)*9);}
+#itemname{position:absolute;left:0;right:0;bottom:calc(var(--slot) + 62px);text-align:center;font-size:20px;text-shadow:2px 2px 0 #000;transition:opacity .6s;opacity:0}
+#stats{display:flex;justify-content:space-between;align-items:flex-end;margin-bottom:6px;position:relative}
+#hearts,#hunger{display:flex;gap:1px}
+#hunger{flex-direction:row-reverse}
+#air{position:absolute;right:0;bottom:30px;display:flex;flex-direction:row-reverse;gap:1px}
+.ic{width:20px;height:20px;background-size:100% 100%;image-rendering:pixelated}
+.ic.shake{animation:shake .25s infinite}
+@keyframes shake{0%{transform:translateY(0)}50%{transform:translateY(-2px)}100%{transform:translateY(0)}}
+#hotbar{display:flex;background:rgba(0,0,0,.45);border:3px solid #000;box-shadow:inset 0 0 0 2px #555}
+.slot{position:relative;width:calc(var(--slot) - 0px);height:calc(var(--slot) - 0px);border:3px solid #555;background:rgba(40,40,40,.55);display:flex;align-items:center;justify-content:center}
+.slot.sel{border-color:#fff;background:rgba(255,255,255,.18);box-shadow:0 0 0 2px #000}
+.slot img{width:76%;height:76%;image-rendering:pixelated;pointer-events:none}
+.slot .cnt{position:absolute;right:3px;bottom:0;font-size:17px;font-weight:bold;text-shadow:2px 2px 0 #000;pointer-events:none}
+.slot .num{position:absolute;left:3px;top:0;font-size:12px;color:#ccc;text-shadow:1px 1px 0 #000;pointer-events:none}
+.slot .dur{position:absolute;left:5px;right:5px;bottom:4px;height:4px;background:#000;pointer-events:none}
+.slot .dur i{display:block;height:100%}
+#dbg{position:absolute;left:14px;bottom:14px;font:13px/1.35 monospace;background:rgba(0,0,0,.45);padding:4px 8px;white-space:pre;color:#cfe}
+#vig{position:absolute;inset:0;background:radial-gradient(ellipse at center,rgba(255,0,0,0) 40%,rgba(200,0,0,.75) 100%);opacity:0;transition:opacity .35s}
+#wet{position:absolute;inset:0;background:rgba(20,70,190,.38);opacity:0}
+.screen{position:fixed;inset:0;display:flex;align-items:center;justify-content:center;z-index:10}
+.panel{background:rgba(24,24,28,.86);border:4px solid #000;box-shadow:inset 0 0 0 3px #666,0 8px 40px rgba(0,0,0,.6);padding:22px 28px}
+.btn{display:block;width:100%;margin:10px 0;padding:12px 18px;font:inherit;font-size:22px;color:#fff;background:#6b6b6b;border:3px solid #000;box-shadow:inset -4px -4px 0 #3c3c3c,inset 4px 4px 0 #a5a5a5;cursor:pointer;text-shadow:2px 2px 0 #333}
+.btn:hover:not(:disabled){background:#7d86c9;box-shadow:inset -4px -4px 0 #4a519a,inset 4px 4px 0 #b6bcee}
+.btn:disabled{opacity:.45;cursor:not-allowed}
+.btn.sm{display:inline-block;width:auto;margin:4px 3px;padding:6px 10px;font-size:18px}
+.row>span:first-child{flex:none}
+.btn.on{background:#5aa03c;box-shadow:inset -4px -4px 0 #2f6b1b,inset 4px 4px 0 #8ad36a}
+#title{background:linear-gradient(180deg,rgba(10,20,50,.35),rgba(10,20,50,.7));flex-direction:column;justify-content:flex-start;gap:14px;overflow-y:auto;padding:18px 0}
+#title>:first-child{margin-top:auto}#title>:last-child{margin-bottom:auto}
+#title h1{margin:0;font-size:clamp(40px,8vw,78px);letter-spacing:.08em;text-shadow:4px 4px 0 #2a2a2a,8px 8px 0 rgba(0,0,0,.35);color:#f4f4f4}
+#title h1 span{color:#7fe04a}
+#title .sub{font-size:20px;text-shadow:2px 2px 0 #000;margin-top:-6px}
+#title .cols{display:flex;gap:22px;align-items:stretch;flex-wrap:wrap;justify-content:center;max-width:96vw}
+#title .menu{width:min(390px,92vw)}
+#title .help{width:min(480px,92vw);font-size:18px;line-height:1.7}
+.help table{border-collapse:collapse;width:100%}
+.help td{padding:2px 6px;vertical-align:top}
+.help td:first-child{white-space:nowrap;color:#ffe066;font-weight:bold}
+.help h3{margin:0 0 6px;font-size:20px;color:#7fe04a}
+#savemeta{font-size:15px;color:#ccc;margin:-4px 0 4px;min-height:20px}
+#pause .panel{width:min(480px,92vw)}
+#pause h2,#death h2{margin:0 0 8px;font-size:30px;text-align:center}
+.row{display:flex;align-items:center;justify-content:space-between;gap:10px;margin:8px 0;font-size:18px}
+.row input[type=range]{width:180px}
+#death{background:rgba(120,0,0,.6);flex-direction:column}
+#death h2{font-size:56px;text-shadow:4px 4px 0 #000;margin-bottom:6px}
+#death p{font-size:22px;margin:4px 0 14px;text-shadow:2px 2px 0 #000}
+#loading{background:#1b2a44;flex-direction:column;z-index:30;font-size:26px}
+#loading .bar{width:300px;height:14px;border:3px solid #000;background:#222;margin-top:14px}
+#loading .bar i{display:block;height:100%;width:30%;background:#7fe04a;animation:ld 1s infinite alternate}
+@keyframes ld{from{margin-left:0}to{margin-left:70%}}
+#inv{background:rgba(0,0,0,.45)}
+#inv .wrap{display:flex;gap:18px;align-items:stretch;max-width:98vw;max-height:94vh}
+#inv .panel{padding:14px 16px}
+#inv h3{margin:0 0 8px;font-size:22px}
+#craftlist{width:min(380px,38vw);overflow-y:auto;max-height:calc(94vh - 90px);padding-right:6px}
+.rec{display:flex;align-items:center;gap:10px;padding:6px 8px;margin:4px 0;border:3px solid #333;background:rgba(60,60,60,.6);cursor:pointer}
+.rec img{width:38px;height:38px;image-rendering:pixelated;flex:none}
+.rec .rn{font-size:18px;font-weight:bold}
+.rec .ri{font-size:14px;color:#ddd;line-height:1.35}
+.rec .ri b{color:#7fe04a;font-weight:normal}
+.rec .ri u{color:#ff6b6b;text-decoration:none}
+.rec.ok{border-color:#7fe04a;background:rgba(60,110,50,.5)}
+.rec.ok:hover{background:rgba(80,140,60,.7)}
+.rec.lock{opacity:.5;cursor:not-allowed}
+.rec .tb{font-size:13px;color:#ffb347}
+#invgrid{display:grid;grid-template-columns:repeat(9,var(--slot));gap:3px}
+#invgrid .slot{background:#3a3a3a;border:3px solid #1d1d1d;box-shadow:inset 2px 2px 0 #222,inset -2px -2px 0 #555;cursor:pointer}
+#invgrid .slot:hover{background:#5a5a78}
+#invgrid .slot.sel{border-color:#fff}
+.gap{height:14px;grid-column:1/-1}
+#cursor{position:fixed;left:0;top:0;width:44px;height:44px;pointer-events:none;z-index:40;display:none}
+#cursor img{width:100%;height:100%;image-rendering:pixelated}
+#cursor span{position:absolute;right:0;bottom:-4px;font-size:17px;font-weight:bold;text-shadow:2px 2px 0 #000}
+#tip{position:fixed;z-index:41;pointer-events:none;background:rgba(20,0,40,.92);border:2px solid #5a2d9c;padding:3px 9px;font-size:16px;display:none}
+#invhint{font-size:14px;color:#bbb;margin-top:8px}
+@media (max-height:720px){#title h1{font-size:clamp(34px,6vw,52px)}#title .sub{font-size:16px;margin-top:-10px}#title .help{font-size:15px;line-height:1.45}.btn{font-size:19px;padding:9px 14px;margin:7px 0}#title .panel{padding:14px 20px}}
+@media (max-width:900px){:root{--slot:44px}#inv .wrap{flex-direction:column;overflow-y:auto}#craftlist{width:auto;max-height:30vh}}
+</style>
+</head>
+<body>
+<canvas id="c" tabindex="0"></canvas>
+
+<div id="hud" class="hidden">
+  <div id="vig"></div><div id="wet"></div>
+  <div id="crosshair"></div>
+  <div id="target"></div>
+  <div id="objective"><div class="ot">▶ もくひょう</div><div id="objtext"></div></div>
+  <div id="clock"><span id="clockicon"></span><span id="clocktext"></span><span id="snd" style="font-size:14px;color:#cde">音ON</span></div>
+  <div id="toasts"></div>
+  <div id="keyhint">W A S D：歩く　Space：ジャンプ　Shift：ダッシュ<br>左クリック長押し：こわす　右クリック：置く　E：持ち物・クラフト</div>
+  <div id="clickhint" class="hidden">画面をクリックして操作を始めよう</div>
+  <div id="bottom">
+    <div id="itemname"></div>
+    <div id="stats"><div id="hearts"></div><div id="hunger"></div><div id="air"></div></div>
+    <div id="hotbar"></div>
+  </div>
+  <div id="dbg" class="hidden"></div>
+</div>
+
+<div id="title" class="screen">
+  <h1>ボクセル<span>クラフト</span></h1>
+  <div class="sub">ブロックを掘って、集めて、作って、夜を生きのびよう</div>
+  <div class="cols">
+    <div class="panel menu">
+      <button class="btn" id="btnNew">あそぶ（新しい世界）</button>
+      <button class="btn" id="btnCont">続きから</button>
+      <div id="savemeta"></div>
+      <div class="row"><span>おと</span><button class="btn sm" id="btnMuteT">ON</button></div>
+      <div class="row"><span>見える距離</span><span id="rdBtnsT"></span></div>
+    </div>
+    <div class="panel help">
+      <h3>そうさ方法</h3>
+      <table>
+        <tr><td>W A S D</td><td>歩く</td></tr>
+        <tr><td>マウス</td><td>見まわす（画面をクリックで操作開始）</td></tr>
+        <tr><td>スペース</td><td>ジャンプ ／ 水の中では泳ぐ</td></tr>
+        <tr><td>Shift</td><td>ダッシュ</td></tr>
+        <tr><td>左クリック長押し</td><td>ブロックをこわす・敵をたたく</td></tr>
+        <tr><td>右クリック</td><td>ブロックを置く・食べる・作業台を開く</td></tr>
+        <tr><td>1〜9 / ホイール</td><td>アイテムを切りかえ</td></tr>
+        <tr><td>E</td><td>持ち物・クラフト画面</td></tr>
+        <tr><td>M ／ Esc</td><td>音ON・OFF ／ ポーズ</td></tr>
+      </table>
+    </div>
+  </div>
+</div>
+
+<div id="pause" class="screen hidden">
+  <div class="panel">
+    <h2>ポーズ</h2>
+    <button class="btn" id="btnResume">ゲームにもどる</button>
+    <div class="row"><span>おと</span><button class="btn sm" id="btnMute">ON</button></div>
+    <div class="row"><span>見える距離</span><span id="rdBtns"></span></div>
+    <div class="row"><span>マウス感度</span><input type="range" id="sens" min="1" max="10" step="1"></div>
+    <button class="btn" id="btnTitle">保存してタイトルへ</button>
+  </div>
+</div>
+
+<div id="inv" class="screen hidden">
+  <div class="wrap">
+    <div class="panel"><h3 id="craftTitle">クラフト</h3><div id="craftlist"></div></div>
+    <div class="panel"><h3>持ち物</h3><div id="invgrid"></div>
+      <div id="invhint">左クリック：持つ・置く／右クリック：半分・1個ずつ／Shift+クリック：移動<br>左のリストをクリックでクラフト（作業台のそばなら道具も作れる）　Eで閉じる</div></div>
+  </div>
+</div>
+<div id="cursor"><img class="px" alt=""><span></span></div>
+<div id="tip"></div>
+
+<div id="death" class="screen hidden">
+  <h2>やられてしまった！</h2>
+  <p id="deathmsg"></p>
+  <div style="width:min(340px,90vw)"><button class="btn" id="btnRespawn">リスポーンする</button></div>
+</div>
+
+<div id="loading" class="screen"><div>ワールドを生成中…</div><div class="bar"><i></i></div></div>
+
+<script>(function(){var w=console.warn;console.warn=function(m){if(typeof m==='string'&&m.indexOf('Scripts "build/three')===0)return;return w.apply(console,arguments);};})();</script>
+<script src="three.min.js"></script>
+<script src="game.js"></script>
+</body>
+</html>
