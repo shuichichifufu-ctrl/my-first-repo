@@ -1,0 +1,657 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,user-scalable=no">
+<title>ネコ大戦争</title>
+<style>
+  html,body{margin:0;height:100%;background:#1b1b2a;overflow:hidden;touch-action:none}
+  body{display:flex;align-items:center;justify-content:center}
+  canvas{background:#000;max-width:100vw;max-height:100vh;touch-action:none;user-select:none;-webkit-user-select:none}
+</style>
+</head>
+<body>
+<canvas id="c" width="1000" height="600"></canvas>
+<script>
+"use strict";
+// ============ 基本設定 ============
+const W = 1000, H = 600, GROUND = 350, UI_TOP = 430;
+const PLAYER_BASE_X = 930, ENEMY_BASE_X = 70;
+const cv = document.getElementById('c');
+const ctx = cv.getContext('2d');
+
+function fit() {
+  const s = Math.min(innerWidth / W, innerHeight / H);
+  cv.style.width = (W * s) + 'px';
+  cv.style.height = (H * s) + 'px';
+}
+addEventListener('resize', fit); fit();
+
+// ============ データ ============
+const CATS = [
+  { id:'neko',  name:'ネコ',     cost:50,  cd:2.5, hp:110,  atk:9,  range:34,  speed:46, ivl:0.8, kb:2, size:20, color:'#fff', key:'1' },
+  { id:'wall',  name:'かべネコ', cost:100, cd:5,   hp:520,  atk:4,  range:30,  speed:34, ivl:1.2, kb:3, size:22, color:'#e8e3d0', key:'2' },
+  { id:'fight', name:'せんしネコ',cost:150, cd:6,   hp:170,  atk:30, range:40,  speed:58, ivl:0.9, kb:2, size:21, color:'#ffe9c8', key:'3' },
+  { id:'archer',name:'ゆみネコ', cost:200, cd:8,   hp:90,   atk:20, range:210, speed:40, ivl:1.4, kb:1, size:19, color:'#e9ffd8', key:'4' },
+  { id:'giant', name:'きょだいネコ',cost:450,cd:20,hp:1300, atk:70, range:55,  speed:30, ivl:1.6, kb:3, size:34, color:'#ffd8d8', key:'5', area:true },
+];
+const ENEMIES = {
+  wanko:  { name:'ワンコ',   hp:70,   atk:7,  range:32,  speed:42, ivl:0.9, kb:1, size:20, color:'#c9a06a', reward:12 },
+  buta:   { name:'ブタ',     hp:260,  atk:11, range:34,  speed:30, ivl:1.2, kb:2, size:24, color:'#ffb3c1', reward:25 },
+  hebi:   { name:'ヘビ',     hp:130,  atk:14, range:120, speed:50, ivl:1.3, kb:1, size:20, color:'#7ccf6a', reward:25 },
+  kuma:   { name:'クマ',     hp:600,  atk:34, range:44,  speed:36, ivl:1.4, kb:2, size:30, color:'#8a5a3a', reward:60 },
+  gori:   { name:'ゴリラ',   hp:1600, atk:70, range:56,  speed:26, ivl:1.7, kb:3, size:38, color:'#555', reward:120, area:true },
+  boss:   { name:'ワンダー大王', hp:6000, atk:120, range:70, speed:20, ivl:2.0, kb:4, size:52, color:'#6b2d8a', reward:500, area:true, boss:true },
+};
+const STAGES = [
+  { name:'はじまりの草原', baseHp:1500, mul:1.0, sky:['#8fd3ff','#e8f8ff'], gnd:'#6ec05a',
+    spawns:[{t:'wanko',first:3,every:6},{t:'buta',first:25,every:16}],
+    bossAt:null },
+  { name:'ひろい荒野', baseHp:3500, mul:1.25, sky:['#ffcf8a','#fff0d6'], gnd:'#c9a56a',
+    spawns:[{t:'wanko',first:2,every:4.5},{t:'buta',first:12,every:11},{t:'hebi',first:20,every:14},{t:'kuma',first:50,every:30}],
+    bossAt:{hpPct:0.5,t:'gori'} },
+  { name:'ワンダー大王の城', baseHp:7000, mul:1.5, sky:['#6a5a9a','#c9b8e8'], gnd:'#5a4a6a',
+    spawns:[{t:'wanko',first:2,every:3.5},{t:'buta',first:10,every:9},{t:'hebi',first:15,every:10},{t:'kuma',first:35,every:22},{t:'gori',first:70,every:45}],
+    bossAt:{hpPct:0.5,t:'boss'} },
+];
+
+// ============ 状態 ============
+let save = { cleared: 0 };
+try { const s = JSON.parse(localStorage.getItem('nekowar')||'null'); if (s) save = s; } catch(e){}
+function persist(){ try{ localStorage.setItem('nekowar', JSON.stringify(save)); }catch(e){} }
+
+let scene = 'title';     // title | select | play | result
+let paused = false;
+let G = null;            // 戦闘中の状態
+let uiMsg = null;
+const mouse = { x:0, y:0, down:false };
+let muted = false;
+
+function newBattle(stage) {
+  const st = STAGES[stage];
+  G = {
+    stage, st, t:0, units:[], fx:[], texts:[], shake:0,
+    money:100, level:1, cd:CATS.map(()=>0),
+    cannon:0, cannonMax:35, cannonFlash:0,
+    pBase:{ hp:2000, max:2000, x:PLAYER_BASE_X, flash:0 },
+    eBase:{ hp:st.baseHp, max:st.baseHp, x:ENEMY_BASE_X, flash:0 },
+    spawnTimers: st.spawns.map(s=>s.first),
+    bossDone:false, over:null, overT:0, kills:0, slow:1,
+  };
+}
+const walletMax = L => 300 + 150*L;
+const income = L => 10 + 4*L;
+const levelCost = L => 100 + 120*(L-1);
+const MAXLV = 8;
+
+// ============ 音 ============
+let actx = null;
+function beep(freq, dur=0.08, type='square', vol=0.05, slide=0) {
+  if (muted) return;
+  try {
+    actx = actx || new (window.AudioContext||window.webkitAudioContext)();
+    const o = actx.createOscillator(), g = actx.createGain();
+    o.type = type; o.frequency.value = freq;
+    if (slide) o.frequency.linearRampToValueAtTime(freq+slide, actx.currentTime+dur);
+    g.gain.value = vol; g.gain.linearRampToValueAtTime(0, actx.currentTime+dur);
+    o.connect(g); g.connect(actx.destination); o.start(); o.stop(actx.currentTime+dur);
+  } catch(e){}
+}
+
+// ============ ユニット ============
+function spawnUnit(side, def, mul=1) {
+  const dir = side === 'p' ? -1 : 1;
+  const x = side === 'p' ? PLAYER_BASE_X - 40 : ENEMY_BASE_X + 40;
+  const u = {
+    side, dir, def, x: x + (Math.random()*10-5), y:0,
+    hp: def.hp*mul, max: def.hp*mul, atk: def.atk*mul,
+    state:'walk', st:0, atkT:0, hit:false, kbLeft: def.kb,
+    kbStep: def.hp*mul / def.kb, nextKb: def.hp*mul - (def.hp*mul)/def.kb,
+    vx:0, flash:0, phase:Math.random()*6, dead:false, deadT:0,
+  };
+  G.units.push(u);
+  return u;
+}
+function dmgText(x,y,v,col='#fff'){ G.texts.push({x,y,v:Math.round(v),t:0,col}); }
+function burst(x,y,col,n=8,sp=140){
+  for(let i=0;i<n;i++){
+    const a = Math.random()*Math.PI*2, s = sp*(0.3+Math.random());
+    G.fx.push({x,y,vx:Math.cos(a)*s,vy:Math.sin(a)*s-60,t:0,life:0.5+Math.random()*0.3,col,r:2+Math.random()*3});
+  }
+}
+function damageUnit(u, dmg, from) {
+  if (u.dead) return;
+  u.hp -= dmg; u.flash = 0.12;
+  dmgText(u.x, GROUND-u.def.size*2.2, dmg, u.side==='p' ? '#ff8080' : '#fff');
+  burst(u.x, GROUND-u.def.size, '#fff', 3, 100);
+  if (u.hp <= 0) { killUnit(u); return; }
+  if (u.hp <= u.nextKb && u.kbLeft > 1) {
+    u.nextKb -= u.kbStep; u.kbLeft--;
+    knockback(u);
+  }
+}
+function knockback(u, power=1) {
+  u.state = 'kb'; u.st = 0; u.hit = false; u.vx = -u.dir * 220 * power;
+}
+function killUnit(u) {
+  u.dead = true; u.deadT = 0;
+  burst(u.x, GROUND-u.def.size, u.side==='p'?'#fff':u.def.color, 14, 220);
+  beep(u.side==='p'?200:320, 0.15, 'triangle', 0.06, -120);
+  if (u.side === 'e') { G.money = Math.min(walletMax(G.level), G.money + u.def.reward); G.kills++; }
+  if (u.def.boss) { G.shake = 0.8; }
+}
+
+function findTarget(u) {
+  let best = null, bd = 1e9;
+  for (const o of G.units) {
+    if (o.side === u.side || o.dead || o.state==='kbdead') continue;
+    const d = (o.x - u.x) * u.dir; // 前方にいる距離
+    if (d < -o.def.size) continue;
+    const gap = d - o.def.size - u.def.size*0.6;
+    if (gap <= u.def.range && gap < bd) { bd = gap; best = o; }
+  }
+  if (best) return best;
+  const base = u.side==='p' ? G.eBase : G.pBase;
+  const d = (base.x - u.x) * u.dir;
+  if (d - 40 <= u.def.range) return base;
+  return null;
+}
+
+function updateUnit(u, dt) {
+  if (u.dead) { u.deadT += dt; return; }
+  u.flash = Math.max(0, u.flash - dt);
+  if (u.state === 'kb') {
+    u.st += dt; u.x += u.vx * dt; u.vx *= Math.pow(0.02, dt);
+    if (u.st > 0.45) { u.state = 'walk'; u.vx = 0; }
+    return;
+  }
+  if (u.state === 'attack') {
+    u.st += dt;
+    if (!u.hit && u.st > 0.25) {
+      u.hit = true;
+      doAttack(u);
+    }
+    if (u.st > u.def.ivl) { u.state = 'walk'; u.st = 0; u.hit = false; }
+    return;
+  }
+  const tgt = findTarget(u);
+  if (tgt) {
+    if (u.atkT <= 0) { u.state = 'attack'; u.st = 0; u.hit = false; u.atkT = 0.1; }
+    else u.atkT -= dt;
+  } else {
+    u.x += u.dir * u.def.speed * dt;
+    u.phase += dt * u.def.speed * 0.2;
+  }
+}
+function doAttack(u) {
+  const tgt = findTarget(u);
+  if (!tgt) return;
+  const sx = u.x + u.dir * u.def.size, sy = GROUND - u.def.size;
+  beep(u.side==='p'?420:260, 0.05, 'square', 0.035);
+  if (u.def.area) {
+    // 範囲攻撃: 射程内の全敵
+    for (const o of G.units) {
+      if (o.side===u.side||o.dead) continue;
+      const d=(o.x-u.x)*u.dir;
+      if (d>-o.def.size && d-o.def.size-u.def.size*0.6<=u.def.range) { damageUnit(o,u.atk,u); }
+    }
+    const base = u.side==='p'?G.eBase:G.pBase;
+    if ((base.x-u.x)*u.dir-40<=u.def.range) hitBase(base,u.atk);
+    G.shake = Math.max(G.shake, 0.25);
+    burst(sx, sy+10, '#ffd24a', 10, 200);
+  } else if (tgt.def) {
+    damageUnit(tgt, u.atk, u);
+    burst(tgt.x, GROUND-tgt.def.size, '#ffd24a', 4, 120);
+  } else {
+    hitBase(tgt, u.atk);
+  }
+  if (u.def.range > 100) { // 飛び道具の演出
+    G.fx.push({ x:sx, y:sy, vx:u.dir*500, vy:0, t:0, life:0.25, col:'#fff', r:3, arrow:true });
+  }
+}
+function hitBase(b, dmg) {
+  b.hp -= dmg; b.flash = 0.12;
+  dmgText(b.x + (b===G.eBase?30:-30), GROUND-120, dmg, '#ffd24a');
+  G.shake = Math.max(G.shake, 0.08);
+}
+
+// ============ 更新 ============
+function update(dt) {
+  if (!G || paused) return;
+  if (G.over) { G.overT += dt; G.slow = Math.max(0.15, G.slow - dt*1.2); }
+  dt *= G.slow;
+  G.t += dt;
+  if (!G.over) {
+    G.money = Math.min(walletMax(G.level), G.money + income(G.level) * dt);
+    for (let i=0;i<G.cd.length;i++) G.cd[i] = Math.max(0, G.cd[i]-dt);
+    G.cannon = Math.min(G.cannonMax, G.cannon + dt);
+    // 敵のスポーン
+    const st = G.st;
+    st.spawns.forEach((s,i)=>{
+      G.spawnTimers[i] -= dt;
+      if (G.spawnTimers[i] <= 0) {
+        spawnUnit('e', ENEMIES[s.t], st.mul);
+        G.spawnTimers[i] = s.every * (0.85 + Math.random()*0.3);
+      }
+    });
+    if (st.bossAt && !G.bossDone && G.eBase.hp <= G.eBase.max*st.bossAt.hpPct) {
+      G.bossDone = true;
+      spawnUnit('e', ENEMIES[st.bossAt.t], st.mul);
+      showMsg(ENEMIES[st.bossAt.t].name + ' があらわれた！', 2.5);
+      G.shake = 0.6; beep(110, 0.5, 'sawtooth', 0.08);
+    }
+  }
+  for (const u of G.units) updateUnit(u, dt);
+  G.units = G.units.filter(u => !(u.dead && u.deadT > 0.5));
+  // 押し合い（重なり軽減）
+  const ps = G.units.filter(u=>!u.dead&&u.side==='p'&&u.state!=='kb');
+  const es = G.units.filter(u=>!u.dead&&u.side==='e'&&u.state!=='kb');
+  for (const grp of [ps,es]) {
+    grp.sort((a,b)=>a.x-b.x);
+    for (let i=1;i<grp.length;i++){ const a=grp[i-1], b=grp[i]; const m=(a.def.size+b.def.size)*0.35; if (b.x-a.x<m && a.state==='walk'&&b.state==='walk'){ const push=(m-(b.x-a.x))*0.5; a.x-=push*0.1; b.x+=push*0.1; } }
+  }
+  for (const u of G.units) { u.x = Math.max(ENEMY_BASE_X-10, Math.min(PLAYER_BASE_X+10, u.x)); }
+  // fx
+  for (const f of G.fx) { f.t += dt; f.x += f.vx*dt; f.y += f.vy*dt; if(!f.arrow) f.vy += 400*dt; }
+  G.fx = G.fx.filter(f=>f.t<f.life);
+  for (const t of G.texts) t.t += dt;
+  G.texts = G.texts.filter(t=>t.t<0.9);
+  G.shake = Math.max(0, G.shake - dt);
+  G.cannonFlash = Math.max(0, G.cannonFlash - dt);
+  G.pBase.flash = Math.max(0, G.pBase.flash - dt);
+  G.eBase.flash = Math.max(0, G.eBase.flash - dt);
+  if (uiMsg) { uiMsg.t -= dt; if (uiMsg.t <= 0) uiMsg = null; }
+  // 勝敗
+  if (!G.over) {
+    if (G.eBase.hp <= 0) { G.over = 'win'; G.overT = 0; endBattle(true); }
+    else if (G.pBase.hp <= 0) { G.over = 'lose'; G.overT = 0; endBattle(false); }
+  } else if (G.overT > 2.2 && scene === 'play') {
+    scene = 'result';
+  }
+}
+function endBattle(win) {
+  G.shake = 1;
+  const b = win ? G.eBase : G.pBase;
+  for (let i=0;i<4;i++) burst(b.x+(Math.random()*60-30), GROUND-40-Math.random()*100, win?'#ffd24a':'#999', 20, 300);
+  for (const u of G.units) { if (u.side === (win?'e':'p') && !u.dead) killUnit(u); }
+  if (win) { save.cleared = Math.max(save.cleared, G.stage+1); persist(); beep(660,0.3,'triangle',0.08,300); }
+  else beep(150,0.5,'sawtooth',0.08,-80);
+}
+function showMsg(text, t=2){ uiMsg = { text, t }; }
+
+// ============ 操作 ============
+function deploy(i) {
+  if (!G || G.over || paused) return;
+  const c = CATS[i];
+  if (G.cd[i] > 0) { beep(120,0.05); return; }
+  if (G.money < c.cost) { beep(120,0.05); flashMoney(); return; }
+  G.money -= c.cost; G.cd[i] = c.cd;
+  spawnUnit('p', c);
+  beep(520,0.06,'triangle',0.05,200);
+}
+let moneyFlash = 0;
+function flashMoney(){ moneyFlash = 0.4; }
+function levelUp() {
+  if (!G || G.over || paused) return;
+  if (G.level >= MAXLV) return;
+  const cost = levelCost(G.level);
+  if (G.money < cost) { flashMoney(); beep(120,0.05); return; }
+  G.money -= cost; G.level++;
+  beep(700,0.12,'triangle',0.06,300);
+}
+function fireCannon() {
+  if (!G || G.over || paused) return;
+  if (G.cannon < G.cannonMax) { beep(120,0.05); return; }
+  G.cannon = 0; G.cannonFlash = 0.5; G.shake = 0.5;
+  beep(90,0.4,'sawtooth',0.1,-40);
+  for (const u of G.units) {
+    if (u.side==='e' && !u.dead) { damageUnit(u, 160, null); if(!u.dead) knockback(u, 1.6); }
+  }
+  G.eBase.hp -= 0; // 砲は城に当たらない
+}
+
+// ボタン配置
+const BTN = { y: UI_TOP+10, w: 112, h: 78, gap: 8, x0: 190 };
+function btnRect(i){ const r = { x: BTN.x0 + i*(BTN.w+BTN.gap), y: BTN.y, w: BTN.w, h: BTN.h }; return r; }
+const CANNON_R = { x: 20, y: UI_TOP+10, w: 150, h: 78 };
+const LEVEL_R  = { x: 20, y: UI_TOP+98, w: 150, h: 70 };
+const PAUSE_R  = { x: 940, y: 10, w: 50, h: 44 };
+const inR = (r,x,y)=> x>=r.x&&x<=r.x+r.w&&y>=r.y&&y<=r.y+r.h;
+
+function pointerPos(e){
+  const r = cv.getBoundingClientRect();
+  return { x:(e.clientX-r.left)*W/r.width, y:(e.clientY-r.top)*H/r.height };
+}
+cv.addEventListener('pointerdown', e=>{
+  e.preventDefault();
+  const p = pointerPos(e); mouse.x=p.x; mouse.y=p.y; mouse.down=true;
+  handleClick(p.x,p.y);
+});
+cv.addEventListener('pointermove', e=>{ const p=pointerPos(e); mouse.x=p.x; mouse.y=p.y; });
+addEventListener('pointerup', ()=>{ mouse.down=false; });
+
+const titleBtn = { x:380, y:400, w:240, h:64 };
+const selectRects = [0,1,2].map(i=>({x:60+i*300,y:170,w:280,h:280,i}));
+const backBtn = { x:20, y:20, w:120, h:44 };
+const resBtns = [ {x:250,y:430,w:220,h:64,k:'retry'}, {x:530,y:430,w:220,h:64,k:'next'} ];
+const pauseBtns = [ {x:380,y:260,w:240,h:56,k:'resume'}, {x:380,y:330,w:240,h:56,k:'retry'}, {x:380,y:400,w:240,h:56,k:'quit'} ];
+
+function handleClick(x,y){
+  if (scene==='title') { if (inR(titleBtn,x,y)) { scene='select'; beep(600,0.08); } return; }
+  if (scene==='select') {
+    if (inR(backBtn,x,y)) { scene='title'; return; }
+    for (const r of selectRects) if (inR(r,x,y) && r.i <= save.cleared) { startStage(r.i); return; }
+    return;
+  }
+  if (scene==='play') {
+    if (paused) {
+      for (const b of pauseBtns) if (inR(b,x,y)) {
+        if (b.k==='resume') paused=false;
+        if (b.k==='retry') { paused=false; startStage(G.stage); }
+        if (b.k==='quit') { paused=false; scene='select'; }
+      }
+      return;
+    }
+    if (inR(PAUSE_R,x,y)) { paused = true; return; }
+    if (inR(CANNON_R,x,y)) { fireCannon(); return; }
+    if (inR(LEVEL_R,x,y)) { levelUp(); return; }
+    for (let i=0;i<CATS.length;i++) if (inR(btnRect(i),x,y)) { deploy(i); return; }
+    return;
+  }
+  if (scene==='result') {
+    for (const b of resBtns) if (inR(b,x,y)) {
+      if (b.k==='retry') startStage(G.stage);
+      else if (G.over==='win' && G.stage<2) startStage(G.stage+1);
+      else scene='select';
+    }
+  }
+}
+function startStage(i){ newBattle(i); scene='play'; paused=false; uiMsg=null; showMsg('ステージ'+(i+1)+'「'+STAGES[i].name+'」',2.2); }
+
+addEventListener('keydown', e=>{
+  if (scene==='play') {
+    const i = CATS.findIndex(c=>c.key===e.key);
+    if (i>=0) deploy(i);
+    else if (e.key===' '||e.key==='f'||e.key==='F') { e.preventDefault(); fireCannon(); }
+    else if (e.key==='u'||e.key==='U') levelUp();
+    else if (e.key==='p'||e.key==='P'||e.key==='Escape') { if(!G.over) paused=!paused; }
+  }
+  if (e.key==='m'||e.key==='M') muted=!muted;
+  if (scene==='title' && (e.key==='Enter'||e.key===' ')) scene='select';
+});
+document.addEventListener('visibilitychange', ()=>{ if (document.hidden && scene==='play' && G && !G.over) paused = true; });
+
+// ============ 描画 ============
+function rr(x,y,w,h,r){ ctx.beginPath(); ctx.moveTo(x+r,y); ctx.arcTo(x+w,y,x+w,y+h,r); ctx.arcTo(x+w,y+h,x,y+h,r); ctx.arcTo(x,y+h,x,y,r); ctx.arcTo(x,y,x+w,y,r); ctx.closePath(); }
+function button(r, label, opts={}) {
+  const hot = inR(r, mouse.x, mouse.y);
+  ctx.fillStyle = opts.disabled ? '#555' : (hot ? (opts.hot||'#ffcf4a') : (opts.bg||'#f2b01e'));
+  rr(r.x,r.y,r.w,r.h,12); ctx.fill();
+  ctx.lineWidth=3; ctx.strokeStyle='#3a2a00'; ctx.stroke();
+  ctx.fillStyle = opts.disabled ? '#999' : '#3a2a00'; ctx.font = 'bold '+(opts.fs||24)+'px sans-serif';
+  ctx.textAlign='center'; ctx.textBaseline='middle'; ctx.fillText(label, r.x+r.w/2, r.y+r.h/2);
+}
+function text(s,x,y,size,col='#fff',align='center',stroke='#000'){
+  ctx.font='bold '+size+'px sans-serif'; ctx.textAlign=align; ctx.textBaseline='middle';
+  if (stroke){ ctx.lineWidth=Math.max(3,size/6); ctx.strokeStyle=stroke; ctx.lineJoin='round'; ctx.strokeText(s,x,y); }
+  ctx.fillStyle=col; ctx.fillText(s,x,y);
+}
+
+function drawBackground(st, t) {
+  const g = ctx.createLinearGradient(0,0,0,GROUND);
+  g.addColorStop(0, st.sky[0]); g.addColorStop(1, st.sky[1]);
+  ctx.fillStyle=g; ctx.fillRect(0,0,W,GROUND);
+  // 雲
+  ctx.fillStyle='rgba(255,255,255,0.7)';
+  for (let i=0;i<5;i++){ const cx=((i*230 + t*8*(1+i%3*0.3))%1200)-100, cy=60+i*28%110; ctx.beginPath(); ctx.ellipse(cx,cy,50,16,0,0,7); ctx.ellipse(cx+30,cy-8,34,14,0,0,7); ctx.fill(); }
+  // 遠景の山
+  ctx.fillStyle='rgba(0,0,0,0.12)';
+  ctx.beginPath(); ctx.moveTo(0,GROUND);
+  for (let x=0;x<=W;x+=50) ctx.lineTo(x, GROUND-70-Math.sin(x*0.011)*40-Math.sin(x*0.027)*18);
+  ctx.lineTo(W,GROUND); ctx.fill();
+  ctx.fillStyle=st.gnd; ctx.fillRect(0,GROUND,W,UI_TOP-GROUND);
+  ctx.fillStyle='rgba(0,0,0,0.15)'; ctx.fillRect(0,GROUND,W,6);
+  ctx.fillStyle='rgba(0,0,0,0.08)';
+  for (let x=0;x<W;x+=60){ ctx.fillRect(x,GROUND+20,30,4); ctx.fillRect(x+20,GROUND+45,34,4); }
+}
+
+function drawBase(b, isPlayer, st) {
+  const x = b.x, y = GROUND;
+  ctx.save();
+  if (b.flash>0) ctx.globalAlpha = 0.7;
+  const col = isPlayer ? '#f4f0e0' : '#9a7a56';
+  const roof = isPlayer ? '#4a8ad8' : '#7a2a2a';
+  ctx.fillStyle=col; ctx.strokeStyle='#222'; ctx.lineWidth=3;
+  rr(x-42,y-120,84,120,6); ctx.fill(); ctx.stroke();
+  ctx.fillStyle=roof; ctx.beginPath(); ctx.moveTo(x-52,y-120); ctx.lineTo(x,y-170); ctx.lineTo(x+52,y-120); ctx.closePath(); ctx.fill(); ctx.stroke();
+  // 顔
+  ctx.fillStyle='#222';
+  ctx.beginPath(); ctx.arc(x-14,y-80,5,0,7); ctx.arc(x+14,y-80,5,0,7); ctx.fill();
+  ctx.beginPath(); ctx.arc(x,y-66,10,0.1,Math.PI-0.1); ctx.stroke();
+  ctx.fillStyle='#222'; ctx.fillRect(x-12,y-40,24,40);
+  ctx.restore();
+  // HPバー
+  const w=110, ratio=Math.max(0,b.hp/b.max);
+  ctx.fillStyle='#000'; ctx.fillRect(x-w/2-2,y-196,w+4,16);
+  ctx.fillStyle= ratio>0.3?'#4ae04a':'#e04a4a'; ctx.fillRect(x-w/2,y-194,w*ratio,12);
+  text(Math.max(0,Math.ceil(b.hp))+'', x, y-204, 14, '#fff');
+}
+
+function drawUnit(u, t) {
+  const d = u.def, s = d.size;
+  let x = u.x, y = GROUND;
+  const walking = u.state==='walk';
+  const bob = walking ? Math.abs(Math.sin(u.phase*2))*4 : 0;
+  let lunge = 0;
+  if (u.state==='attack') { const k=u.st/d.ivl; lunge = Math.sin(Math.min(1,k*3)*Math.PI)*10*u.dir; }
+  if (u.state==='kb') { y -= Math.sin(Math.min(1,u.st/0.45)*Math.PI)*28; }
+  let alpha = 1;
+  if (u.dead) { alpha = Math.max(0, 1-u.deadT/0.5); y -= u.deadT*60; }
+  ctx.save();
+  ctx.globalAlpha = alpha;
+  ctx.translate(x+lunge, y-bob);
+  ctx.scale(u.dir, 1); // 絵は右向き基準。味方(dir=-1)は左向きに反転
+  // 影
+  ctx.fillStyle='rgba(0,0,0,0.25)'; ctx.beginPath(); ctx.ellipse(0,bob,s*0.9,5,0,0,7); ctx.fill();
+  if (u.side==='p') drawCat(d, s, u); else drawEnemy(d, s, u);
+  if (u.flash>0) { ctx.globalCompositeOperation='source-atop'; ctx.fillStyle='rgba(255,255,255,0.6)'; ctx.fillRect(-60,-120,120,130); }
+  ctx.restore();
+  // HPバー
+  if (!u.dead && u.hp<u.max) {
+    const w=s*1.6; ctx.fillStyle='#000'; ctx.fillRect(x-w/2-1,GROUND-s*2.4-1,w+2,6);
+    ctx.fillStyle=u.side==='p'?'#4ae0ff':'#ff6a4a'; ctx.fillRect(x-w/2,GROUND-s*2.4,w*Math.max(0,u.hp/u.max),4);
+  }
+}
+function legs(s,u,col){
+  const ph = u.state==='walk' ? Math.sin(u.phase*2)*5 : 0;
+  ctx.fillStyle=col; ctx.strokeStyle='#222'; ctx.lineWidth=2;
+  ctx.fillRect(-s*0.5+ph, -s*0.35, s*0.3, s*0.35); ctx.strokeRect(-s*0.5+ph, -s*0.35, s*0.3, s*0.35);
+  ctx.fillRect(s*0.2-ph, -s*0.35, s*0.3, s*0.35); ctx.strokeRect(s*0.2-ph, -s*0.35, s*0.3, s*0.35);
+}
+function drawCat(d, s, u) {
+  ctx.strokeStyle='#222'; ctx.lineWidth=2.5;
+  const id = d.id;
+  const bodyCol = d.color;
+  legs(s,u,'#fff');
+  // 体
+  ctx.fillStyle=bodyCol;
+  const bh = id==='wall' ? s*1.9 : s*1.5;
+  rr(-s*0.8, -bh-s*0.2, s*1.6, bh, s*0.4); ctx.fill(); ctx.stroke();
+  const fy = -bh-s*0.2 + s*0.65; // 顔の中心
+  // 耳
+  ctx.fillStyle=bodyCol;
+  ctx.beginPath(); ctx.moveTo(-s*0.75,fy-s*0.3); ctx.lineTo(-s*0.55,fy-s*0.95); ctx.lineTo(-s*0.15,fy-s*0.6); ctx.closePath(); ctx.fill(); ctx.stroke();
+  ctx.beginPath(); ctx.moveTo(s*0.75,fy-s*0.3); ctx.lineTo(s*0.55,fy-s*0.95); ctx.lineTo(s*0.15,fy-s*0.6); ctx.closePath(); ctx.fill(); ctx.stroke();
+  // 目と口
+  ctx.fillStyle='#222';
+  ctx.beginPath(); ctx.arc(-s*0.3,fy,s*0.1,0,7); ctx.arc(s*0.3,fy,s*0.1,0,7); ctx.fill();
+  ctx.beginPath(); ctx.arc(-s*0.12,fy+s*0.22,s*0.12,0,Math.PI); ctx.arc(s*0.12,fy+s*0.22,s*0.12,0,Math.PI); ctx.stroke();
+  // 装備
+  if (id==='fight') { ctx.fillStyle='#ccc'; ctx.save(); ctx.translate(s*0.9,-s*0.9); ctx.rotate(u.state==='attack'?Math.min(1,u.st/0.3)*1.6-0.6:-0.4); ctx.fillRect(-2,-s*1.3,5,s*1.4); ctx.strokeRect(-2,-s*1.3,5,s*1.4); ctx.restore(); }
+  if (id==='archer') { ctx.strokeStyle='#8a5a2a'; ctx.lineWidth=3; ctx.beginPath(); ctx.arc(s*0.9,-s*0.9,s*0.7,-1.3,1.3); ctx.stroke(); ctx.strokeStyle='#fff'; ctx.lineWidth=1; ctx.beginPath(); ctx.moveTo(s*0.9+Math.cos(-1.3)*s*0.7,-s*0.9+Math.sin(-1.3)*s*0.7); ctx.lineTo(s*0.9+Math.cos(1.3)*s*0.7,-s*0.9+Math.sin(1.3)*s*0.7); ctx.stroke(); }
+  if (id==='wall') { ctx.fillStyle='#8a7a5a'; ctx.fillRect(-s*0.5,-bh*0.5,s*1.0,s*0.3); }
+  if (id==='giant') { ctx.fillStyle='#e05050'; ctx.fillRect(-s*0.8,-bh*0.45,s*1.6,s*0.25); }
+}
+function drawEnemy(d, s, u) {
+  ctx.strokeStyle='#222'; ctx.lineWidth=2.5;
+  const col = d.color;
+  const k = d.name;
+  if (k==='ヘビ') {
+    ctx.strokeStyle='#222'; ctx.lineWidth=s*0.7+4; ctx.lineCap='round';
+    ctx.beginPath(); for(let i=0;i<=10;i++){ const px=-s*1.3+i*s*0.26, py=-s*0.4-Math.sin(i*0.9+u.phase*3)*s*0.3; i?ctx.lineTo(px,py):ctx.moveTo(px,py);} ctx.stroke();
+    ctx.strokeStyle=col; ctx.lineWidth=s*0.7; ctx.stroke();
+    ctx.fillStyle=col; ctx.beginPath(); ctx.arc(s*1.3,-s*0.9,s*0.5,0,7); ctx.fill(); ctx.lineWidth=2.5; ctx.strokeStyle='#222'; ctx.stroke();
+    ctx.fillStyle='#fff'; ctx.beginPath(); ctx.arc(s*1.45,-s*1.0,s*0.15,0,7); ctx.fill(); ctx.fillStyle='#222'; ctx.beginPath(); ctx.arc(s*1.5,-s*1.0,s*0.07,0,7); ctx.fill();
+    return;
+  }
+  legs(s,u,col);
+  ctx.fillStyle=col;
+  const bw = k==='ゴリラ'||u.def.boss ? s*1.1 : s*0.95;
+  rr(-bw,-s*1.7,bw*2,s*1.5,s*0.4); ctx.fill(); ctx.stroke();
+  const fy = -s*1.1;
+  // 耳（種類で変える）
+  if (k==='ワンコ') { ctx.fillStyle='#8a5a2a'; rr(-s*0.95,fy-s*0.6,s*0.4,s*0.9,6); ctx.fill(); ctx.stroke(); rr(s*0.55,fy-s*0.6,s*0.4,s*0.9,6); ctx.fill(); ctx.stroke(); }
+  if (k==='ブタ') { ctx.fillStyle='#ff8fa6'; ctx.beginPath(); ctx.ellipse(s*0.75,fy+s*0.15,s*0.45,s*0.3,0,0,7); ctx.fill(); ctx.stroke(); ctx.fillStyle='#222'; ctx.beginPath(); ctx.arc(s*0.65,fy+s*0.15,3,0,7); ctx.arc(s*0.85,fy+s*0.15,3,0,7); ctx.fill(); }
+  if (k==='クマ') { ctx.fillStyle=col; ctx.beginPath(); ctx.arc(-s*0.7,fy-s*0.7,s*0.3,0,7); ctx.arc(s*0.7,fy-s*0.7,s*0.3,0,7); ctx.fill(); ctx.stroke(); }
+  if (k==='ゴリラ') { ctx.fillStyle='#888'; ctx.beginPath(); ctx.ellipse(0,fy+s*0.2,s*0.6,s*0.5,0,0,7); ctx.fill(); ctx.stroke(); ctx.fillStyle=col; rr(-s*1.4,-s*1.6,s*0.5,s*1.2,8); ctx.fill(); ctx.stroke(); rr(s*0.9,-s*1.6,s*0.5,s*1.2,8); ctx.fill(); ctx.stroke(); }
+  if (u.def.boss) { ctx.fillStyle='#ffd24a'; ctx.beginPath(); ctx.moveTo(-s*0.8,fy-s*0.9); ctx.lineTo(-s*0.5,fy-s*1.5); ctx.lineTo(-s*0.2,fy-s*1.0); ctx.lineTo(0,fy-s*1.6); ctx.lineTo(s*0.2,fy-s*1.0); ctx.lineTo(s*0.5,fy-s*1.5); ctx.lineTo(s*0.8,fy-s*0.9); ctx.closePath(); ctx.fill(); ctx.stroke(); }
+  // 目（怒り）
+  ctx.fillStyle='#fff'; ctx.beginPath(); ctx.arc(s*0.2,fy-s*0.1,s*0.2,0,7); ctx.arc(s*0.6,fy-s*0.1,s*0.2,0,7); ctx.fill();
+  ctx.fillStyle='#222'; ctx.beginPath(); ctx.arc(s*0.28,fy-s*0.1,s*0.09,0,7); ctx.arc(s*0.68,fy-s*0.1,s*0.09,0,7); ctx.fill();
+  ctx.strokeStyle='#222'; ctx.lineWidth=3; ctx.beginPath(); ctx.moveTo(0,fy-s*0.4); ctx.lineTo(s*0.45,fy-s*0.22); ctx.moveTo(s*0.85,fy-s*0.4); ctx.lineTo(s*0.5,fy-s*0.22); ctx.stroke();
+}
+
+function drawFX() {
+  for (const f of G.fx) {
+    ctx.globalAlpha = Math.max(0,1-f.t/f.life);
+    ctx.fillStyle = f.col;
+    if (f.arrow) { ctx.fillRect(f.x-14,f.y-1,28,3); }
+    else { ctx.beginPath(); ctx.arc(f.x,f.y,f.r,0,7); ctx.fill(); }
+  }
+  ctx.globalAlpha=1;
+  for (const t of G.texts) {
+    ctx.globalAlpha = Math.max(0,1-t.t/0.9);
+    text(t.v||'', t.x, t.y - t.t*40, 18, t.col);
+  }
+  ctx.globalAlpha=1;
+}
+
+function drawUI() {
+  ctx.fillStyle='#2b2438'; ctx.fillRect(0,UI_TOP,W,H-UI_TOP);
+  ctx.fillStyle='#4a3f66'; ctx.fillRect(0,UI_TOP,W,4);
+  // 大砲
+  const ready = G.cannon >= G.cannonMax;
+  button(CANNON_R, ready ? 'キャノン発射！' : 'キャノン充填中', { bg: ready?'#ff6a3a':'#666', hot: ready?'#ff9a6a':'#666', fs:18 });
+  ctx.fillStyle='#000'; ctx.fillRect(CANNON_R.x+10,CANNON_R.y+CANNON_R.h-22,CANNON_R.w-20,10);
+  ctx.fillStyle= ready?'#ffd24a':'#4ab0ff'; ctx.fillRect(CANNON_R.x+10,CANNON_R.y+CANNON_R.h-22,(CANNON_R.w-20)*G.cannon/G.cannonMax,10);
+  if (ready) text('SPACE', CANNON_R.x+CANNON_R.w/2, CANNON_R.y+CANNON_R.h-48, 12, '#fff', 'center', null);
+  // レベルアップ
+  const lcost = levelCost(G.level), maxed = G.level>=MAXLV;
+  const can = !maxed && G.money>=lcost;
+  button(LEVEL_R, maxed?'さいだい':'財布UP '+lcost+'円', { bg: can?'#4ae04a':'#777', hot: can?'#7aff7a':'#777', fs:18, disabled:false });
+  text('財布Lv'+G.level+'  [U]', LEVEL_R.x+LEVEL_R.w/2, LEVEL_R.y+LEVEL_R.h-12, 12, '#fff','center',null);
+  // 出撃ボタン
+  for (let i=0;i<CATS.length;i++) {
+    const c = CATS[i], r = btnRect(i);
+    const cdLeft = G.cd[i], affordable = G.money >= c.cost, ok = affordable && cdLeft<=0;
+    ctx.fillStyle = ok ? '#fff6d8' : '#8a8478';
+    rr(r.x,r.y,r.w,r.h,10); ctx.fill(); ctx.lineWidth=3; ctx.strokeStyle= ok?'#ffcf4a':'#444'; ctx.stroke();
+    // 顔アイコン
+    ctx.save(); ctx.translate(r.x+r.w/2, r.y+r.h-26); ctx.scale(0.55,0.55); ctx.globalAlpha = ok?1:0.5;
+    drawCat(c, c.size, { state:'idle', phase:0, st:0 }); ctx.restore();
+    text(c.name, r.x+r.w/2, r.y+12, 14, '#fff', 'center', '#000');
+    text(c.cost+'円', r.x+r.w/2, r.y+r.h-10, 16, affordable?'#ffe14a':'#ff8a8a', 'center','#000');
+    text(c.key, r.x+10, r.y+r.h-12, 12, '#fff','center','#000');
+    if (cdLeft>0) { ctx.fillStyle='rgba(0,0,0,0.55)'; ctx.fillRect(r.x+3,r.y+3,r.w-6,(r.h-6)*cdLeft/c.cd); }
+  }
+  // 財布
+  moneyFlash = Math.max(0, moneyFlash - 1/60);
+  text(Math.floor(G.money)+' / '+walletMax(G.level)+' 円', 985, UI_TOP-24, 30, moneyFlash>0?'#ff6a6a':'#ffe14a', 'right');
+  // ステージ名・停止ボタン
+  text('ステージ'+(G.stage+1)+' '+G.st.name, 20, 24, 18, '#fff','left');
+  ctx.fillStyle='rgba(0,0,0,0.5)'; rr(PAUSE_R.x,PAUSE_R.y,PAUSE_R.w,PAUSE_R.h,8); ctx.fill();
+  ctx.fillStyle='#fff'; ctx.fillRect(PAUSE_R.x+15,PAUSE_R.y+10,7,24); ctx.fillRect(PAUSE_R.x+28,PAUSE_R.y+10,7,24);
+  if (uiMsg) { ctx.globalAlpha=Math.min(1,uiMsg.t); text(uiMsg.text, W/2, 110, 34); ctx.globalAlpha=1; }
+}
+
+function drawCannonFX() {
+  if (G.cannonFlash<=0) return;
+  const k = G.cannonFlash/0.5;
+  ctx.fillStyle='rgba(255,255,220,'+(0.5*k)+')'; ctx.fillRect(0,0,W,UI_TOP);
+  ctx.fillStyle='rgba(255,180,60,'+k+')';
+  ctx.fillRect(0, GROUND-70, W-PLAYER_BASE_X+PLAYER_BASE_X, 60*k+10);
+}
+
+function drawGame() {
+  ctx.save();
+  if (G.shake>0) ctx.translate((Math.random()-0.5)*G.shake*16,(Math.random()-0.5)*G.shake*16);
+  drawBackground(G.st, G.t);
+  drawBase(G.eBase,false,G.st); drawBase(G.pBase,true,G.st);
+  const order = G.units.slice().sort((a,b)=>a.def.size-b.def.size);
+  for (const u of order) drawUnit(u, G.t);
+  drawFX(); drawCannonFX();
+  ctx.restore();
+  drawUI();
+  if (paused) {
+    ctx.fillStyle='rgba(0,0,0,0.6)'; ctx.fillRect(0,0,W,H);
+    text('一時停止', W/2, 190, 56);
+    button(pauseBtns[0],'つづける'); button(pauseBtns[1],'やりなおす'); button(pauseBtns[2],'ステージ選択へ');
+  }
+  if (G.over) {
+    const a = Math.min(1,G.overT/0.6);
+    ctx.globalAlpha=a; text(G.over==='win'?'しょうり！':'はいぼく…', W/2, 220, 88, G.over==='win'?'#ffe14a':'#ff7a7a'); ctx.globalAlpha=1;
+  }
+}
+
+function drawTitle(t) {
+  drawBackground(STAGES[0], t);
+  text('ネコ大戦争', W/2, 170, 100, '#fff');
+  text('ネコをだして、敵のしろをたおせ！', W/2, 250, 28, '#fff');
+  ctx.save(); ctx.translate(500, 350); const u={state:'walk',phase:t*3,st:0}; ctx.scale(3,3); drawCat(CATS[0], 20, u); ctx.restore();
+  button(titleBtn, 'はじめる', { fs:32 });
+  text('1〜5:出撃  スペース:キャノン  U:財布UP  P:停止  M:音', W/2, 560, 18, '#fff');
+}
+function drawSelect(t) {
+  ctx.fillStyle='#2b2438'; ctx.fillRect(0,0,W,H);
+  text('ステージをえらぶ', W/2, 90, 52);
+  button(backBtn, 'もどる', { fs:20 });
+  for (const r of selectRects) {
+    const st = STAGES[r.i], open = r.i <= save.cleared;
+    const g = ctx.createLinearGradient(0,r.y,0,r.y+r.h); g.addColorStop(0, st.sky[0]); g.addColorStop(1, st.gnd);
+    ctx.fillStyle = open?g:'#444'; rr(r.x,r.y,r.w,r.h,16); ctx.fill();
+    ctx.lineWidth=4; ctx.strokeStyle = inR(r,mouse.x,mouse.y)&&open?'#ffd24a':'#111'; ctx.stroke();
+    text('ステージ'+(r.i+1), r.x+r.w/2, r.y+50, 28);
+    text(open?st.name:'？？？', r.x+r.w/2, r.y+100, 24);
+    text(open?(save.cleared>r.i?'クリア済み':'みクリア'):'前のステージをクリア', r.x+r.w/2, r.y+r.h-40, 20, open?(save.cleared>r.i?'#ffe14a':'#fff'):'#aaa');
+  }
+}
+function drawResult() {
+  drawGame();
+  ctx.fillStyle='rgba(0,0,0,0.65)'; ctx.fillRect(0,0,W,H);
+  const win = G.over==='win';
+  text(win?'ステージクリア！':'ざんねん…', W/2, 150, 72, win?'#ffe14a':'#ff7a7a');
+  text('たおした敵: '+G.kills+'体   かかった時間: '+Math.floor(G.t)+'秒', W/2, 270, 30);
+  if (win && G.stage===2) text('ぜんステージ制覇！おめでとう！', W/2, 340, 34, '#fff');
+  button(resBtns[0], 'もう一度');
+  button(resBtns[1], win ? (G.stage<2?'次のステージ':'ステージ選択') : 'ステージ選択');
+}
+
+// ============ メインループ ============
+let last = performance.now();
+function frame(now) {
+  const dt = Math.min(0.05, (now-last)/1000); last = now;
+  try {
+    if (scene==='play' || scene==='result') update(dt);
+    ctx.clearRect(0,0,W,H);
+    if (scene==='title') drawTitle(now/1000);
+    else if (scene==='select') drawSelect(now/1000);
+    else if (scene==='play') drawGame();
+    else if (scene==='result') drawResult();
+  } catch (e) { console.error(e); }
+  requestAnimationFrame(frame);
+}
+requestAnimationFrame(frame);
+window.__game = { get G(){return G;}, get scene(){return scene;}, set scene(v){scene=v;}, startStage, deploy, levelUp, fireCannon, CATS, save };
+</script>
+</body>
+</html>
