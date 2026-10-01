@@ -56,7 +56,7 @@ button{font-family:inherit}
 #world .house .door{left:72px;top:124px;width:48px;height:68px;background:#8a5a2b;border-radius:24px 24px 0 0;box-shadow:inset 0 0 0 4px #6e4520}
 #world .house .win{top:100px;width:34px;height:34px;background:#bfe6ff;border:4px solid #d9b87a;border-radius:6px}
 #world .house .win.l{left:28px}#world .house .win.r{left:130px}
-#world .house .sign{left:50%;top:60px;transform:translateX(-50%);height:32px;line-height:28px;padding:0 12px;white-space:nowrap;background:#fffbe8;border:3px solid #d9b87a;border-radius:10px;text-align:center;font-weight:800;font-size:19px;color:#5a3b1f}
+#world .house .sign{left:50%;top:58px;transform:translateX(-50%);height:38px;line-height:33px;padding:0 12px;white-space:nowrap;background:#fffbe8;border:3px solid #d9b87a;border-radius:10px;text-align:center;font-weight:800;font-size:25px;color:#5a3b1f}
 /* ひと・ねこ */
 #world .ent{left:0;top:0;width:64px;height:80px;pointer-events:none}
 #world .ent .flip{position:absolute;inset:0;transform:scaleX(var(--f,1))}
@@ -99,7 +99,8 @@ button{font-family:inherit}
 .rdesk{display:flex;gap:2.4vmin}
 .ritem{display:flex;flex-direction:column;align-items:center;gap:1vmin;cursor:pointer;animation:wob 1.8s infinite ease-in-out}
 .ritem:nth-child(2){animation-delay:.3s}.ritem:nth-child(3){animation-delay:.6s}
-.ritem span{font-size:4.2vmin;line-height:1.15;white-space:nowrap;text-align:center;font-weight:800;background:#fffbe8;border-radius:2vmin;padding:.4vmin 1.4vmin}
+.ritem{justify-content:flex-start}
+.ritem span{min-height:10.6vmin;display:flex;align-items:center;justify-content:center;font-size:4.2vmin;line-height:1.15;white-space:nowrap;text-align:center;font-weight:800;background:#fffbe8;border-radius:2vmin;padding:.4vmin 1.4vmin}
 @keyframes wob{50%{transform:translateY(-1.4vmin)}}
 .rempty{font-size:5.4vmin;font-weight:800;color:#fffbe8;padding:6vmin 8vmin}
 .hdesk{display:grid;grid-template-columns:repeat(3,22vmin);gap:2vmin}
@@ -125,6 +126,17 @@ button{font-family:inherit}
 .bag.pop{animation:pop .45s}
 @keyframes pop{40%{transform:scale(1.18) rotate(-4deg)}}
 @keyframes pulse{50%{transform:scale(1.04)}}
+#fade{position:absolute;inset:0;z-index:49;background:#fffbe8;opacity:0;pointer-events:none}
+#fade.go{animation:fadeout .28s ease-out}
+@keyframes fadeout{from{opacity:1}to{opacity:0}}
+.plate.bounce{animation:pop .45s}
+.mom.joy{animation:momhop .6s}
+.mom.no{animation:momno .5s}
+@keyframes momhop{30%{translate:0 -3.4vmin}60%{translate:0 0}80%{translate:0 -1.4vmin}}
+@keyframes momno{20%{translate:-1.6vmin 0}50%{translate:1.6vmin 0}80%{translate:-.8vmin 0}}
+#ending .items{display:flex;gap:1.6vmin;flex-wrap:wrap;justify-content:center;padding:0 4vmin}
+#ending .eit{width:12vmin;height:12vmin;border-radius:3vmin;background:var(--c);border:.6vmin solid #fff9;display:flex;align-items:center;justify-content:center;font-size:7.4vmin;line-height:1;opacity:0;animation:eit .5s forwards;animation-delay:var(--d)}
+@keyframes eit{0%{opacity:0;transform:translateY(-6vmin) scale(.4)}70%{opacity:1;transform:translateY(0) scale(1.15)}100%{opacity:1;transform:scale(1)}}
 .fly{position:absolute;z-index:65;border-radius:3vmin;background:var(--c);border:.8vmin solid #fff9;display:flex;align-items:center;justify-content:center;line-height:1;pointer-events:none;transition:all .5s ease-in}
 .rip{position:absolute;z-index:16;width:10vmin;height:10vmin;margin:-5vmin 0 0 -5vmin;border-radius:50%;border:1vmin solid #fff;opacity:.9;pointer-events:none;animation:rip .45s ease-out forwards}
 @keyframes rip{to{transform:scale(2.2);opacity:0}}
@@ -134,11 +146,12 @@ button{font-family:inherit}
   #packbox{left:0;right:0;bottom:21vmin;justify-content:center}
 }
 @media (orientation:landscape){
+  #goal{top:1.2vmin;transform:translateX(-50%) scale(.8);transform-origin:50% 0}
   #msg .box{bottom:19vmin;min-height:17vmin;padding:1.6vmin 3.5vmin 2.2vmin}
   #msg .txt{font-size:5vmin}
   #msg .who{min-height:4vmin;font-size:4vmin}
   #room .stage{padding-top:33vmin}
-  .mom{left:6vmin;top:50%;transform:translateY(-60%)}
+  .mom{left:6vmin;top:40%;transform:translateY(-60%)}
   .stage{padding-top:14vmin}
   #home.packing .stage{padding-bottom:42vmin}
   #home.packing .hdesk{grid-template-columns:repeat(3,18vmin);gap:1.6vmin;padding:2vmin}
@@ -234,6 +247,7 @@ button{font-family:inherit}
     </div>
   </div>
 
+  <div id="fade"></div>
   <div id="hudbar"></div>
   <div id="goal" class="hidden"></div>
   <div id="arrow" class="hidden"><span>▶</span></div>
@@ -253,6 +267,7 @@ button{font-family:inherit}
 
   <div id="ending" class="hidden">
     <div class="heart">🎒</div>
+    <div class="items" id="endItems"></div>
     <div class="big">ごあんぜんに</div>
     <div class="sub">ぼうさいグッズを ぜんぶ つめたよ！</div>
     <button class="bigbtn yes" id="again">もういちど あそぶ</button>
@@ -533,6 +548,7 @@ const locked = () => S.bubble || S.modal || msgOn || S.ending || S.mode !== 'out
 /* ---------- 画面（レイヤー）切り替え ---------- */
 function setMode(m) {
   S.mode = m; ptr = null; guardUntil = performance.now() + 350;
+  { const f = $('fade'); f.classList.remove('go'); void f.offsetWidth; f.classList.add('go'); }
   $('game').dataset.mode = m;
   $('goal').classList.toggle('hidden', m === 'home');
   if (m !== 'outdoor') $('arrow').classList.add('hidden');
@@ -562,7 +578,7 @@ function advance() {
     if (l.text !== undefined) {
       $('msgwho').textContent = l.who || '';
       $('msgtxt').textContent = l.text;
-      $('msg').classList.remove('hidden');
+      $('msg').classList.remove('hidden'); lastAdv = performance.now();
       return;
     }
     if (l.done) l.done();
@@ -570,7 +586,13 @@ function advance() {
   msgOn = false;
   $('msg').classList.add('hidden');
 }
-$('msg').addEventListener('click', () => { if (msgOn) { sfx.tap(); advance(); } });
+let lastAdv = 0;
+$('msg').addEventListener('click', e => {
+  if (!msgOn) return;
+  const now = performance.now();
+  if (e.pointerType !== 'mouse' && now - lastAdv < 250) return;   // 指が連続で当たっても1行ずつ進む
+  lastAdv = now; sfx.tap(); advance();
+});
 
 let toastTimer = 0;
 function toast(t) {
@@ -579,7 +601,9 @@ function toast(t) {
 }
 
 /* ---------- 吹き出し（住人の頭上。タップで消える） ---------- */
+let bubbleAt = 0;
 function showBubble(n) {
+  bubbleAt = performance.now();
   const b = $('bubble');
   b.innerHTML = catDone(n) ? 'もう わたしたよ。ありがとニャ🎵' : `<span class="nw">わたしのいえに</span> <span class="nw">”${DEF[n.h.kind].name}”</span> <span class="nw">があるから</span><span class="nw">もっていってニャ🎵</span>`;
   b.style.removeProperty('--tx'); b.classList.remove('below');
@@ -601,30 +625,38 @@ function showBubble(n) {
   sfx.pop();
 }
 function hideBubble() { S.bubble = false; $('bcatch').classList.add('hidden'); }
-$('bcatch').addEventListener('pointerdown', e => { e.preventDefault(); e.stopPropagation(); hideBubble(); });
+$('bcatch').addEventListener('pointerdown', e => { e.preventDefault(); e.stopPropagation(); if (performance.now() - bubbleAt < 300) return; hideBubble(); });
 
 /* ---------- 外の入力：タップ(イベント) と 長押し/ドラッグ(移動) の切り分け ---------- */
 const O = $('outdoor');
 let ptr = null;
 O.addEventListener('pointerdown', e => {
-  if (!e.isPrimary || ptr || locked()) return;
+  if (locked()) return;
+  if (ptr) { if (!ptr.alt && e.pointerId !== ptr.id) ptr.alt = {id:e.pointerId, x:e.clientX, y:e.clientY}; return; }   // 2本目の指は控えにする
+  if (!e.isPrimary) return;
   try { O.setPointerCapture(e.pointerId); } catch (_) {}
   const hit = hitTest(e.clientX, e.clientY);
   ptr = {id:e.pointerId, x0:e.clientX, y0:e.clientY, x:e.clientX, y:e.clientY, t0:performance.now(), hold:false,
          holdMs:hit ? HOLD_HIT : HOLD_FREE, moveLim:vmin * (hit ? MOVE_HIT : MOVE_FREE) / 100, hit};
 });
 O.addEventListener('pointermove', e => {
+  if (ptr && ptr.alt && e.pointerId === ptr.alt.id) { ptr.alt.x = e.clientX; ptr.alt.y = e.clientY; return; }
   if (!ptr || e.pointerId !== ptr.id) return;
   ptr.x = e.clientX; ptr.y = e.clientY;
   if (!ptr.hold && Math.hypot(ptr.x - ptr.x0, ptr.y - ptr.y0) > ptr.moveLim) ptr.hold = true;
 });
 O.addEventListener('pointerup', e => {
+  if (ptr && ptr.alt && e.pointerId === ptr.alt.id) { ptr.alt = null; return; }
   if (!ptr || e.pointerId !== ptr.id) return;
+  if (ptr.alt) { const a = ptr.alt; ptr.id = a.id; ptr.x = a.x; ptr.y = a.y; ptr.hold = true; ptr.hit = null; ptr.alt = null; return; }   // 残った指へ引き継ぐ
   const p = ptr; ptr = null;
   const isTap = !p.hold && performance.now() - p.t0 < p.holdMs && Math.hypot(e.clientX - p.x0, e.clientY - p.y0) <= p.moveLim;
   if (isTap && !locked()) onTap(e.clientX, e.clientY, p.hit);
 });
-O.addEventListener('pointercancel', e => { if (ptr && e.pointerId === ptr.id) ptr = null; });
+O.addEventListener('pointercancel', e => {
+  if (ptr && ptr.alt && e.pointerId === ptr.alt.id) ptr.alt = null;
+  else if (ptr && e.pointerId === ptr.id) ptr = null;
+});
 O.addEventListener('contextmenu', e => e.preventDefault());
 
 // 画面の座標にある住人・家を返す（距離に関係なく、画面に見えていれば反応。指が大きくても当たるよう広めに判定）
@@ -780,15 +812,16 @@ function enterHome() {
     ]);
   } else judge();
 }
+function momReact(c) { const m = $('mom'); m.classList.remove('joy', 'no'); void m.offsetWidth; m.classList.add(c); }
 function judge() {
   const lines = [];
   S.hud.filter(it => !it.checked).forEach(it => {
     const d = DEF[it.kind];
     if (d.ok) {
-      lines.push({who:'おかあさん', text:`${d.name}をもってきたのね。つくえにならべてちょうだい。`, fx:() => { it.checked = true; sfx.ok(); renderHud(); renderHome(); }});
+      lines.push({who:'おかあさん', text:`${d.name}をもってきたのね。つくえにならべてちょうだい。`, fx:() => { it.checked = true; sfx.ok(); momReact('joy'); renderHud(); renderHome(); }});
     } else {
       lines.push({who:'おかあさん', text:`${d.name}は ぼうさいグッズではないのよ。かえしておくわ。`, fx:() => {
-        removeHud(it); it.state = 'house'; it.checked = false; sfx.ng(); renderHud(); renderHome();
+        removeHud(it); it.state = 'house'; it.checked = false; sfx.ng(); momReact('no'); renderHud(); renderHome();
       }});
     }
   });
@@ -820,8 +853,15 @@ function onSlot(i) {
   if (S.desk[i]) return;
   const it = S.hud.find(x => x.uid === S.sel);
   if (!it) { toast('したの アイテムを タップしてから、ここを タップしてね'); return; }
+  const hudEl = $('hud').children[S.hud.indexOf(it)], from = hudEl ? hudEl.getBoundingClientRect() : null;
   removeHud(it); it.state = 'desk'; S.desk[i] = it; S.sel = null;
   sfx.place(); renderHud(); renderHome();
+  const slotEl = document.querySelectorAll('#homeDesk .hslot')[i], plate = slotEl && slotEl.querySelector('.plate');
+  if (from && plate) {
+    plate.style.visibility = 'hidden';
+    flyRect(from, slotEl.getBoundingClientRect(), it);
+    setTimeout(() => { plate.style.visibility = ''; plate.classList.add('bounce'); }, 520);
+  }
   if (S.desk.every(Boolean)) {
     msg([{who:'おかあさん', text:'ひじょうもちだしぶくろにつめよう！', fx:() => sfx.fanfare()},
          {who:'おかあさん', text:'つくえの アイテムを タップして、「ふくろにいれる」ボタンを おしてね。'}], () => { S.phase = 'pack'; S.deskSel = null; renderHome(); });
@@ -854,6 +894,7 @@ function showEnding() {
   S.ending = true;
   const e = $('ending');
   e.querySelectorAll('.cf').forEach(x => x.remove());
+  $('endItems').innerHTML = ALL_OK.map((k, i) => `<div class="eit" style="--c:${DEF[k].col};--d:${.3 + i * .22}s">${DEF[k].icon}</div>`).join('');
   const cols = ['#ff6f61', '#ffd23f', '#58b368', '#4a90d9', '#d9638f'];
   for (let i = 0; i < 36; i++) {
     const c = document.createElement('i'); c.className = 'cf';
