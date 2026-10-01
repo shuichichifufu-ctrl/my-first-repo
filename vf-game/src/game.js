@@ -9,7 +9,7 @@ const WIN_ROUNDS = 2, ROUND_TIME = 60;
 
 const MOVES = {
   P:  { name:'パンチ',   h:'high', su:6,  ac:3, rc:11, dmg:6,  hs:15, bs:9,  range:1.45, kb:0.10, pose:'punch' },
-  K:  { name:'キック',   h:'mid',  su:11, ac:3, rc:17, dmg:11, hs:18, bs:11, range:1.85, kb:0.16, pose:'kick' },
+  K:  { name:'キック',   h:'mid',  su:11, ac:3, rc:17, dmg:11, hs:21, bs:11, range:1.85, kb:0.16, pose:'kick' },
   LK: { name:'下段キック', h:'low', su:9,  ac:3, rc:19, dmg:8,  hs:15, bs:8,  range:1.70, kb:0.08, pose:'lowkick' },
   EL: { name:'ひじ打ち', h:'mid',  su:13, ac:3, rc:20, dmg:14, hs:24, bs:13, range:1.55, kb:0.26, pose:'elbow', lunge:0.05 },
   TH: { name:'投げ',     h:'throw',su:12, ac:2, rc:34, dmg:20, range:1.20, pose:'throw' },
@@ -153,7 +153,7 @@ function makeFighter(idx, look) {
     idx, mesh, shadow, name: look.name,
     x:0, z:0, fx:1, fz:0, vx:0, vz:0, y:0, vy:0,
     hp:100, state:'idle', t:0, stun:0, move:null, hit:false, freeze:0,
-    ax:1, az:0, crouching:false, guarding:false, walkPhase:0, walkMode:0,
+    ax:1, az:0, sideStepping:0, dodgeShown:false, crouching:false, guarding:false, walkPhase:0, walkMode:0,
     pose:{ ...POSES.idle }, input:newInput(), ai:null, wins:0, lieAmt:0,
     invuln:false, grabBy:null, lastHitCounter:false, thrownT:0, dead:false, ringOut:false
   };
@@ -260,7 +260,7 @@ function press(f, key) { f.input[key + 'Buf'] = 5; }
 // ====== 攻撃開始 ======
 function startMove(f, o, id) {
   const m = MOVES[id];
-  f.state = 'attack'; f.move = m; f.t = 0; f.hit = false; f.ax = f.fx; f.az = f.fz;
+  f.state = 'attack'; f.move = m; f.t = 0; f.hit = false; f.dodgeShown = false; f.ax = f.fx; f.az = f.fz;
   f.input.pBuf = f.input.kBuf = f.input.gBuf = 0;
   f.guarding = false;
   SFX.whoosh();
@@ -280,10 +280,11 @@ function tryHit(a, d) {
     // つかみ成立
     a.hit = true; a.state = 'throwhold'; a.t = 0; a.grabTarget = d;
     d.state = 'grabbed'; d.t = 0; d.grabBy = a; d.input.pBuf = d.input.gBuf = 0; d.crouching = false;
-    a.freeze = d.freeze = 4; SFX.grab(); sub('つかんだ！ 投げ抜け = P+G');
+    a.freeze = d.freeze = 4; SFX.grab(); sub('つかまれた！ すぐ J+L で投げ抜け！', 900); tone(700, 0.15, 0.25, 400); tone(900, 0.15, 0.2, 500);
     return true;
   }
-  if (r.along < 0 || r.along > m.range || Math.abs(r.lat) > 0.5) return false;
+  if (r.along < 0 || r.along > m.range) return false;
+  if (Math.abs(r.lat) > 0.32) { if (!a.dodgeShown && d.sideStepping > 0) { a.dodgeShown = true; sub('サイドステップでかわした！', 700); spark(d.x, 1.0, d.z, 0x7dffb0, 0.3); SFX.whoosh(); } return false; }
   if (!canBeHit(d)) return false;
   // しゃがみで上段をかわす
   if (m.h === 'high' && d.crouching && (d.state === 'idle' || d.state === 'walk')) { a.hit = true; sub('かわされた', 500); return true; }
@@ -310,7 +311,7 @@ function tryHit(a, d) {
     d.hitLow = m.h === 'low' || m.pose === 'elbow';
     d.vx = a.ax * kb; d.vz = a.az * kb;
     a.freeze = d.freeze = counter ? 8 : 6; game.shake = counter ? 6 : 4;
-    spark(midX, hitY, midZ, counter ? 0xffe14d : 0xffffff, counter ? 0.6 : 0.42);
+    { const col = counter ? 0xffe14d : m.pose === 'kick' ? 0xff9a3d : m.pose === 'lowkick' ? 0x7dffb0 : m.pose === 'elbow' ? 0xff4d4d : 0xffffff; const sz = (counter ? 0.7 : 0.45) * (m.pose === 'kick' ? 1.25 : m.pose === 'elbow' ? 1.4 : m.pose === 'punch' ? 0.85 : 1); spark(midX, hitY, midZ, col, sz); spark(midX, hitY, midZ, 0xffffff, sz * 0.5); }
     (counter || m.pose === 'elbow' ? SFX.heavy : SFX.hit)();
     if (counter) sub('カウンター！', 700);
     game.flash = counter ? 6 : 3;
@@ -340,6 +341,7 @@ function updateFighter(f, o) {
   const inp = f.input;
   const d = faceOpp(f, o);
   f.crouching = false; f.guarding = false;
+  if (f.sideStepping > 0) f.sideStepping--;
   switch (f.state) {
     case 'idle': case 'walk': {
       f.t++;
@@ -363,13 +365,14 @@ function updateFighter(f, o) {
         if (side) {
           // 画面の奥(-n)方向へ回る：nはカメラ側。1Pから見て右へ向かう単位ベクトルdir、n=(-dz,dx)
           const nx = -f.fz * (f.idx === 0 ? 1 : -1), nz = f.fx * (f.idx === 0 ? 1 : -1);
-          mx += nx * side * 0.042; mz += nz * side * 0.042; moved = true;
+          mx += nx * side * 0.090; mz += nz * side * 0.090; moved = true; f.sideStepping = 6;
         }
       }
       f.state = moved ? 'walk' : 'idle';
       f.walkMode = inp.fwd ? 1 : inp.back ? -1 : 0;
       if (moved) f.walkPhase += 0.2;
       f.x += mx; f.z += mz;
+      if (f.sideStepping > 0 && !inp.fwd && !inp.back) { const nd = Math.hypot(f.x - o.x, f.z - o.z) || 1; f.x = o.x + (f.x - o.x) / nd * d; f.z = o.z + (f.z - o.z) / nd * d; }
       break;
     }
     case 'attack': {
@@ -386,9 +389,10 @@ function updateFighter(f, o) {
       // つかみ中は相手を目の前に保つ
       const gx = f.x + f.fx * 0.85, gz = f.z + f.fz * 0.85;
       v.x += (gx - v.x) * 0.5; v.z += (gz - v.z) * 0.5;
-      if (f.t >= 16 && v.state === 'grabbed') {
+      v.y = Math.min(0.35, f.t * 0.02);
+      if (f.t >= 20 && v.state === 'grabbed') {
         // 投げ成立
-        v.hp -= MOVES.TH.dmg; v.state = 'thrown'; v.t = 0; v.thrownT = 0; v.grabBy = null;
+        v.y = 0; v.hp -= MOVES.TH.dmg; v.state = 'thrown'; v.t = 0; v.thrownT = 0; v.grabBy = null;
         v.vx = f.fx * 0.34; v.vz = f.fz * 0.34;
         f.state = 'attack'; f.move = { ...MOVES.TH, su:0, ac:0, rc:22, h:'none' }; f.t = 0; f.hit = true;
         game.shake = 9; game.flash = 6; SFX.heavy(); sub('投げ！', 700);
@@ -400,7 +404,7 @@ function updateFighter(f, o) {
       f.t++;
       // 投げ抜け
       const esc = (inp.pBuf > 0 && inp.g) || (inp.gBuf > 0 && inp.p);
-      if (esc && f.t <= 13 && f.grabBy) {
+      if (esc && f.t <= 18 && f.grabBy) {
         const a = f.grabBy;
         a.state = 'hitstun'; a.t = 0; a.stun = 16; a.move = null; a.vx = -a.fx * 0.2; a.vz = -a.fz * 0.2;
         f.state = 'hitstun'; f.t = 0; f.stun = 16; f.vx = -f.fx * 0.2; f.vz = -f.fz * 0.2; f.grabBy = null;
@@ -491,12 +495,12 @@ function makeAI(f, o, level) {
       if (game.phase !== 'fight') return;
       const d = Math.hypot(o.x - f.x, o.z - f.z);
       // 投げ抜け
-      if (f.state === 'grabbed' && f.t < 12 && Math.random() < 0.06 * level) { inp.pBuf = inp.gBuf = 5; inp.p = inp.g = true; return; }
+      if (f.state === 'grabbed' && f.t < 12 && Math.random() < 0.12 * level) { inp.pBuf = inp.gBuf = 5; inp.p = inp.g = true; return; }
       // 相手の攻撃に反応
       if (o.state === 'attack' && o.move && o.t === 1 && d < 2.4 && o.move.h !== 'throw') {
         const r = Math.random();
-        if (r < 0.40 * level) { this.react = { h:o.move.h }; }
-        else if (r < 0.50 * level) this.set(Math.random() < 0.5 ? 'sideIn' : 'sideOut', 14);
+        if (r < 0.62 * level) { this.react = { h:o.move.h }; }
+        else if (r < 0.80 * level) this.set(Math.random() < 0.5 ? 'sideIn' : 'sideOut', 14);
         if (this.react) {
           if (o.move.h === 'low') this.set('crouch', 24);
           else if (o.move.h === 'high' && Math.random() < 0.35) this.set('crouch', 18);
@@ -507,6 +511,9 @@ function makeAI(f, o, level) {
       if (!isFree(f)) return;
       if (this.cd > 0) { this.cd--; return; }
       // 行動の決定
+      // 空振り・攻撃後の隙を突く
+      if (o.state === 'attack' && o.move && o.t > o.move.su + o.move.ac && d < 1.9 && Math.random() < 0.8) { this.useMove(d < 1.5 ? 'P' : 'K'); this.cd = 14; return; }
+      if (o.state === 'attack' && o.move && o.move.h === 'throw' && o.t > o.move.su && d < 1.8 && Math.random() < 0.8) { this.useMove('P'); this.cd = 16; return; }
       const guardingOpp = o.input.g && isFree(o);
       const oppStunned = o.state === 'blockstun' || o.state === 'hitstun';
       if (d > 2.7) {
@@ -528,7 +535,7 @@ function makeAI(f, o, level) {
       }
       // 近距離
       const r = Math.random();
-      const wThrow = guardingOpp ? 0.40 : 0.14;
+      const wThrow = guardingOpp ? 0.55 : 0.12;
       if (oppStunned && r < 0.7) this.useMove(Math.random() < 0.5 ? 'P' : 'K');
       else if (r < wThrow) this.useMove('TH');
       else if (r < wThrow + 0.26) this.useMove('P');
@@ -625,7 +632,7 @@ function updateCamera() {
   camera.position.x += (cx - camera.position.x) * 0.2;
   camera.position.y += (cy - camera.position.y) * 0.2;
   camera.position.z += (cz - camera.position.z) * 0.2;
-  camera.lookAt(mx, 1.0, mz);
+  const fall = Math.min(0, F[0].y, F[1].y); camera.lookAt(mx, 1.0 + fall * 0.6, mz);
 }
 
 // ====== メインループ ======
