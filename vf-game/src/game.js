@@ -26,14 +26,16 @@ function newInput() { return { fwd:false, back:false, crouch:false, sideIn:false
 // ====== three.js ======
 const canvas = document.getElementById('c');
 const renderer = new THREE.WebGLRenderer({ canvas, antialias:true });
-renderer.setPixelRatio(Math.min(devicePixelRatio, 2));
+renderer.setPixelRatio(Math.min(devicePixelRatio, 1.75));
 const scene = new THREE.Scene();
 scene.fog = new THREE.Fog(0x0d1226, 18, 60);
 const camera = new THREE.PerspectiveCamera(38, 1, 0.1, 200);
+const TOUCH = Q.get('touch') === '1' || (matchMedia('(pointer:coarse)').matches) || ('ontouchstart' in window);
+if (TOUCH) document.body.classList.add('touch');
 function resize() {
   const w = innerWidth, h = innerHeight;
   renderer.setSize(w, h, false);
-  camera.aspect = w / h; camera.updateProjectionMatrix();
+  camera.aspect = w / h; camera.fov = camera.aspect < 1 ? 55 : 38; camera.updateProjectionMatrix();
 }
 addEventListener('resize', resize); resize();
 
@@ -662,7 +664,8 @@ function updateCamera() {
   const mx = (a.x + b.x) / 2, mz = (a.z + b.z) / 2;
   let dx = b.x - a.x, dz = b.z - a.z; const d = Math.hypot(dx, dz) || 1; dx /= d; dz /= d;
   const nx = -dz, nz = dx;
-  const target = Math.min(9, Math.max(5.2, 4.3 + d * 1.0));
+  let target = Math.min(9, Math.max(5.2, 4.3 + d * 1.0));
+  { const tanH = Math.tan(camera.fov * Math.PI / 360) * camera.aspect; target = Math.max(target, (d + 2.4) / (2 * tanH)); }
   game.lastCamD += (target - game.lastCamD) * 0.08;
   const shake = game.shake > 0 ? (Math.random() - 0.5) * 0.02 * game.shake : 0;
   const cx = mx + nx * game.lastCamD + shake, cz = mz + nz * game.lastCamD + shake, cy = 1.7 + game.lastCamD * 0.1;
@@ -714,7 +717,7 @@ function logicStep() {
       if (a.wins >= WIN_ROUNDS || b.wins >= WIN_ROUNDS) {
         game.phase = 'matchEnd'; game.matchWinner = a.wins >= WIN_ROUNDS ? a : b;
         say(game.matchWinner.name + ' WINS', 'big go');
-        $('result').textContent = 'Enter キーでもう一度'; $('result').className = 'show';
+        $('result').textContent = TOUCH ? '画面をタップでもう一度' : 'Enter キーでもう一度'; $('result').className = 'show';
         if (AUTO) setTimeout(() => { if (game.phase === 'matchEnd') startMatch(); }, 1200);
       } else { game.round++; resetRound(); }
     }
@@ -749,22 +752,47 @@ function frame(now) {
 }
 
 // ====== 入力イベント ======
-addEventListener('keydown', e => {
-  if (['Space', 'ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight'].includes(e.code)) e.preventDefault();
+function keyDown(code) {
   audio();
-  if (e.repeat) return;
-  keys[e.code] = true;
+  keys[code] = true;
   const a = F[0];
-  if (e.code === 'KeyJ') press(a, 'p');
-  if (e.code === 'KeyK') press(a, 'k');
-  if (e.code === 'KeyL') press(a, 'g');
-  if (e.code === 'Enter') {
+  if (code === 'KeyJ') press(a, 'p');
+  if (code === 'KeyK') press(a, 'k');
+  if (code === 'KeyL') press(a, 'g');
+  if (code === 'Enter') {
     if (game.phase === 'title' || game.phase === 'matchEnd') startMatch();
   }
-  if (e.code === 'Escape') { game.phase = 'title'; $('title').className = ''; $('msg').className = ''; $('result').className = ''; }
+  if (code === 'Escape') { game.phase = 'title'; $('title').className = ''; $('msg').className = ''; $('result').className = ''; }
+}
+function keyUp(code) { keys[code] = false; }
+addEventListener('keydown', e => {
+  if (['Space', 'ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight'].includes(e.code)) e.preventDefault();
+  if (e.repeat) return;
+  keyDown(e.code);
 });
-addEventListener('keyup', e => { keys[e.code] = false; });
+addEventListener('keyup', e => keyUp(e.code));
 addEventListener('blur', () => { for (const k in keys) keys[k] = false; });
+
+// ====== タッチ操作（スマホ・タブレット用） ======
+document.querySelectorAll('#pad [data-k]').forEach(btn => {
+  const codes = btn.dataset.k.split('+');
+  const on = e => { e.preventDefault(); try { btn.setPointerCapture(e.pointerId); } catch (_) {} btn.classList.add('on'); codes.forEach(keyDown); };
+  const off = e => { e.preventDefault(); btn.classList.remove('on'); codes.forEach(keyUp); };
+  btn.addEventListener('pointerdown', on);
+  btn.addEventListener('pointerup', off);
+  btn.addEventListener('pointercancel', off);
+  btn.addEventListener('lostpointercapture', off);
+  btn.addEventListener('contextmenu', e => e.preventDefault());
+});
+// 画面タップで開始・再戦
+addEventListener('pointerdown', e => {
+  if ((game.phase === 'title' || game.phase === 'matchEnd') && !(e.target.closest && e.target.closest('#pad'))) { audio(); startMatch(); }
+});
+if (TOUCH) {
+  document.querySelector('#title .go').textContent = '画面をタップでスタート';
+  const hint = document.getElementById('rot'); if (hint) hint.style.display = 'block';
+}
+addEventListener('touchmove', e => e.preventDefault(), { passive: false });
 
 // 初期配置
 F[0].x = -1.8; F[1].x = 1.8; F[0].fx = 1; F[1].fx = -1;

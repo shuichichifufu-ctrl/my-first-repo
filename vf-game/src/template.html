@@ -2,7 +2,8 @@
 <html lang="ja">
 <head>
 <meta charset="utf-8">
-<meta name="viewport" content="width=device-width,initial-scale=1">
+<meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no,viewport-fit=cover">
+<meta name="apple-mobile-web-app-capable" content="yes">
 <title>ポリゴンファイター</title>
 <style>
   html,body{margin:0;height:100%;background:#000;overflow:hidden;font-family:"Hiragino Kaku Gothic ProN","Yu Gothic",Meiryo,sans-serif;color:#fff;user-select:none}
@@ -32,12 +33,25 @@
   @keyframes blink{50%{opacity:.3}}
   #flash{position:fixed;inset:0;background:#fff;opacity:0;pointer-events:none}
   #title{position:fixed;inset:0;background:radial-gradient(circle at 50% 40%,#2b1e5acc,#05060fee);display:flex;flex-direction:column;align-items:center;justify-content:center;gap:18px;text-align:center}
+  #title{z-index:10}
   #title.hide{display:none}
   #title h1{margin:0;font-size:min(12vw,96px);font-style:italic;font-weight:900;letter-spacing:.05em;text-shadow:0 6px 0 #7a1c1c,0 0 30px #ff7a3d}
   #title .go{font-size:26px;animation:blink 1.1s infinite}
   .keys{display:grid;grid-template-columns:auto auto;gap:4px 22px;font-size:15px;text-align:left;background:#0008;padding:14px 20px;border:1px solid #fff4;border-radius:6px}
   .keys b{color:#ffe45c}
   #help{position:fixed;bottom:8px;left:0;right:0;text-align:center;font-size:12px;opacity:.65;text-shadow:0 1px 0 #000;pointer-events:none}
+
+  html,body{touch-action:none;-webkit-touch-callout:none;-webkit-user-select:none;overscroll-behavior:none}
+  #pad{display:none;position:fixed;left:0;right:0;bottom:0;padding:0 14px calc(14px + env(safe-area-inset-bottom));justify-content:space-between;align-items:flex-end;pointer-events:none;z-index:5}
+  body.touch #pad{display:flex}
+  body.touch #help{display:none}
+  #pad .grp{display:grid;gap:8px;pointer-events:auto}
+  #dpad{grid-template-columns:repeat(3,76px);grid-template-rows:repeat(3,52px)}
+  #acts{grid-template-columns:repeat(2,76px);grid-template-rows:repeat(2,76px)}
+  #pad button{font:inherit;font-weight:900;color:#fff;background:#ffffff26;border:2px solid #ffffff80;border-radius:14px;font-size:14px;white-space:nowrap;padding:0;touch-action:none;-webkit-tap-highlight-color:transparent;backdrop-filter:blur(2px)}
+  #pad button.on{background:#ffd23fcc;color:#000;border-color:#fff}
+  #acts button{border-radius:50%;font-size:16px}
+  #rot{display:none;font-size:14px;opacity:.8}
 </style>
 </head>
 <body>
@@ -49,6 +63,17 @@
 </div>
 <div id="msg"></div><div id="sub"></div><div id="result"></div><div id="flash"></div>
 <div id="help">A/D 後退・前進 　S しゃがみ 　Q/E よこ移動 　J パンチ 　K キック 　L ガード 　P+G(J+L) 投げ</div>
+<div id="pad">
+  <div class="grp" id="dpad">
+    <span></span><button data-k="KeyQ">奥</button><span></span>
+    <button data-k="KeyA">◀後退</button><button data-k="KeyS">しゃがむ</button><button data-k="KeyD">前進▶</button>
+    <span></span><button data-k="KeyE">手前</button><span></span>
+  </div>
+  <div class="grp" id="acts">
+    <button data-k="KeyJ+KeyL">投げ</button><button data-k="KeyJ">パンチ</button>
+    <button data-k="KeyL">ガード</button><button data-k="KeyK">キック</button>
+  </div>
+</div>
 <div id="title">
   <h1>ポリゴン<br>ファイター</h1>
   <div class="keys">
@@ -62,6 +87,7 @@
     <span><b>J+L</b></span><span>投げ（ガードを崩す。つかまれたら J+L で抜ける）</span>
   </div>
   <div class="go">Enter キーでスタート</div>
+  <div id="rot">横向きにすると大きく見えます</div>
 </div>
 <script>/*THREE*/</script>
 <script>/*GAME*/</script>

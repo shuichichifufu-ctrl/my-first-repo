@@ -2,7 +2,8 @@
 <html lang="ja">
 <head>
 <meta charset="utf-8">
-<meta name="viewport" content="width=device-width,initial-scale=1">
+<meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no,viewport-fit=cover">
+<meta name="apple-mobile-web-app-capable" content="yes">
 <title>ポリゴンファイター</title>
 <style>
   html,body{margin:0;height:100%;background:#000;overflow:hidden;font-family:"Hiragino Kaku Gothic ProN","Yu Gothic",Meiryo,sans-serif;color:#fff;user-select:none}
@@ -32,12 +33,25 @@
   @keyframes blink{50%{opacity:.3}}
   #flash{position:fixed;inset:0;background:#fff;opacity:0;pointer-events:none}
   #title{position:fixed;inset:0;background:radial-gradient(circle at 50% 40%,#2b1e5acc,#05060fee);display:flex;flex-direction:column;align-items:center;justify-content:center;gap:18px;text-align:center}
+  #title{z-index:10}
   #title.hide{display:none}
   #title h1{margin:0;font-size:min(12vw,96px);font-style:italic;font-weight:900;letter-spacing:.05em;text-shadow:0 6px 0 #7a1c1c,0 0 30px #ff7a3d}
   #title .go{font-size:26px;animation:blink 1.1s infinite}
   .keys{display:grid;grid-template-columns:auto auto;gap:4px 22px;font-size:15px;text-align:left;background:#0008;padding:14px 20px;border:1px solid #fff4;border-radius:6px}
   .keys b{color:#ffe45c}
   #help{position:fixed;bottom:8px;left:0;right:0;text-align:center;font-size:12px;opacity:.65;text-shadow:0 1px 0 #000;pointer-events:none}
+
+  html,body{touch-action:none;-webkit-touch-callout:none;-webkit-user-select:none;overscroll-behavior:none}
+  #pad{display:none;position:fixed;left:0;right:0;bottom:0;padding:0 14px calc(14px + env(safe-area-inset-bottom));justify-content:space-between;align-items:flex-end;pointer-events:none;z-index:5}
+  body.touch #pad{display:flex}
+  body.touch #help{display:none}
+  #pad .grp{display:grid;gap:8px;pointer-events:auto}
+  #dpad{grid-template-columns:repeat(3,76px);grid-template-rows:repeat(3,52px)}
+  #acts{grid-template-columns:repeat(2,76px);grid-template-rows:repeat(2,76px)}
+  #pad button{font:inherit;font-weight:900;color:#fff;background:#ffffff26;border:2px solid #ffffff80;border-radius:14px;font-size:14px;white-space:nowrap;padding:0;touch-action:none;-webkit-tap-highlight-color:transparent;backdrop-filter:blur(2px)}
+  #pad button.on{background:#ffd23fcc;color:#000;border-color:#fff}
+  #acts button{border-radius:50%;font-size:16px}
+  #rot{display:none;font-size:14px;opacity:.8}
 </style>
 </head>
 <body>
@@ -49,6 +63,17 @@
 </div>
 <div id="msg"></div><div id="sub"></div><div id="result"></div><div id="flash"></div>
 <div id="help">A/D 後退・前進 　S しゃがみ 　Q/E よこ移動 　J パンチ 　K キック 　L ガード 　P+G(J+L) 投げ</div>
+<div id="pad">
+  <div class="grp" id="dpad">
+    <span></span><button data-k="KeyQ">奥</button><span></span>
+    <button data-k="KeyA">◀後退</button><button data-k="KeyS">しゃがむ</button><button data-k="KeyD">前進▶</button>
+    <span></span><button data-k="KeyE">手前</button><span></span>
+  </div>
+  <div class="grp" id="acts">
+    <button data-k="KeyJ+KeyL">投げ</button><button data-k="KeyJ">パンチ</button>
+    <button data-k="KeyL">ガード</button><button data-k="KeyK">キック</button>
+  </div>
+</div>
 <div id="title">
   <h1>ポリゴン<br>ファイター</h1>
   <div class="keys">
@@ -62,6 +87,7 @@
     <span><b>J+L</b></span><span>投げ（ガードを崩す。つかまれたら J+L で抜ける）</span>
   </div>
   <div class="go">Enter キーでスタート</div>
+  <div id="rot">横向きにすると大きく見えます</div>
 </div>
 <script>console.warn('Scripts "build/three.js" and "build/three.min.js" are deprecated with r150+, and will be removed with r160. Please use ES Modules or alternatives: https://threejs.org/docs/index.html#manual/en/introduction/Installation'),
 /**
@@ -99,14 +125,16 @@ function newInput() { return { fwd:false, back:false, crouch:false, sideIn:false
 // ====== three.js ======
 const canvas = document.getElementById('c');
 const renderer = new THREE.WebGLRenderer({ canvas, antialias:true });
-renderer.setPixelRatio(Math.min(devicePixelRatio, 2));
+renderer.setPixelRatio(Math.min(devicePixelRatio, 1.75));
 const scene = new THREE.Scene();
 scene.fog = new THREE.Fog(0x0d1226, 18, 60);
 const camera = new THREE.PerspectiveCamera(38, 1, 0.1, 200);
+const TOUCH = Q.get('touch') === '1' || (matchMedia('(pointer:coarse)').matches) || ('ontouchstart' in window);
+if (TOUCH) document.body.classList.add('touch');
 function resize() {
   const w = innerWidth, h = innerHeight;
   renderer.setSize(w, h, false);
-  camera.aspect = w / h; camera.updateProjectionMatrix();
+  camera.aspect = w / h; camera.fov = camera.aspect < 1 ? 55 : 38; camera.updateProjectionMatrix();
 }
 addEventListener('resize', resize); resize();
 
@@ -735,7 +763,8 @@ function updateCamera() {
   const mx = (a.x + b.x) / 2, mz = (a.z + b.z) / 2;
   let dx = b.x - a.x, dz = b.z - a.z; const d = Math.hypot(dx, dz) || 1; dx /= d; dz /= d;
   const nx = -dz, nz = dx;
-  const target = Math.min(9, Math.max(5.2, 4.3 + d * 1.0));
+  let target = Math.min(9, Math.max(5.2, 4.3 + d * 1.0));
+  { const tanH = Math.tan(camera.fov * Math.PI / 360) * camera.aspect; target = Math.max(target, (d + 2.4) / (2 * tanH)); }
   game.lastCamD += (target - game.lastCamD) * 0.08;
   const shake = game.shake > 0 ? (Math.random() - 0.5) * 0.02 * game.shake : 0;
   const cx = mx + nx * game.lastCamD + shake, cz = mz + nz * game.lastCamD + shake, cy = 1.7 + game.lastCamD * 0.1;
@@ -787,7 +816,7 @@ function logicStep() {
       if (a.wins >= WIN_ROUNDS || b.wins >= WIN_ROUNDS) {
         game.phase = 'matchEnd'; game.matchWinner = a.wins >= WIN_ROUNDS ? a : b;
         say(game.matchWinner.name + ' WINS', 'big go');
-        $('result').textContent = 'Enter キーでもう一度'; $('result').className = 'show';
+        $('result').textContent = TOUCH ? '画面をタップでもう一度' : 'Enter キーでもう一度'; $('result').className = 'show';
         if (AUTO) setTimeout(() => { if (game.phase === 'matchEnd') startMatch(); }, 1200);
       } else { game.round++; resetRound(); }
     }
@@ -822,22 +851,47 @@ function frame(now) {
 }
 
 // ====== 入力イベント ======
-addEventListener('keydown', e => {
-  if (['Space', 'ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight'].includes(e.code)) e.preventDefault();
+function keyDown(code) {
   audio();
-  if (e.repeat) return;
-  keys[e.code] = true;
+  keys[code] = true;
   const a = F[0];
-  if (e.code === 'KeyJ') press(a, 'p');
-  if (e.code === 'KeyK') press(a, 'k');
-  if (e.code === 'KeyL') press(a, 'g');
-  if (e.code === 'Enter') {
+  if (code === 'KeyJ') press(a, 'p');
+  if (code === 'KeyK') press(a, 'k');
+  if (code === 'KeyL') press(a, 'g');
+  if (code === 'Enter') {
     if (game.phase === 'title' || game.phase === 'matchEnd') startMatch();
   }
-  if (e.code === 'Escape') { game.phase = 'title'; $('title').className = ''; $('msg').className = ''; $('result').className = ''; }
+  if (code === 'Escape') { game.phase = 'title'; $('title').className = ''; $('msg').className = ''; $('result').className = ''; }
+}
+function keyUp(code) { keys[code] = false; }
+addEventListener('keydown', e => {
+  if (['Space', 'ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight'].includes(e.code)) e.preventDefault();
+  if (e.repeat) return;
+  keyDown(e.code);
 });
-addEventListener('keyup', e => { keys[e.code] = false; });
+addEventListener('keyup', e => keyUp(e.code));
 addEventListener('blur', () => { for (const k in keys) keys[k] = false; });
+
+// ====== タッチ操作（スマホ・タブレット用） ======
+document.querySelectorAll('#pad [data-k]').forEach(btn => {
+  const codes = btn.dataset.k.split('+');
+  const on = e => { e.preventDefault(); try { btn.setPointerCapture(e.pointerId); } catch (_) {} btn.classList.add('on'); codes.forEach(keyDown); };
+  const off = e => { e.preventDefault(); btn.classList.remove('on'); codes.forEach(keyUp); };
+  btn.addEventListener('pointerdown', on);
+  btn.addEventListener('pointerup', off);
+  btn.addEventListener('pointercancel', off);
+  btn.addEventListener('lostpointercapture', off);
+  btn.addEventListener('contextmenu', e => e.preventDefault());
+});
+// 画面タップで開始・再戦
+addEventListener('pointerdown', e => {
+  if ((game.phase === 'title' || game.phase === 'matchEnd') && !(e.target.closest && e.target.closest('#pad'))) { audio(); startMatch(); }
+});
+if (TOUCH) {
+  document.querySelector('#title .go').textContent = '画面をタップでスタート';
+  const hint = document.getElementById('rot'); if (hint) hint.style.display = 'block';
+}
+addEventListener('touchmove', e => e.preventDefault(), { passive: false });
 
 // 初期配置
 F[0].x = -1.8; F[1].x = 1.8; F[0].fx = 1; F[1].fx = -1;
