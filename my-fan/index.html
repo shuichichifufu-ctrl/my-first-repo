@@ -1,0 +1,567 @@
+<!doctype html>
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no,viewport-fit=cover">
+<title>マイ換気扇</title>
+<style>
+:root{--bg:#f4f0e8;--panel:#fffdf8;--ink:#34443f;--sub:#6d7c76;--accent:#6fae94;--accent-d:#477f68;--line:#e3ddd0;--warn:#b5651d}
+*{box-sizing:border-box}
+html,body{height:100%;margin:0;background:var(--bg);color:var(--ink);
+  font-family:-apple-system,"Hiragino Sans","Noto Sans JP","Yu Gothic",sans-serif;
+  -webkit-text-size-adjust:100%;touch-action:manipulation;-webkit-user-select:none;user-select:none}
+#app{display:grid;height:100vh;height:100dvh;grid-template-rows:minmax(0,1fr) auto}
+@media (orientation:landscape) and (min-width:700px){
+  #app{grid-template-columns:minmax(0,1fr) 380px;grid-template-rows:minmax(0,1fr)}
+}
+#stageWrap{position:relative;min-height:0;min-width:0}
+#stage{width:100%;height:100%;display:block}
+#readout{position:absolute;left:14px;top:12px;display:flex;gap:10px;flex-wrap:wrap;pointer-events:none}
+.chip{background:rgba(255,253,248,.82);border:1px solid var(--line);border-radius:14px;padding:6px 12px;min-width:96px}
+.chip b{display:block;font-size:22px;line-height:1.1;font-variant-numeric:tabular-nums}
+.chip span{font-size:11px;color:var(--sub)}
+#age-label{position:absolute;right:14px;top:12px;background:rgba(255,253,248,.82);border:1px solid var(--line);
+  border-radius:14px;padding:6px 12px;font-size:14px;pointer-events:none}
+#hint{position:absolute;left:50%;bottom:14px;transform:translateX(-50%);background:rgba(255,246,230,.94);border:1px solid #e8c48f;color:#8a5a1f;border-radius:14px;padding:8px 14px;font-size:14px;max-width:90%;text-align:center;pointer-events:none}
+#hint[hidden]{display:none}
+#panel{background:var(--panel);border-top:1px solid var(--line);padding:12px 16px calc(16px + env(safe-area-inset-bottom));
+  overflow:auto;max-height:46vh;max-height:46dvh;-webkit-overflow-scrolling:touch}
+@media (orientation:landscape) and (min-width:700px){
+  #panel{max-height:none;border-top:0;border-left:1px solid var(--line)}
+}
+h1{font-size:17px;margin:0 0 10px;letter-spacing:.04em}
+h2{font-size:14px;margin:14px 0 6px;color:var(--accent-d)}
+.row{display:flex;gap:10px;align-items:center;flex-wrap:wrap;margin:6px 0}
+button,label.btn{font:inherit;font-size:15px;min-height:44px;padding:8px 14px;border-radius:12px;
+  border:1px solid var(--line);background:#fff;color:var(--ink);cursor:pointer;display:inline-flex;align-items:center;justify-content:center}
+button:active,label.btn:active{transform:scale(.97)}
+button.primary{background:var(--accent);border-color:var(--accent-d);color:#fff;font-weight:700;min-width:120px;font-size:17px}
+button.primary.on{background:#e08a5a;border-color:#b86a3d}
+button.small{min-height:40px;padding:6px 12px;font-size:14px}
+.slider{display:grid;grid-template-columns:128px 1fr 54px;gap:8px;align-items:center;margin:6px 0;font-size:14px}
+.slider output{text-align:right;color:var(--sub);font-variant-numeric:tabular-nums;font-size:13px}
+.slider.wide{grid-template-columns:96px 1fr 54px}
+input[type=range]{width:100%;height:36px;accent-color:var(--accent-d)}
+details{border-top:1px solid var(--line);margin-top:12px;padding-top:8px}
+summary{font-size:14px;font-weight:700;color:var(--accent-d);min-height:36px;display:flex;align-items:center;cursor:pointer}
+.note{font-size:12px;color:var(--sub);line-height:1.6;margin:4px 0}
+.note.warn{color:var(--warn)}
+input[type=file]{display:none}
+.bar{display:grid;grid-template-columns:104px 1fr;gap:8px;align-items:center;font-size:12px;margin:4px 0}
+.bar i{display:block;height:10px;border-radius:5px;background:#e7e2d6;position:relative;overflow:hidden}
+.bar i u{position:absolute;left:0;top:0;bottom:0;width:0;border-radius:5px;background:var(--accent)}
+.bar.f i u{background:#d99a5b}.bar.d i u{background:#7aa7c7}
+</style>
+</head>
+<body>
+<div id="app">
+  <div id="stageWrap">
+    <canvas id="stage"></canvas>
+    <div id="readout">
+      <div class="chip"><b id="rpm">0</b><span>1分あたりの回転数 (rpm)</span></div>
+      <div class="chip"><b id="rps">0.0</b><span>1秒あたりの回転数</span></div>
+      <div class="chip"><b id="flow">0.0</b><span>風の量 (m³/分・めやす)</span></div>
+    </div>
+    <div id="age-label">新品</div>
+    <div id="hint" hidden>モーターの力がたりなくて、回りだせません。「風の強さ」を上げてみよう。</div>
+  </div>
+
+  <div id="panel">
+    <h1>マイ換気扇</h1>
+
+    <div class="row">
+      <button id="power" class="primary">スイッチ ON</button>
+      <button id="mute" class="small">🔊 音あり</button>
+    </div>
+    <div class="slider wide"><span>風の強さ</span><input id="powerLevel" type="range" min="10" max="100" value="65"><output id="powerLevelOut">65</output></div>
+
+    <h2>時間のけいか</h2>
+    <div class="slider wide"><span>使った年数</span><input id="age" type="range" min="0" max="20" step="0.5" value="0"><output id="ageOut">0年</output></div>
+    <div class="row">
+      <button class="small" data-age="0">新品</button>
+      <button class="small" data-age="5">5年</button>
+      <button class="small" data-age="10">10年</button>
+      <button class="small" data-age="20">20年</button>
+      <button class="small" id="clean">🧽 そうじする</button>
+    </div>
+    <p class="note">年数を動かすと、ほこり・黄ばみ・すり減りがいっしょに進みます。「そうじ」はほこりだけが取れて、すり減りは戻りません。</p>
+
+    <details>
+      <summary>くわしく（ひとつずつ変える）</summary>
+      <div id="paramSliders"></div>
+      <h2>力のつりあい</h2>
+      <div class="bar"><span>モーターの力</span><i><u id="barM"></u></i></div>
+      <div class="bar f"><span>まさつ（こすれ）</span><i><u id="barF"></u></i></div>
+      <div class="bar d"><span>空気のていこう</span><i><u id="barD"></u></i></div>
+      <p class="note">回転がふえるのは「モーターの力」が「まさつ」と「空気のていこう」より大きいとき。つりあったところで回転数が一定になります。スイッチを切ると、モーターの力が0になって、だんだん止まります。数字は計算でつくった目安で、実測ではありません。</p>
+    </details>
+
+    <details>
+      <summary>画像を入れかえる（PNG）</summary>
+      <div class="row">
+        <label class="btn" for="fileProp">プロペラの画像</label><input id="fileProp" type="file" accept="image/*">
+        <label class="btn" for="fileCover">カバーの画像</label><input id="fileCover" type="file" accept="image/*">
+      </div>
+      <div class="row">
+        <button class="small" id="resetImg">見本にもどす</button>
+        <button class="small" id="saveTplProp">プロペラの見本を保存</button>
+        <button class="small" id="saveTplCover">カバーの見本を保存</button>
+      </div>
+      <div class="slider wide"><span>プロペラの大きさ</span><input id="propScale" type="range" min="0.4" max="1.4" step="0.01" value="1"><output id="propScaleOut">1.00</output></div>
+      <div class="slider wide"><span>カバーの大きさ</span><input id="coverScale" type="range" min="0.4" max="1.4" step="0.01" value="1"><output id="coverScaleOut">1.00</output></div>
+      <p class="note" id="imgNote">画像は「背景が透明なPNG」で、まん中がプロペラの回転の中心になるように作ってください。カバーはすき間を透明にすると、後ろのプロペラが見えます。「見本を保存」で、この見本と同じ大きさ（600×600）の下絵が手に入ります。</p>
+    </details>
+  </div>
+</div>
+
+<script>
+'use strict';
+const TAU = Math.PI * 2;
+const $ = id => document.getElementById(id);
+const clamp = (v, a, b) => Math.min(b, Math.max(a, v));
+function mk(w, h) { const c = document.createElement('canvas'); c.width = w; c.height = h; return c; }
+function rng(seed) { // 再現できる乱数 (同じ見た目のほこりになる)
+  return function () {
+    seed |= 0; seed = seed + 0x6D2B79F5 | 0;
+    let t = Math.imul(seed ^ seed >>> 15, 1 | seed);
+    t = t + Math.imul(t ^ t >>> 7, 61 | t) ^ t;
+    return ((t ^ t >>> 14) >>> 0) / 4294967296;
+  };
+}
+
+/* ---------- 見本の画像 (プロペラ / カバー) ---------- */
+function makeDefaultProp() {
+  const c = mk(600, 600), g = c.getContext('2d');
+  g.translate(300, 300);
+  const N = 5;
+  for (let i = 0; i < N; i++) {
+    g.save(); g.rotate(i * TAU / N);
+    g.beginPath();
+    g.moveTo(24, -12);
+    g.bezierCurveTo(70, -76, 190, -116, 262, -72);
+    g.bezierCurveTo(300, -40, 288, 42, 240, 62);
+    g.bezierCurveTo(170, 72, 80, 52, 24, 24);
+    g.closePath();
+    const gr = g.createLinearGradient(0, -110, 0, 70);
+    gr.addColorStop(0, '#d9f0f4'); gr.addColorStop(.55, '#a4d2e2'); gr.addColorStop(1, '#6fb0c8');
+    g.fillStyle = gr; g.fill();
+    g.lineWidth = 3; g.strokeStyle = 'rgba(40,95,115,.6)'; g.stroke();
+    g.beginPath(); g.moveTo(60, -40); g.bezierCurveTo(120, -80, 190, -92, 240, -62);
+    g.lineWidth = 5; g.lineCap = 'round'; g.strokeStyle = 'rgba(255,255,255,.55)'; g.stroke();
+    g.restore();
+  }
+  const hub = g.createRadialGradient(-10, -10, 4, 0, 0, 52);
+  hub.addColorStop(0, '#fbfdfd'); hub.addColorStop(1, '#a9bcc4');
+  g.beginPath(); g.arc(0, 0, 50, 0, TAU); g.fillStyle = hub; g.fill();
+  g.lineWidth = 3; g.strokeStyle = 'rgba(40,95,115,.6)'; g.stroke();
+  g.beginPath(); g.arc(0, 0, 30, 0, TAU); g.strokeStyle = 'rgba(40,95,115,.35)'; g.lineWidth = 2; g.stroke();
+  g.lineWidth = 5; g.lineCap = 'round'; g.strokeStyle = 'rgba(60,90,100,.65)';
+  g.beginPath(); g.moveTo(-14, 0); g.lineTo(14, 0); g.moveTo(0, -14); g.lineTo(0, 14); g.stroke();
+  return c;
+}
+function makeDefaultCover() {
+  const c = mk(600, 600), g = c.getContext('2d');
+  g.translate(300, 300); g.lineCap = 'round';
+  g.shadowColor = 'rgba(0,0,0,.18)'; g.shadowBlur = 5; g.shadowOffsetY = 2;
+  g.strokeStyle = '#bcc5cb'; g.lineWidth = 4;
+  for (const r of [72, 122, 172, 222, 262]) { g.beginPath(); g.arc(0, 0, r, 0, TAU); g.stroke(); }
+  g.lineWidth = 3.5;
+  for (let i = 0; i < 20; i++) {
+    const a = i * TAU / 20;
+    g.beginPath(); g.moveTo(Math.cos(a) * 54, Math.sin(a) * 54); g.lineTo(Math.cos(a) * 274, Math.sin(a) * 274); g.stroke();
+  }
+  const ring = g.createLinearGradient(-290, -290, 290, 290);
+  ring.addColorStop(0, '#f1f4f6'); ring.addColorStop(1, '#aeb8bf');
+  g.strokeStyle = ring; g.lineWidth = 16; g.beginPath(); g.arc(0, 0, 284, 0, TAU); g.stroke();
+  const cap = g.createRadialGradient(-14, -14, 4, 0, 0, 62);
+  cap.addColorStop(0, '#fbfcfd'); cap.addColorStop(1, '#b8c2c9');
+  g.shadowBlur = 4; g.fillStyle = cap; g.beginPath(); g.arc(0, 0, 58, 0, TAU); g.fill();
+  g.shadowColor = 'transparent'; g.strokeStyle = '#98a4ac'; g.lineWidth = 3; g.stroke();
+  g.fillStyle = '#d7dee3'; g.beginPath(); g.arc(0, 0, 26, 0, TAU); g.fill();
+  return c;
+}
+
+/* ---------- 画像レイヤー ---------- */
+function makeLayer(kind) {
+  const L = { kind, src: null, aged: null, scale: 1, custom: false, blobs: [], lint: [] };
+  const r = rng(kind === 'prop' ? 11 : 29);
+  const n = kind === 'prop' ? 300 : 240;
+  for (let i = 0; i < n; i++) {
+    const a = r() * TAU, d = 0.5 * Math.pow(r(), 0.4); // ふちほど多い
+    L.blobs.push({ x: Math.cos(a) * d, y: Math.sin(a) * d, r: 0.006 + Math.pow(r(), 2.2) * 0.05,
+      t: r(), a: 0.25 + r() * 0.55, tone: r() });
+  }
+  if (kind === 'cover') {
+    for (let i = 0; i < 170; i++) {
+      const a = r() * TAU, d = 0.43 * Math.sqrt(r());
+      const la = r() * TAU, len = 0.03 + r() * 0.09;
+      L.lint.push({ x: Math.cos(a) * d, y: Math.sin(a) * d, dx: Math.cos(la) * len, dy: Math.sin(la) * len,
+        c: (r() - .5) * 0.06, t: r(), w: 0.003 + r() * 0.006 });
+    }
+  }
+  return L;
+}
+const layers = { prop: makeLayer('prop'), cover: makeLayer('cover') };
+function setDefaultImages() {
+  layers.prop.src = makeDefaultProp(); layers.prop.custom = false;
+  layers.cover.src = makeDefaultCover(); layers.cover.custom = false;
+  dirtyAge = true;
+}
+
+/* ---------- 経年変化のパラメーター ---------- */
+const PARAMS = [
+  { key: 'dust',    label: 'ほこり',          hint: 'つもるほど重く、風が通りにくい' },
+  { key: 'yellow',  label: '黄ばみ',          hint: '見た目だけ' },
+  { key: 'bearing', label: 'じくうけのすり減り', hint: 'まさつ↑ 回りにくい' },
+  { key: 'motor',   label: 'モーターの弱り',   hint: '力↓' },
+  { key: 'wobble',  label: 'ガタつき',         hint: 'ぶれ↑' },
+  { key: 'noise',   label: '音のうるささ',     hint: '音だけ' },
+];
+const P = { dust: 0, yellow: 0, bearing: 0, motor: 0, wobble: 0, noise: 0 };
+function paramsFromAge(y) {
+  const a = clamp(y / 20, 0, 1);
+  return { dust: 1 - Math.exp(-y / 6), yellow: Math.pow(a, 0.8), bearing: a, motor: a * 0.9,
+    wobble: a * 0.8, noise: Math.pow(a, 0.9) };
+}
+let dirtyAge = true;
+const sliderEls = {};
+(function buildParamSliders() {
+  const box = $('paramSliders');
+  for (const p of PARAMS) {
+    const row = document.createElement('div'); row.className = 'slider';
+    row.innerHTML = `<span>${p.label}</span><input type="range" min="0" max="1" step="0.01" value="0"><output>0.00</output>`;
+    const inp = row.querySelector('input'), out = row.querySelector('output');
+    inp.addEventListener('input', () => {
+      P[p.key] = +inp.value; out.textContent = (+inp.value).toFixed(2);
+      dirtyAge = true; $('age-label').textContent = 'カスタム（ひとつずつ調整中）';
+    });
+    sliderEls[p.key] = { inp, out };
+    box.appendChild(row);
+    const t = document.createElement('p'); t.className = 'note'; t.style.margin = '-4px 0 4px 0'; t.textContent = '　' + p.hint;
+    box.appendChild(t);
+  }
+})();
+function syncParamSliders() {
+  for (const p of PARAMS) { sliderEls[p.key].inp.value = P[p.key]; sliderEls[p.key].out.textContent = P[p.key].toFixed(2); }
+}
+function ageLabel(y) {
+  if (y < 0.5) return '新品';
+  return `使って ${Number.isInteger(y) ? y : y.toFixed(1)} 年`;
+}
+function setAge(y) {
+  Object.assign(P, paramsFromAge(y));
+  $('age').value = y; $('ageOut').textContent = y + '年';
+  $('age-label').textContent = ageLabel(y);
+  syncParamSliders(); dirtyAge = true;
+}
+$('age').addEventListener('input', e => setAge(+e.target.value));
+document.querySelectorAll('[data-age]').forEach(b => b.addEventListener('click', () => setAge(+b.dataset.age)));
+$('clean').addEventListener('click', () => {
+  P.dust = 0; syncParamSliders(); dirtyAge = true;
+  $('age-label').textContent = 'そうじ後（すり減りは残っています）';
+});
+
+/* ---------- ほこり・黄ばみを画像に重ねる ---------- */
+function buildAged(L) {
+  const s = L.src, w = s.width, h = s.height, m = Math.max(w, h);
+  if (!L.aged || L.aged.width !== w || L.aged.height !== h) L.aged = mk(w, h);
+  const g = L.aged.getContext('2d');
+  g.setTransform(1, 0, 0, 1, 0, 0); g.globalCompositeOperation = 'source-over'; g.globalAlpha = 1;
+  g.clearRect(0, 0, w, h); g.drawImage(s, 0, 0);
+  g.save();
+  g.globalCompositeOperation = 'source-atop';
+  if (P.yellow > 0.001) { g.fillStyle = `rgba(176,126,44,${0.5 * P.yellow})`; g.fillRect(0, 0, w, h); }
+  if (P.dust > 0.001) { g.fillStyle = `rgba(78,68,50,${0.2 * P.dust})`; g.fillRect(0, 0, w, h); }
+  g.translate(w / 2, h / 2);
+  for (const b of L.blobs) {
+    if (b.t > P.dust) continue;
+    const x = b.x * m, y = b.y * m, r = b.r * m;
+    const al = b.a * Math.min(1, (P.dust - b.t) * 4 + 0.25);
+    const col = b.tone > 0.5 ? '96,86,70' : '120,112,98';
+    const gr = g.createRadialGradient(x, y, 0, x, y, r);
+    gr.addColorStop(0, `rgba(${col},${al})`); gr.addColorStop(1, `rgba(${col},0)`);
+    g.fillStyle = gr; g.beginPath(); g.arc(x, y, r, 0, TAU); g.fill();
+  }
+  g.restore();
+  if (L.kind === 'prop') buildBlurDisc(L);
+  if (L.kind === 'cover' && P.dust > 0.001) { // ほこりのかたまり (目づまり)
+    g.save(); g.translate(w / 2, h / 2); g.lineCap = 'round';
+    for (const l of L.lint) {
+      if (l.t > P.dust) continue;
+      g.strokeStyle = `rgba(128,122,110,${0.55 * Math.min(1, (P.dust - l.t) * 3 + 0.2)})`;
+      g.lineWidth = l.w * m;
+      g.beginPath(); g.moveTo(l.x * m, l.y * m);
+      g.quadraticCurveTo((l.x + l.dx / 2 + l.c) * m, (l.y + l.dy / 2 - l.c) * m, (l.x + l.dx) * m, (l.y + l.dy) * m);
+      g.stroke();
+    }
+    const mat = Math.max(0, P.dust - 0.45) / 0.55;
+    if (mat > 0) {
+      const gr = g.createRadialGradient(0, 0, 0, 0, 0, 0.44 * m);
+      gr.addColorStop(0, `rgba(150,145,134,${0.34 * mat})`); gr.addColorStop(1, `rgba(150,145,134,${0.12 * mat})`);
+      g.fillStyle = gr; g.beginPath(); g.arc(0, 0, 0.44 * m, 0, TAU); g.fill();
+    }
+    g.restore();
+  }
+}
+
+// 高速で回っているときに見える「ぼやけた円盤」。いろいろな角度の平均で作る
+function buildBlurDisc(L) {
+  const s = L.aged, side = Math.ceil(Math.hypot(s.width, s.height));
+  if (!L.blur || L.blur.width !== side) { L.blur = mk(side, side); L.blurTmp = mk(side, side); }
+  const g = L.blur.getContext('2d'), t = L.blurTmp.getContext('2d');
+  g.setTransform(1, 0, 0, 1, 0, 0); g.clearRect(0, 0, side, side);
+  const A = 8, B = 8;                                   // 計64方向の平均 (8方向ずつ足してから、さらに平均)
+  for (let j = 0; j < B; j++) {
+    t.setTransform(1, 0, 0, 1, 0, 0); t.globalCompositeOperation = 'source-over'; t.clearRect(0, 0, side, side);
+    t.globalCompositeOperation = 'lighter'; t.globalAlpha = 1 / A;
+    for (let i = 0; i < A; i++) {
+      t.save(); t.translate(side / 2, side / 2); t.rotate((i + j / B) * TAU / A);
+      t.drawImage(s, -s.width / 2, -s.height / 2); t.restore();
+    }
+    g.globalCompositeOperation = 'lighter'; g.globalAlpha = 1 / B; g.drawImage(L.blurTmp, 0, 0);
+  }
+  g.globalCompositeOperation = 'source-over'; g.globalAlpha = 1;
+}
+
+/* ---------- 画像の読みこみ ---------- */
+function loadImageFile(file, kind) {
+  const note = $('imgNote');
+  const url = URL.createObjectURL(file);
+  const img = new Image();
+  img.onload = () => {
+    const k = Math.min(1, 1024 / Math.max(img.width, img.height));
+    const c = mk(Math.max(1, Math.round(img.width * k)), Math.max(1, Math.round(img.height * k)));
+    c.getContext('2d').drawImage(img, 0, 0, c.width, c.height);
+    URL.revokeObjectURL(url);
+    const L = layers[kind]; L.src = c; L.custom = true; dirtyAge = true;
+    const d = c.getContext('2d'), w = c.width, h = c.height;
+    const corners = [[0, 0], [w - 1, 0], [0, h - 1], [w - 1, h - 1]].map(p => d.getImageData(p[0], p[1], 1, 1).data[3]);
+    const opaque = corners.every(a => a > 250);
+    note.className = opaque ? 'note warn' : 'note';
+    note.textContent = (kind === 'prop' ? 'プロペラ' : 'カバー') + 'の画像を入れかえました。' +
+      (opaque ? '四すみが透明ではないので、背景が四角く見えるかもしれません。背景が透明なPNGがおすすめです。' : '');
+  };
+  img.onerror = () => { URL.revokeObjectURL(url); note.className = 'note warn'; note.textContent = '画像を読みこめませんでした。PNGかJPEGを選んでください。'; };
+  img.src = url;
+}
+$('fileProp').addEventListener('change', e => { if (e.target.files[0]) loadImageFile(e.target.files[0], 'prop'); e.target.value = ''; });
+$('fileCover').addEventListener('change', e => { if (e.target.files[0]) loadImageFile(e.target.files[0], 'cover'); e.target.value = ''; });
+$('resetImg').addEventListener('click', () => {
+  setDefaultImages(); $('imgNote').className = 'note'; $('imgNote').textContent = '見本の画像にもどしました。';
+});
+function downloadCanvas(c, name) {
+  c.toBlob(b => {
+    const a = document.createElement('a'); a.href = URL.createObjectURL(b); a.download = name;
+    document.body.appendChild(a); a.click(); a.remove(); setTimeout(() => URL.revokeObjectURL(a.href), 4000);
+  }, 'image/png');
+}
+$('saveTplProp').addEventListener('click', () => downloadCanvas(makeDefaultProp(), 'my-fan-propeller.png'));
+$('saveTplCover').addEventListener('click', () => downloadCanvas(makeDefaultCover(), 'my-fan-cover.png'));
+for (const k of ['prop', 'cover']) {
+  const el = $(k + 'Scale'), out = $(k + 'ScaleOut');
+  el.addEventListener('input', () => { layers[k].scale = +el.value; out.textContent = (+el.value).toFixed(2); });
+}
+
+/* ---------- 回転のしくみ (モーターの力 − まさつ − 空気のていこう) ---------- */
+const OMEGA0 = 157;           // 無負荷での最大角速度 (rad/s) = 約1500rpm
+const QMAX = 12;              // 風量の最大の目安 (m³/分)
+let on = false, power = 0.65, x = 0, theta = 0, forces = { m: 0, f: 0, d: 0 };
+function simStep(h) {
+  const Tm = 1 - 0.45 * P.motor;
+  const Fc = 0.02 + 0.22 * P.bearing + 0.03 * P.dust;           // 止まっているとき・回っているときの一定のまさつ
+  const Fv = 0.035 + 0.12 * P.bearing;                           // 速いほど増えるまさつ
+  const drag = 0.25 * x * x * (1 + 0.6 * P.dust);               // 空気のていこう
+  const I = 2.4 * (1 + 0.25 * P.dust);                          // 回しにくさ (ほこりで重くなる)
+  const drive = on ? Tm * (power - x) : 0;
+  let net = drive - Fv * x - drag;
+  let fric = Fv * x;
+  if (x <= 0) {
+    if (net > Fc) { net -= Fc; fric += Fc; } else { net = 0; }
+  } else { net -= Fc; fric += Fc; }
+  x += net / I * h;
+  if (x < 0.002 && !(on && drive > Fc)) x = 0;
+  x = clamp(x, 0, 1.2);
+  theta += x * OMEGA0 * h;
+  forces = { m: Math.max(0, drive), f: fric, d: drag };
+}
+function airflow() { return QMAX * x * (1 - 0.55 * Math.pow(P.dust, 1.3)) * (1 - 0.1 * P.dust); }
+
+/* ---------- 表示 ---------- */
+const stage = $('stage'), ctx = stage.getContext('2d');
+let W = 0, H = 0, DPR = 1;
+function resize() {
+  const r = stage.getBoundingClientRect();
+  DPR = Math.min(window.devicePixelRatio || 1, 2);
+  W = Math.max(1, r.width); H = Math.max(1, r.height);
+  stage.width = Math.round(W * DPR); stage.height = Math.round(H * DPR);
+}
+window.addEventListener('resize', resize);
+if (window.ResizeObserver) new ResizeObserver(resize).observe(stage);
+
+const prog = { cv: mk(4, 4), side: 0 };
+const particles = [];
+function spawnParticles(dt, R) {
+  const q = airflow() / QMAX;
+  const rate = 90 * q;
+  let n = rate * dt + Math.random();
+  while (n >= 1 && particles.length < 320) {
+    n -= 1;
+    particles.push({ a: Math.random() * TAU, r: R * (0.15 + Math.random() * 0.75), v: 0.5 + Math.random() * 0.7,
+      life: 0, max: 1.4 + Math.random() * 1.2, s: 1 + Math.random() * 2.2, sw: (Math.random() - .5) * 0.6 });
+  }
+}
+function drawBackground() {
+  const g = ctx.createLinearGradient(0, 0, 0, H);
+  g.addColorStop(0, '#f6f1e6'); g.addColorStop(1, '#e6efe6');
+  ctx.fillStyle = g; ctx.fillRect(0, 0, W, H);
+}
+function drawPropLayer(theta0, theta1, R, cx, cy) {
+  const L = layers.prop, s = L.src, m = Math.max(s.width, s.height);
+  const size = 2 * R * L.scale;                         // 画面での画像の大きさ (css px)
+  const span = theta1 - theta0;
+  const mix = clamp((Math.abs(span) - 0.5) / 1.0, 0, 1);  // 速いほど「ぼやけた円盤」に近づける
+  const n = clamp(Math.ceil(Math.min(Math.abs(span), 1.5) / 0.15), 1, 10);
+  const rs = n > 1 ? 0.6 : 1;                           // ぼやけて見える間は解像度を下げて軽くする
+  const wobCss = clamp(0.7 * P.wobble + 0.4 * P.dust, 0, 1) * R * 0.035 * (0.15 + x);
+  const sideCss = size * Math.hypot(s.width, s.height) / m + wobCss * 2 + 4;
+  const side = Math.ceil(sideCss * DPR * rs);
+  if (prog.side !== side) { prog.cv.width = side; prog.cv.height = side; prog.side = side; }
+  const pc = prog.cv.getContext('2d');
+  pc.setTransform(1, 0, 0, 1, 0, 0); pc.clearRect(0, 0, side, side);
+  const wob = wobCss * DPR * rs;
+  const k = size * DPR * rs / m, dw = s.width * k, dh = s.height * k;
+  const ph = theta1 + 0.7;
+  const ox = side / 2 + Math.cos(ph) * wob, oy = side / 2 + Math.sin(ph) * wob;
+  if (mix < 1) {
+    const span2 = Math.sign(span) * Math.min(Math.abs(span), 1.5);
+    for (let i = 0; i < n; i++) {
+      const th = theta1 - span2 * (1 - (i + 0.5) / n);
+      pc.save();
+      pc.globalCompositeOperation = 'lighter';
+      pc.globalAlpha = 1 / n;                           // 平均をとって回転のブレを表す
+      pc.translate(ox, oy); pc.rotate(th);
+      pc.drawImage(L.aged, -dw / 2, -dh / 2, dw, dh);
+      pc.restore();
+    }
+  }
+  const outCss = side / (DPR * rs);
+  ctx.save();
+  ctx.globalAlpha = 1 - mix;
+  if (mix < 1) ctx.drawImage(prog.cv, cx - outCss / 2, cy - outCss / 2, outCss, outCss);
+  if (mix > 0 && L.blur) {
+    ctx.globalAlpha = mix;
+    const bw = L.blur.width * size / m;
+    const wx = Math.cos(ph) * wobCss, wy = Math.sin(ph) * wobCss;
+    ctx.drawImage(L.blur, cx + wx - bw / 2, cy + wy - bw / 2, bw, bw);
+  }
+  ctx.restore();
+}
+function drawCover(R, cx, cy) {
+  const L = layers.cover, s = L.src, m = Math.max(s.width, s.height);
+  const k = 2 * R * L.scale / m;
+  ctx.save();
+  ctx.shadowColor = 'rgba(60,70,60,.18)'; ctx.shadowBlur = 10; ctx.shadowOffsetY = 3;
+  ctx.drawImage(L.aged, cx - s.width * k / 2, cy - s.height * k / 2, s.width * k, s.height * k);
+  ctx.restore();
+}
+function drawParticles(dt, R, cx, cy) {
+  const q = airflow() / QMAX;
+  ctx.save(); ctx.lineCap = 'round';
+  for (let i = particles.length - 1; i >= 0; i--) {
+    const p = particles[i];
+    p.life += dt;
+    if (p.life > p.max || p.r > R * 1.9) { particles.splice(i, 1); continue; }
+    p.r += R * 0.9 * p.v * q * dt + R * 0.04 * dt;
+    p.a += p.sw * q * dt + x * 0.35 * dt;
+    const f = p.life / p.max, al = Math.sin(f * Math.PI) * 0.55;
+    const px = cx + Math.cos(p.a) * p.r, py = cy + Math.sin(p.a) * p.r;
+    const tail = Math.max(0, p.r - R * 0.12 * (0.4 + q));
+    ctx.strokeStyle = `rgba(120,185,175,${al * 0.9})`; ctx.lineWidth = p.s + 0.8;
+    ctx.beginPath(); ctx.moveTo(cx + Math.cos(p.a) * tail, cy + Math.sin(p.a) * tail); ctx.lineTo(px, py); ctx.stroke();
+  }
+  ctx.restore();
+}
+function render(dt, theta0) {
+  ctx.setTransform(DPR, 0, 0, DPR, 0, 0);
+  drawBackground();
+  const R = Math.min(W, H) * 0.42, cx = W / 2, cy = H / 2;
+  const hr = R * layers.cover.scale * 0.96;             // かべの穴 (プロペラの後ろの暗がり)
+  const g = ctx.createRadialGradient(cx - hr * .15, cy - hr * .2, hr * .1, cx, cy, hr);
+  g.addColorStop(0, '#f5f8f8'); g.addColorStop(.75, '#dbe4e6'); g.addColorStop(1, '#b9c6ca');
+  ctx.fillStyle = g; ctx.beginPath(); ctx.arc(cx, cy, hr, 0, TAU); ctx.fill();
+  drawPropLayer(theta0, theta, R, cx, cy);
+  drawCover(R, cx, cy);
+  spawnParticles(dt, R); drawParticles(dt, R, cx, cy);
+}
+
+/* ---------- 音 ---------- */
+let au = null, soundOn = true;
+function initAudio() {
+  if (au) { if (au.ctx.state === 'suspended') au.ctx.resume(); return; }
+  const AC = window.AudioContext || window.webkitAudioContext; if (!AC) return;
+  const c = new AC(), master = c.createGain(); master.gain.value = 0.0; master.connect(c.destination);
+  const buf = c.createBuffer(1, c.sampleRate * 2, c.sampleRate), d = buf.getChannelData(0);
+  for (let i = 0; i < d.length; i++) d[i] = Math.random() * 2 - 1;
+  const src = c.createBufferSource(); src.buffer = buf; src.loop = true;
+  const bp = c.createBiquadFilter(); bp.type = 'bandpass'; bp.Q.value = 0.7;
+  const wg = c.createGain(); wg.gain.value = 0; src.connect(bp); bp.connect(wg); wg.connect(master); src.start();
+  const rat = c.createOscillator(); rat.type = 'square';
+  const rlp = c.createBiquadFilter(); rlp.type = 'lowpass'; rlp.frequency.value = 180;
+  const rg = c.createGain(); rg.gain.value = 0; rat.connect(rlp); rlp.connect(rg); rg.connect(master); rat.start();
+  const sq = c.createOscillator(); sq.type = 'sawtooth';
+  const slp = c.createBiquadFilter(); slp.type = 'lowpass'; slp.frequency.value = 2400;
+  const sg = c.createGain(); sg.gain.value = 0; sq.connect(slp); slp.connect(sg); sg.connect(master); sq.start();
+  au = { ctx: c, master, bp, wg, rat, rg, sq, sg };
+  if (c.state === 'suspended') c.resume();
+}
+function updateAudio() {
+  if (!au) return;
+  const t = au.ctx.currentTime, tc = 0.08;
+  au.master.gain.setTargetAtTime(soundOn ? 0.7 : 0, t, 0.05);
+  au.bp.frequency.setTargetAtTime(250 + 1500 * x, t, tc);
+  au.wg.gain.setTargetAtTime(0.22 * Math.pow(x, 1.4) * (1 + 0.9 * P.noise), t, tc);
+  au.rat.frequency.setTargetAtTime(Math.max(2, x * OMEGA0 / TAU * 1.0), t, tc);
+  au.rg.gain.setTargetAtTime(0.16 * P.noise * Math.min(1, x * 2.2) * (0.3 + 0.7 * clamp(P.wobble + P.dust * 0.5, 0, 1)), t, tc);
+  au.sq.frequency.setTargetAtTime(700 + 900 * x, t, tc);
+  au.sg.gain.setTargetAtTime(0.018 * P.noise * P.bearing * Math.min(1, x * 3), t, tc);
+}
+$('mute').addEventListener('click', () => {
+  soundOn = !soundOn; $('mute').textContent = soundOn ? '🔊 音あり' : '🔇 音なし'; initAudio();
+});
+
+/* ---------- 操作 ---------- */
+function setPower(v) {
+  on = v; initAudio();
+  const b = $('power'); b.textContent = on ? 'スイッチ OFF' : 'スイッチ ON'; b.classList.toggle('on', on);
+}
+$('power').addEventListener('click', () => setPower(!on));
+$('powerLevel').addEventListener('input', e => { power = +e.target.value / 100; $('powerLevelOut').textContent = e.target.value; });
+
+/* ---------- メインループ ---------- */
+let last = performance.now(), tick = 0;
+const bars = { m: $('barM'), f: $('barF'), d: $('barD') };
+function frame(now) {
+  const dt = Math.min(0.1, Math.max(0, (now - last) / 1000)); last = now;
+  if (dirtyAge) { buildAged(layers.prop); buildAged(layers.cover); dirtyAge = false; }
+  const theta0 = theta, hStep = 1 / 120;
+  let rest = dt;
+  while (rest > 1e-6) { const h = Math.min(hStep, rest); simStep(h); rest -= h; }
+  render(dt, theta0);
+  updateAudio();
+  if ((tick++ & 3) === 0) {
+    const rpm = x * OMEGA0 * 60 / TAU;
+    $('rpm').textContent = Math.round(rpm).toLocaleString('en-US');
+    $('rps').textContent = (rpm / 60).toFixed(1);
+    $('flow').textContent = airflow().toFixed(1);
+    $('hint').hidden = !(on && x === 0);
+    bars.m.style.width = clamp(forces.m * 100, 0, 100) + '%';
+    bars.f.style.width = clamp(forces.f * 100 / 0.6, 0, 100) + '%';
+    bars.d.style.width = clamp(forces.d * 100 / 0.4, 0, 100) + '%';
+  }
+  requestAnimationFrame(frame);
+}
+setDefaultImages(); setAge(0); resize();
+requestAnimationFrame(frame);
+</script>
+</body>
+</html>
