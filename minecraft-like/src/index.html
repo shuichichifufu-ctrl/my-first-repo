@@ -5,7 +5,7 @@
 <title>ボクセルクラフト</title>
 <meta name="viewport" content="width=device-width,initial-scale=1">
 <style>
-:root{--slot:max(34px,min(56px,5.4vw,9.2vh));--ui:#2b2b2b;--edge:#111;--hi:#8b8b8b;--txt:#fff}
+:root{--slot:max(24px,min(56px,5.4vw,9.2vh));--ui:#2b2b2b;--edge:#111;--hi:#8b8b8b;--txt:#fff}
 *{box-sizing:border-box;-webkit-user-select:none;user-select:none}
 html,body{margin:0;height:100%;overflow:hidden;background:#78a7ff;color:var(--txt);
  font-family:"Hiragino Kaku Gothic ProN","Meiryo","Noto Sans JP","IPAGothic","Yu Gothic",sans-serif;font-size:18px}
@@ -86,7 +86,7 @@ img.px,.px{image-rendering:pixelated;image-rendering:crisp-edges}
 #loading .bar i{display:block;height:100%;width:30%;background:#7fe04a;animation:ld 1s infinite alternate}
 @keyframes ld{from{margin-left:0}to{margin-left:70%}}
 #inv{background:rgba(0,0,0,.45)}
-#inv .wrap{display:flex;gap:18px;align-items:stretch;max-width:98vw;max-height:94vh}
+#inv .wrap{overflow:auto;display:flex;gap:18px;align-items:stretch;max-width:98vw;max-height:94vh}
 #inv .panel{padding:14px 16px}
 #inv h3{margin:0 0 8px;font-size:22px}
 #craftlist{width:min(380px,38vw);overflow-y:auto;max-height:calc(94vh - 90px);padding-right:6px}
@@ -123,7 +123,7 @@ img.px,.px{image-rendering:pixelated;image-rendering:crisp-edges}
 @media (max-height:720px){#title h1{font-size:clamp(34px,6vw,52px)}#title .sub{font-size:16px;margin-top:-10px}#title .help{font-size:15px;line-height:1.45}.btn{font-size:19px;padding:9px 14px;margin:7px 0}#title .panel{padding:14px 20px}}
 @media (max-width:700px),(max-aspect-ratio:1/1){#tl{max-width:calc(100vw - 28px)}#objtext{font-size:15px}#keyhint{font-size:12px}#clock{top:auto;bottom:calc(var(--slot) + 112px);right:8px;font-size:15px;padding:4px 8px}#clockicon{width:16px;height:16px}.toast{font-size:15px}}
 @media (max-height:420px){.panel{padding:10px 14px}.btn{font-size:15px;padding:6px 10px;margin:5px 0}#pause h2{font-size:20px;margin:0}.row{font-size:14px;margin:4px 0}.btn.sm{font-size:14px;padding:3px 8px}#death h2{font-size:32px}#death p{font-size:15px}}
-@media (max-width:900px){:root{--slot:44px}#inv .wrap{flex-direction:column;overflow-y:auto}#craftlist{width:auto;max-height:30vh}}
+@media (max-width:900px){#inv .wrap{overflow:auto;flex-direction:column;overflow-y:auto}#craftlist{width:auto;max-height:30vh}}
 </style>
 </head>
 <body>
