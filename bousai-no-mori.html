@@ -1,0 +1,729 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no,viewport-fit=cover">
+<meta name="theme-color" content="#2f7d3a">
+<title>そなえろ！ぼうさいの森</title>
+<style>
+:root{--ink:#5a3b1f;--paper:#fffbe8;--line:#e0b86a;--accent:#ff6f61}
+*{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
+html,body{margin:0;height:100%;overflow:hidden;background:#2f7d3a;color:var(--ink);
+  font-family:"Hiragino Maru Gothic ProN","BIZ UDPGothic","Yu Gothic","Meiryo",sans-serif;
+  touch-action:none;user-select:none;-webkit-user-select:none;-webkit-touch-callout:none;overscroll-behavior:none}
+button{font-family:inherit}
+#game{position:fixed;inset:0;overflow:hidden}
+.layer{position:absolute;inset:0}
+.hidden{display:none!important}
+
+/* ---------- ボタン共通 ---------- */
+.bigbtn{font-weight:800;font-size:6vmin;min-height:14vmin;min-width:28vmin;padding:0 4vmin;border-radius:7vmin;
+  border:.9vmin solid var(--line);background:#ffe07a;color:var(--ink);box-shadow:0 1.1vmin 0 #b98a2e;cursor:pointer;touch-action:manipulation}
+.bigbtn:active{transform:translateY(.8vmin);box-shadow:0 .3vmin 0 #b98a2e}
+.bigbtn:disabled{background:#e8e2cc;color:#a99b78;box-shadow:0 1.1vmin 0 #c9bf9d;border-color:#d8cfb0}
+.bigbtn.yes{background:#8fe08a;box-shadow:0 1.1vmin 0 #4a9f45;border-color:#4a9f45}
+.bigbtn.no{background:#ffb3a8;box-shadow:0 1.1vmin 0 #c9675a;border-color:#c9675a}
+
+/* ---------- 外（村マップ） ---------- */
+#outdoor{background:#2f7d3a;touch-action:none;cursor:pointer}
+#world{position:absolute;left:0;top:0;transform-origin:0 0;will-change:transform}
+#world i,#world b,#world u{display:block;position:absolute;font-style:normal;text-decoration:none}
+#world .ground{left:0;top:0;background-color:#8fd16b;background-image:radial-gradient(#7cc15a 2px,transparent 3px);background-size:32px 32px}
+#world .t{width:65px;height:65px}
+#world .water{background:#59b4f0;background-image:repeating-linear-gradient(135deg,#ffffff22 0 6px,transparent 6px 16px)}
+#world .path{background:#ecd9a0}
+#world .bridge{background:repeating-linear-gradient(90deg,#b98a4e 0 12px,#8d6531 12px 14px);border-top:4px solid #7a5628;border-bottom:4px solid #7a5628}
+#world .tree{width:64px;height:64px}
+#world .tree u{left:24px;top:34px;width:16px;height:30px;background:#7a4f28;border-radius:4px}
+#world .tree b{left:-8px;top:-22px;width:80px;height:70px;border-radius:50%;background:#3f9a45;box-shadow:inset -8px -8px 0 #348a3b}
+#world .tree.v1 b{background:#4aa84f;width:74px;left:-5px}
+#world .tree.v2 b{background:#378f3e;height:76px;top:-28px}
+#world .rock{width:64px;height:64px}
+#world .rock b{left:6px;top:24px;width:52px;height:36px;border-radius:50% 50% 30% 30%;background:#a9adb4;box-shadow:inset -6px -6px 0 #8c9097}
+#world .fl{width:8px;height:8px;border-radius:50%;background:#ffd43b;box-shadow:-8px 0 0 #fff,8px 0 0 #fff,0 -8px 0 #fff,0 8px 0 #fff}
+#world .fl.p{background:#fff3a0;box-shadow:-8px 0 0 #ff9ec4,8px 0 0 #ff9ec4,0 -8px 0 #ff9ec4,0 8px 0 #ff9ec4}
+/* 家 */
+#world .house{width:192px;height:192px}
+#world .house .roof{left:0;top:8px;width:192px;height:84px;background:var(--roof);clip-path:polygon(50% 0,100% 100%,0 100%)}
+#world .house .wall{left:14px;top:76px;width:164px;height:116px;background:#fff1c9;border:4px solid #d9b87a;border-radius:6px}
+#world .house .door{left:72px;top:124px;width:48px;height:68px;background:#8a5a2b;border-radius:24px 24px 0 0;box-shadow:inset 0 0 0 4px #6e4520}
+#world .house .win{top:100px;width:34px;height:34px;background:#bfe6ff;border:4px solid #d9b87a;border-radius:6px}
+#world .house .win.l{left:28px}#world .house .win.r{left:130px}
+#world .house .sign{left:36px;top:-6px;width:120px;height:34px;line-height:34px;background:#fffbe8;border:3px solid #d9b87a;border-radius:10px;text-align:center;font-weight:800;font-size:20px;color:#5a3b1f}
+/* ひと・ねこ */
+#world .ent{left:0;top:0;width:64px;height:80px;pointer-events:none}
+#world .ent .flip{position:absolute;inset:0;transform:scaleX(var(--f,1))}
+#world .ent .in{position:absolute;inset:0}
+#world .ent i,#world .ent b,#world .ent u{display:block;position:absolute}
+.sh{left:12px;bottom:2px;width:40px;height:10px;border-radius:50%;background:#0003}
+.kid .body{left:18px;top:38px;width:28px;height:28px;border-radius:10px 10px 6px 6px;background:#ff6f61}
+.kid .leg{top:62px;width:9px;height:12px;background:#4a6fa5;border-radius:3px}
+.kid .leg.a{left:20px}.kid .leg.b{left:35px}
+.kid .head{left:13px;top:8px;width:38px;height:36px;border-radius:50%;background:#ffd9b0}
+.kid .hair{left:11px;top:4px;width:42px;height:20px;border-radius:21px 21px 6px 6px;background:#5a3a22}
+.kid .eye{top:28px;width:5px;height:7px;border-radius:50%;background:#222}
+.kid .eye.a{left:24px}.kid .eye.b{left:37px}
+#hero.walk .in{animation:bob .3s infinite ease-in-out}
+#hero.walk .leg.a{animation:legA .3s infinite}
+#hero.walk .leg.b{animation:legA .3s infinite reverse}
+@keyframes bob{50%{transform:translateY(-4px)}}
+@keyframes legA{50%{transform:translateY(-4px)}}
+.cat .in{animation:idle 1.6s infinite ease-in-out}
+@keyframes idle{50%{transform:translateY(-3px)}}
+.cat .body{left:16px;top:42px;width:32px;height:30px;border-radius:50% 50% 40% 40%;background:var(--c);box-shadow:inset -4px -4px 0 #0001}
+.cat .head{left:10px;top:16px;width:44px;height:36px;border-radius:50%;background:var(--c);box-shadow:inset -4px -4px 0 #0001}
+.cat .ear{top:8px;width:0;height:0;border-left:9px solid transparent;border-right:9px solid transparent;border-bottom:17px solid var(--c)}
+.cat .ear.l{left:10px;transform:rotate(-14deg)}.cat .ear.r{left:35px;transform:rotate(14deg)}
+.cat .eye{top:31px;width:6px;height:8px;border-radius:50%;background:#222}
+.cat .eye.a{left:22px}.cat .eye.b{left:36px}
+.cat .nose{left:29px;top:39px;width:6px;height:4px;border-radius:50%;background:#ff8fa3}
+.cat .tail{left:44px;top:50px;width:8px;height:22px;border-radius:8px;background:var(--c);transform:rotate(-30deg);transform-origin:50% 100%}
+.cat .hint{left:14px;top:-18px;font-size:30px;line-height:1;animation:hop 1s infinite ease-in-out}
+@keyframes hop{50%{transform:translateY(-6px)}}
+
+/* ---------- 家の中 ---------- */
+.room-bg{background:linear-gradient(#ffe9b8 0 52%,#d9a066 52% 100%)}
+.room-bg::before{content:"";position:absolute;left:0;right:0;top:50%;height:2vmin;background:#b9824a}
+.title{position:absolute;top:3vmin;left:0;right:0;text-align:center;font-weight:800;font-size:6.4vmin;pointer-events:none}
+.exit{position:absolute;left:2.5vmin;top:2.5vmin;z-index:5;font-size:5.6vmin;min-width:26vmin}
+.stage{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;padding:16vmin 2vmin 22vmin}
+.plate{width:22vmin;height:22vmin;border-radius:5vmin;background:var(--c,#fff);border:.8vmin solid #fff9;display:flex;align-items:center;justify-content:center;font-size:13vmin;line-height:1;box-shadow:0 1vmin 0 #0003}
+.rdesk,.hdesk{background:#b57a3d;border:1vmin solid #8a5a2b;border-radius:4vmin;padding:3vmin;box-shadow:0 2vmin 0 #7a4f26}
+.rdesk{display:flex;gap:2.4vmin}
+.ritem{display:flex;flex-direction:column;align-items:center;gap:1vmin;cursor:pointer;animation:wob 1.8s infinite ease-in-out}
+.ritem:nth-child(2){animation-delay:.3s}.ritem:nth-child(3){animation-delay:.6s}
+.ritem span{font-size:3.6vmin;font-weight:800;background:#fffbe8;border-radius:2vmin;padding:.4vmin 1.4vmin}
+@keyframes wob{50%{transform:translateY(-1.4vmin)}}
+.rempty{font-size:5.4vmin;font-weight:800;color:#fffbe8;padding:6vmin 8vmin}
+.hdesk{display:grid;grid-template-columns:repeat(3,22vmin);gap:2vmin}
+.hslot{width:22vmin;height:22vmin;border-radius:5vmin;background:#9a6530;border:.8vmin dashed #e8c58a;display:flex;align-items:center;justify-content:center;cursor:pointer;position:relative}
+.hslot.full{border:none;background:transparent}
+.hslot .plate{width:100%;height:100%}
+.hslot.sel .plate{outline:1.2vmin solid var(--accent);transform:scale(1.06)}
+.hslot.ready{border-color:#fff;background:#b87b3e;animation:wob 1.2s infinite ease-in-out}
+.mom{position:absolute;width:20vmin;height:28vmin;cursor:pointer;z-index:4}
+.mom i{position:absolute;display:block}
+.mom .hair{left:3vmin;top:1vmin;width:14vmin;height:10vmin;background:#5a3a22;border-radius:7vmin 7vmin 2vmin 2vmin}
+.mom .head{left:4vmin;top:3vmin;width:12vmin;height:11vmin;background:#ffd9b0;border-radius:50%}
+.mom .eye{top:8vmin;width:1.4vmin;height:2vmin;background:#222;border-radius:50%}
+.mom .eye.a{left:7vmin}.mom .eye.b{left:11.4vmin}
+.mom .body{left:2vmin;top:13vmin;width:16vmin;height:13vmin;background:#f48fb1;border-radius:4vmin 4vmin 2vmin 2vmin}
+.mom .apron{left:5vmin;top:15vmin;width:10vmin;height:11vmin;background:#fffbe8;border-radius:2vmin}
+.mom .lbl{left:0;right:0;bottom:-4.4vmin;text-align:center;font-size:3.4vmin;font-weight:800}
+.mom .hint{left:7vmin;top:-7vmin;font-size:6vmin;animation:hop 1s infinite}
+#packbox{position:absolute;z-index:6;display:flex;align-items:center;gap:3vmin}
+.bag{position:relative;width:24vmin;height:26vmin;background:#4aa3df;border:.8vmin solid #2f77a8;border-radius:5vmin 5vmin 7vmin 7vmin;display:flex;align-items:center;justify-content:center;font-size:6vmin;font-weight:800;color:#fff;margin-top:6vmin}
+.bag::before{content:"";position:absolute;top:-6.4vmin;left:4.4vmin;width:13vmin;height:10vmin;border:1.6vmin solid #2f77a8;border-bottom:0;border-radius:8vmin 8vmin 0 0}
+.bag::after{content:"";position:absolute;top:7vmin;left:2vmin;right:2vmin;height:1vmin;background:#ffffff66}
+.bag.pop{animation:pop .45s}
+@keyframes pop{40%{transform:scale(1.18) rotate(-4deg)}}
+@media (orientation:portrait){
+  .mom{top:15vmin;right:5vmin}
+  .stage{padding-top:40vmin}
+  #packbox{left:0;right:0;bottom:21vmin;justify-content:center}
+}
+@media (orientation:landscape){
+  .mom{left:6vmin;top:50%;transform:translateY(-60%)}
+  .stage{padding-top:14vmin}
+  #home.packing .stage{padding-bottom:42vmin}
+  #home.packing .hdesk{grid-template-columns:repeat(3,18vmin);gap:1.6vmin;padding:2vmin}
+  #home.packing .hslot{width:18vmin;height:18vmin}
+  #packbox{left:0;right:0;bottom:19vmin;justify-content:center}
+  #packbox .bag{width:22vmin;height:14vmin;margin-top:5vmin;font-size:5vmin}
+  #packbox .bag::before{top:-5vmin;left:4.5vmin;width:12vmin;height:8vmin}
+  #packbox .bigbtn{min-height:13vmin}
+}
+/* ---------- HUD ---------- */
+#hud{position:absolute;left:0;right:0;bottom:2vmin;display:flex;justify-content:center;gap:1.6vmin;z-index:20;pointer-events:none}
+#hud .slot{pointer-events:auto;width:14vmin;height:14vmin;border-radius:3vmin;background:rgba(255,251,232,.92);border:.8vmin solid var(--line);
+  display:flex;align-items:center;justify-content:center;font-size:8.4vmin;line-height:1;box-shadow:0 .8vmin 0 #0003;transition:transform .12s}
+#hud .slot.has{background:var(--c)}
+#hud .slot.sel{border-color:var(--accent);box-shadow:0 0 0 1vmin #ff6f6188,0 .8vmin 0 #0003;transform:translateY(-2.4vmin)}
+#hud .slot.new{border-style:dashed}
+
+/* ---------- 吹き出し・メッセージ・モーダル ---------- */
+#bcatch{position:absolute;inset:0;z-index:40;touch-action:none}
+#bubble{position:absolute;width:max-content;max-width:78vmin;padding:3vmin 4vmin;background:#fff;border:.8vmin solid var(--line);border-radius:4vmin;font-size:5vmin;line-height:1.45;font-weight:800;text-align:center;box-shadow:0 1vmin 0 #0002;transform:translate(-50%,-100%)}
+#bubble::after{content:"";position:absolute;left:var(--tx,50%);bottom:-2.6vmin;margin-left:-2vmin;border:2vmin solid transparent;border-top:2.6vmin solid #fff;border-bottom:0}
+#toast{position:absolute;left:50%;top:14vmin;transform:translateX(-50%);z-index:45;background:#fffbe8;border:.8vmin solid var(--line);border-radius:4vmin;padding:2vmin 4vmin;font-size:4.6vmin;font-weight:800;text-align:center;max-width:90vmin;pointer-events:none;opacity:0;transition:opacity .2s}
+#toast.on{opacity:1}
+#msg{position:absolute;inset:0;z-index:50;cursor:pointer}
+#msg .box{position:absolute;left:3vmin;right:3vmin;bottom:20vmin;min-height:24vmin;background:var(--paper);border:1vmin solid var(--line);border-radius:5vmin;padding:2.6vmin 4vmin 3vmin;box-shadow:0 1.2vmin 0 #0003}
+#msg .who{font-size:4.4vmin;font-weight:800;color:#c4602a;min-height:5vmin}
+#msg .txt{font-size:5.6vmin;font-weight:800;line-height:1.5}
+#msg .nx{position:absolute;right:4vmin;bottom:1.6vmin;font-size:5vmin;color:var(--accent);animation:hop .9s infinite}
+#modal{position:absolute;inset:0;z-index:60;background:rgba(0,0,0,.72);display:flex;flex-direction:column;align-items:center;justify-content:center;gap:2vmin;touch-action:none}
+#modal .scene{perspective:120vmin;width:46vmin;height:46vmin}
+#spin{position:relative;width:100%;height:100%;transform-style:preserve-3d;animation:spin 7s linear infinite}
+@keyframes spin{to{transform:rotateY(360deg)}}
+#spin .l{position:absolute;inset:0;border-radius:9vmin;background:var(--c);border:1vmin solid #fff9;display:flex;align-items:center;justify-content:center;font-size:26vmin;line-height:1;backface-visibility:hidden}
+#spin .l1{transform:translateZ(-2.4vmin) rotateY(180deg)}
+#spin .l2{transform:translateZ(0);filter:brightness(.82);backface-visibility:visible}
+#spin .l3{transform:translateZ(2.4vmin)}
+#modal .mname{font-size:7vmin;font-weight:800;color:#fff}
+#modal .q{font-size:8vmin;font-weight:800;color:#ffe07a}
+#modal .btns{display:flex;gap:5vmin;margin-top:2vmin}
+#modal .btns .bigbtn{min-width:34vmin;min-height:18vmin;font-size:8vmin}
+#ending{position:absolute;inset:0;z-index:70;background:linear-gradient(#bfe9ff,#ffeaa8);display:flex;flex-direction:column;align-items:center;justify-content:center;gap:5vmin;overflow:hidden}
+#ending .big{font-size:15vmin;font-weight:800;color:#e8564a;text-shadow:0 1vmin 0 #fff,0 2vmin 0 #0002;animation:pop 1.6s infinite}
+#ending .sub{font-size:6vmin;font-weight:800}
+#ending .heart{font-size:18vmin;animation:hop 1.2s infinite}
+#ending .cf{position:absolute;top:-6vmin;width:3vmin;height:3vmin;border-radius:50%;animation:fall linear infinite}
+@keyframes fall{to{transform:translateY(120vh) rotate(720deg)}}
+</style>
+</head>
+<body>
+<div id="game">
+  <!-- 外 -->
+  <div id="outdoor" class="layer hidden"><div id="world"></div></div>
+
+  <!-- 住人の家の中 -->
+  <div id="room" class="layer room-bg hidden">
+    <button class="bigbtn exit" id="roomExit">でる</button>
+    <div class="title" id="roomTitle"></div>
+    <div class="stage"><div class="rdesk" id="roomDesk"></div></div>
+  </div>
+
+  <!-- 自分の家の中 -->
+  <div id="home" class="layer room-bg hidden">
+    <button class="bigbtn exit" id="homeExit">そとへ</button>
+    <div class="title">じぶんの いえ</div>
+    <div class="mom" id="mom"><i class="hair"></i><i class="head"></i><i class="eye a"></i><i class="eye b"></i><i class="body"></i><i class="apron"></i><i class="lbl">おかあさん</i><i class="hint">💬</i></div>
+    <div class="stage"><div class="hdesk" id="homeDesk"></div></div>
+    <div id="packbox" class="hidden">
+      <div class="bag" id="bag"><span id="bagcnt">0/6</span></div>
+      <button class="bigbtn yes" id="packBtn" disabled>ふくろにいれる</button>
+    </div>
+  </div>
+
+  <div id="hud"></div>
+  <div id="toast"></div>
+
+  <div id="bcatch" class="hidden"><div id="bubble"></div></div>
+
+  <div id="msg" class="hidden"><div class="box"><div class="who" id="msgwho"></div><div class="txt" id="msgtxt"></div><div class="nx">▼</div></div></div>
+
+  <div id="modal" class="hidden">
+    <div class="scene"><div id="spin"><div class="l l1"></div><div class="l l2"></div><div class="l l3"></div></div></div>
+    <div class="mname" id="mname"></div>
+    <div class="q">もっていきますか？</div>
+    <div class="btns"><button class="bigbtn yes" id="yes">はい</button><button class="bigbtn no" id="no">いいえ</button></div>
+  </div>
+
+  <div id="ending" class="hidden">
+    <div class="heart">🎒</div>
+    <div class="big">ごあんぜんに</div>
+    <div class="sub">ぼうさいグッズを ぜんぶ つめたよ！</div>
+    <button class="bigbtn yes" id="again">もういちど あそぶ</button>
+  </div>
+</div>
+
+<script>
+'use strict';
+/* =========================================================
+   そなえろ！ぼうさいの森
+   ========================================================= */
+const $ = id => document.getElementById(id);
+
+/* ---------- 定数 ---------- */
+const T = 64;            // 1マスの論理サイズ(px)。座標はすべて「マス単位」
+const MW = 40, MH = 30;  // マップのマス数
+const VIEW = 7;          // 短い辺に見えるマス数
+const SPEED = 3.0;       // 主人公の速さ(マス/秒)
+const R = 0.24;          // 主人公の当たり判定の半径(マス)
+const HOLD_MS = 220;     // これ以上押し続けたら「長押し(移動)」
+const TAP_MOVE = 3;      // これ以上動いたら「ドラッグ(移動)」 (vmin単位)
+const HUD_MAX = 5;
+
+/* ---------- アイテム定義（見た目は仮のCSS図形＋絵文字） ---------- */
+const DEF = {
+  helmet:{name:'ヘルメット',icon:'⛑️',col:'#ffd23f',ok:true},
+  whistle:{name:'ふえ',icon:'📯',col:'#9bd0ff',ok:true},
+  water:{name:'みず',icon:'💧',col:'#7cc4ff',ok:true},
+  food:{name:'ひじょうしょく',icon:'🥫',col:'#ffb36b',ok:true},
+  light:{name:'かいちゅうでんとう',icon:'🔦',col:'#ffe27a',ok:true},
+  toilet:{name:'けいたいトイレ',icon:'🚽',col:'#d6e4ff',ok:true},
+  ice:{name:'アイスクリーム',icon:'🍦',col:'#ffc4dd',ok:false},
+  cake:{name:'ケーキ',icon:'🍰',col:'#ffd6e0',ok:false},
+  game:{name:'ゲームき',icon:'🎮',col:'#c9b8ff',ok:false},
+  bear:{name:'ぬいぐるみ',icon:'🧸',col:'#e9c9a0',ok:false},
+  juice:{name:'ジュース',icon:'🧃',col:'#ffc17a',ok:false},
+  ball:{name:'ボール',icon:'⚽',col:'#d8f0c8',ok:false},
+  candy:{name:'おかし',icon:'🍭',col:'#ffb3d1',ok:false},
+};
+const ALL_OK = ['helmet','whistle','water','food','light','toilet'];
+
+/* ---------- 家・住人 ---------- */
+const HDEF = [
+  {id:'home',own:true,name:'じぶんのいえ',tx:8, ty:4, roof:'#e8564a'},
+  {id:'h1',name:'ミケ',tx:13,ty:4, roof:'#4a90d9',cat:'#f2b36b',kind:'helmet', dummy:['ice','cake']},
+  {id:'h2',name:'タマ',tx:23,ty:4, roof:'#58b368',cat:'#c9c9d0',kind:'whistle',dummy:['game','bear']},
+  {id:'h3',name:'クロ',tx:9, ty:12,roof:'#8b6bd1',cat:'#4a4a52',kind:'water',  dummy:['juice','ball']},
+  {id:'h4',name:'シロ',tx:26,ty:12,roof:'#e59a3c',cat:'#fbfbfb',kind:'food',   dummy:['candy','ice']},
+  {id:'h5',name:'トラ',tx:12,ty:20,roof:'#2fa8a0',cat:'#e0a23c',kind:'light',  dummy:['cake','game']},
+  {id:'h6',name:'ブチ',tx:27,ty:20,roof:'#d9638f',cat:'#efe3cf',kind:'toilet', dummy:['bear','juice']},
+];
+const HOME = HDEF[0];
+const INST = {};     // uid -> アイテム実体 {uid,kind,house,state,checked}
+let uidN = 0;
+HDEF.forEach(h => {
+  h.roadY = h.ty + 3;
+  if (h.own) return;
+  const kinds = [h.kind, ...h.dummy];
+  for (let i = kinds.length - 1; i > 0; i--) { const j = Math.floor(Math.random() * (i + 1)); [kinds[i], kinds[j]] = [kinds[j], kinds[i]]; }
+  h.items = kinds.map(k => { const it = {uid:++uidN, kind:k, house:h.id, state:'house', checked:false}; INST[it.uid] = it; return it; });
+});
+const NPCS = HDEF.filter(h => !h.own).map(h => ({h, x:h.tx + 3.4, y:h.roadY + 0.5}));
+
+/* ---------- ゲーム状態 ---------- */
+const S = {
+  mode:'home',          // 'outdoor' | 'room' | 'home'
+  hud:[],               // HUDのアイテム(最大5)
+  desk:Array(6).fill(null),
+  sel:null,             // HUDで選択中のuid
+  deskSel:null,         // 机で選択中のスロット番号(袋詰め用)
+  bag:0,
+  phase:'collect',      // 'collect' → 'pack'
+  started:false,
+  curHouse:null,
+  bubble:false, modal:false, ending:false,
+};
+const hero = {x:HOME.tx + 1.5, y:HOME.roadY + 0.6, moving:false, f:1};
+
+/* ---------- 画面サイズ ---------- */
+let vw = innerWidth, vh = innerHeight, vmin = Math.min(vw, vh), ppt = vmin / VIEW;
+function resize() {
+  vw = innerWidth; vh = innerHeight; vmin = Math.min(vw, vh); ppt = vmin / VIEW;
+  if (S.mode === 'outdoor') camera();
+}
+addEventListener('resize', resize);
+
+/* ---------- 音 ---------- */
+let AC = null;
+function ac() {
+  try {
+    if (!AC) AC = new (window.AudioContext || window.webkitAudioContext)();
+    if (AC.state === 'suspended') AC.resume();
+  } catch (e) {}
+  return AC;
+}
+function tone(f, d = .15, type = 'sine', v = .08, delay = 0) {
+  const a = ac(); if (!a) return;
+  const t = a.currentTime + delay;
+  const o = a.createOscillator(), g = a.createGain();
+  o.type = type; o.frequency.value = f;
+  g.gain.setValueAtTime(.0001, t);
+  g.gain.exponentialRampToValueAtTime(v, t + .02);
+  g.gain.exponentialRampToValueAtTime(.0001, t + d);
+  o.connect(g); g.connect(a.destination); o.start(t); o.stop(t + d + .05);
+}
+const sfx = {
+  tap(){ tone(660, .08, 'triangle', .06); },
+  pop(){ tone(520, .1, 'sine', .08); tone(780, .12, 'sine', .06, .07); },
+  get(){ tone(660, .1, 'triangle', .07); tone(880, .1, 'triangle', .07, .09); tone(1175, .18, 'triangle', .07, .18); },
+  ok(){ tone(784, .12, 'triangle', .07); tone(1047, .2, 'triangle', .07, .1); },
+  ng(){ tone(330, .18, 'sine', .08); tone(247, .3, 'sine', .08, .16); },
+  place(){ tone(440, .08, 'square', .04); tone(587, .12, 'triangle', .07, .07); },
+  door(){ tone(200, .12, 'triangle', .08); tone(150, .16, 'triangle', .07, .1); },
+  pack(){ tone(523, .1, 'triangle', .07); tone(784, .16, 'triangle', .07, .08); },
+  fanfare(){
+    [[392,0,.16],[392,.18,.16],[392,.36,.16],[523,.54,.5],[440,1.1,.16],[523,1.28,.16],[659,1.46,.7]].forEach(([f,s,d]) => {
+      tone(f, d, 'square', .045, s); tone(f / 2, d, 'triangle', .06, s);
+    });
+  },
+  ending(){
+    [523,659,784,1047,784,1047,1319].forEach((f, i) => { tone(f, .3, 'triangle', .07, i * .16); tone(f / 2, .3, 'sine', .05, i * .16); });
+  },
+};
+addEventListener('pointerdown', ac, {capture:true});
+
+/* ---------- マップ生成 ---------- */
+// 0草 1川 2木 3岩 4道 5橋 6家
+const SOL = [0, 1, 1, 1, 0, 0, 1];
+const G = new Uint8Array(MW * MH), RES = new Uint8Array(MW * MH);
+const gi = (x, y) => y * MW + x;
+const inMap = (x, y) => x >= 0 && y >= 0 && x < MW && y < MH;
+const solidTile = (x, y) => !inMap(x, y) || SOL[G[gi(x, y)]] === 1;
+function mulberry(a) { return () => { a |= 0; a = a + 0x6D2B79F5 | 0; let t = Math.imul(a ^ a >>> 15, 1 | a); t = t + Math.imul(t ^ t >>> 7, 61 | t) ^ t; return ((t ^ t >>> 14) >>> 0) / 4294967296; }; }
+const rand = mulberry(20240601);
+const FLOWERS = [];
+(function buildMap() {
+  // 家の土台（周りの1マスは木を置かない）
+  HDEF.forEach(h => {
+    for (let y = h.ty - 1; y <= h.ty + 3; y++) for (let x = h.tx - 1; x <= h.tx + 3; x++) if (inMap(x, y)) RES[gi(x, y)] = 1;
+    for (let y = h.ty; y < h.ty + 3; y++) for (let x = h.tx; x < h.tx + 3; x++) G[gi(x, y)] = 6;
+  });
+  // 道（横3本・縦2本、すべてつながる）
+  [7, 15, 23].forEach(y => { for (let x = 5; x <= 33; x++) for (const yy of [y, y + 1]) { RES[gi(x, yy)] = 1; if (G[gi(x, yy)] !== 6) G[gi(x, yy)] = 4; } });
+  for (let y = 7; y <= 24; y++) for (const x of [5, 6, 32, 33]) { RES[gi(x, y)] = 1; if (G[gi(x, y)] !== 6) G[gi(x, y)] = 4; }
+  // 川（まん中を縦に流れる。道と交わるところは橋）
+  for (let y = 0; y < MH; y++) {
+    const cx = 18 + Math.round(2 * Math.sin(y / 3.5));
+    for (const x of [cx, cx + 1]) { const v = G[gi(x, y)]; if (v === 4) G[gi(x, y)] = 5; else if (v === 0) G[gi(x, y)] = 1; }
+  }
+  // 外わくの木
+  for (let y = 0; y < MH; y++) for (let x = 0; x < MW; x++) if (x === 0 || y === 0 || x === MW - 1 || y === MH - 1) G[gi(x, y)] = 2;
+  // ちらばる木・岩・花
+  for (let y = 1; y < MH - 1; y++) for (let x = 1; x < MW - 1; x++) {
+    if (G[gi(x, y)] !== 0 || RES[gi(x, y)]) continue;
+    const r = rand();
+    if (r < .13) G[gi(x, y)] = 2; else if (r < .15) G[gi(x, y)] = 3;
+    else if (r < .20) FLOWERS.push({x:x * T + 12 + rand() * 40, y:y * T + 12 + rand() * 40, p:rand() < .5});
+  }
+})();
+
+/* ---------- 世界のDOMを作る ---------- */
+const world = $('world');
+let heroEl, catEls = {};
+(function buildWorld() {
+  let h = `<i class="ground" style="width:${MW * T}px;height:${MH * T}px"></i>`;
+  const pos = (x, y, z) => `style="left:${x * T}px;top:${y * T}px;${z !== undefined ? 'z-index:' + z : ''}"`;
+  for (let y = 0; y < MH; y++) for (let x = 0; x < MW; x++) {
+    const v = G[gi(x, y)];
+    if (v === 1 || v === 5) h += `<i class="t water" ${pos(x, y, 1)}></i>`;
+    if (v === 4) h += `<i class="t path" ${pos(x, y, 1)}></i>`;
+    if (v === 5) h += `<i class="t bridge" ${pos(x, y, 2)}></i>`;
+    if (v === 2) h += `<i class="tree v${(x * 7 + y * 13) % 3}" ${pos(x, y, Math.round((y + .95) * 10))}><u></u><b></b></i>`;
+    if (v === 3) h += `<i class="rock" ${pos(x, y, Math.round((y + .9) * 10))}><b></b></i>`;
+  }
+  FLOWERS.forEach(f => { h += `<i class="fl${f.p ? ' p' : ''}" style="left:${f.x}px;top:${f.y}px;z-index:2"></i>`; });
+  HDEF.forEach(d => {
+    h += `<i class="house" style="left:${d.tx * T}px;top:${d.ty * T - 4}px;z-index:${(d.ty + 3) * 10};--roof:${d.roof}">` +
+      `<b class="roof"></b><b class="wall"></b><b class="door"></b><b class="win l"></b><b class="win r"></b>` +
+      `<b class="sign">${d.own ? '♥ ' : ''}${d.name}</b></i>`;
+  });
+  NPCS.forEach(n => {
+    h += `<i class="ent cat" id="cat_${n.h.id}" style="--c:${n.h.cat}"><i class="flip"><i class="in">` +
+      `<i class="sh"></i><i class="tail"></i><i class="body"></i><i class="head"></i><i class="ear l"></i><i class="ear r"></i>` +
+      `<i class="eye a"></i><i class="eye b"></i><i class="nose"></i><i class="hint">💬</i></i></i></i>`;
+  });
+  h += `<i class="ent kid" id="hero"><i class="flip"><i class="in"><i class="sh"></i><i class="leg a"></i><i class="leg b"></i><i class="body"></i><i class="head"></i><i class="hair"></i><i class="eye a"></i><i class="eye b"></i></i></i></i>`;
+  world.innerHTML = h;
+  heroEl = $('hero');
+  NPCS.forEach(n => {
+    const el = $('cat_' + n.h.id); catEls[n.h.id] = el;
+    el.style.transform = `translate(${n.x * T - 32}px,${n.y * T - 72}px)`;
+    el.style.zIndex = Math.round(n.y * 10);
+  });
+})();
+
+function camera() {
+  const s = ppt / T;
+  world.style.transform = `translate(${vw / 2 - hero.x * ppt}px,${vh / 2 - hero.y * ppt}px) scale(${s})`;
+  heroEl.style.transform = `translate(${hero.x * T - 32}px,${hero.y * T - 72}px)`;
+  heroEl.style.zIndex = Math.round(hero.y * 10);
+  heroEl.style.setProperty('--f', hero.f);
+  heroEl.classList.toggle('walk', hero.moving);
+  NPCS.forEach(n => catEls[n.h.id].style.setProperty('--f', hero.x < n.x ? -1 : 1));
+}
+
+/* ---------- 当たり判定 ---------- */
+function canStand(x, y) {
+  return !(solidTile(Math.floor(x - R), Math.floor(y - R)) || solidTile(Math.floor(x + R), Math.floor(y - R)) ||
+           solidTile(Math.floor(x - R), Math.floor(y + R)) || solidTile(Math.floor(x + R), Math.floor(y + R)));
+}
+
+/* ---------- ロック ---------- */
+// 吹き出し・モーダル・メッセージ・エンディング中、または家の中にいる間は移動できない
+let msgOn = false;
+const locked = () => S.bubble || S.modal || msgOn || S.ending || S.mode !== 'outdoor';
+
+/* ---------- 画面（レイヤー）切り替え ---------- */
+function setMode(m) {
+  S.mode = m; ptr = null;
+  $('outdoor').classList.toggle('hidden', m !== 'outdoor');
+  $('room').classList.toggle('hidden', m !== 'room');
+  $('home').classList.toggle('hidden', m !== 'home');
+  if (m === 'outdoor') camera();
+  if (m !== 'home') { S.sel = null; renderHud(); }
+}
+function exitTo(h) {
+  hero.x = h.tx + 1.5; hero.y = h.roadY + 0.6; hero.moving = false;
+  setMode('outdoor');
+}
+
+/* ---------- メッセージウィンドウ（タップで次へ） ---------- */
+const mq = [];
+function msg(lines, done) {
+  lines.forEach(l => mq.push(typeof l === 'string' ? {text:l} : l));
+  if (done) mq.push({done});
+  if (!msgOn) advance();
+}
+function advance() {
+  msgOn = true;
+  while (mq.length) {
+    const l = mq.shift();
+    if (l.fx) l.fx();
+    if (l.text !== undefined) {
+      $('msgwho').textContent = l.who || '';
+      $('msgtxt').textContent = l.text;
+      $('msg').classList.remove('hidden');
+      return;
+    }
+    if (l.done) l.done();
+  }
+  msgOn = false;
+  $('msg').classList.add('hidden');
+}
+$('msg').addEventListener('click', () => { if (msgOn) { sfx.tap(); advance(); } });
+
+let toastTimer = 0;
+function toast(t) {
+  const el = $('toast'); el.textContent = t; el.classList.add('on');
+  clearTimeout(toastTimer); toastTimer = setTimeout(() => el.classList.remove('on'), 2200);
+}
+
+/* ---------- 吹き出し（住人の頭上。タップで消える） ---------- */
+function showBubble(n) {
+  const b = $('bubble');
+  b.textContent = `わたしのいえに ”${DEF[n.h.kind].name}” があるからもっていってニャ🎵`;
+  b.style.removeProperty('--tx');
+  $('bcatch').classList.remove('hidden');
+  S.bubble = true; ptr = null;
+  const sx = vw / 2 + (n.x - hero.x) * ppt, sy = vh / 2 + (n.y - hero.y) * ppt - 1.15 * ppt;
+  b.style.left = sx + 'px'; b.style.top = Math.max(sy, vmin * 0.2) + 'px';
+  const rc = b.getBoundingClientRect(), m = vmin * .02;
+  let shift = 0;
+  if (rc.left < m) shift = m - rc.left; else if (rc.right > vw - m) shift = vw - m - rc.right;
+  b.style.left = (sx + shift) + 'px';
+  const tail = Math.min(rc.width - vmin * .06, Math.max(vmin * .06, rc.width / 2 - shift));
+  b.style.setProperty('--tx', tail + 'px');
+  sfx.pop();
+}
+function hideBubble() { S.bubble = false; $('bcatch').classList.add('hidden'); }
+$('bcatch').addEventListener('pointerdown', e => { e.preventDefault(); e.stopPropagation(); hideBubble(); });
+
+/* ---------- 外の入力：タップ(イベント) と 長押し/ドラッグ(移動) の切り分け ---------- */
+const O = $('outdoor');
+let ptr = null;
+O.addEventListener('pointerdown', e => {
+  if (!e.isPrimary || ptr || locked()) return;
+  try { O.setPointerCapture(e.pointerId); } catch (_) {}
+  ptr = {id:e.pointerId, x0:e.clientX, y0:e.clientY, x:e.clientX, y:e.clientY, t0:performance.now(), hold:false};
+});
+O.addEventListener('pointermove', e => {
+  if (!ptr || e.pointerId !== ptr.id) return;
+  ptr.x = e.clientX; ptr.y = e.clientY;
+  if (!ptr.hold && Math.hypot(ptr.x - ptr.x0, ptr.y - ptr.y0) > vmin * TAP_MOVE / 100 * 1) ptr.hold = true;
+});
+O.addEventListener('pointerup', e => {
+  if (!ptr || e.pointerId !== ptr.id) return;
+  const p = ptr; ptr = null;
+  const isTap = !p.hold && performance.now() - p.t0 < HOLD_MS && Math.hypot(e.clientX - p.x0, e.clientY - p.y0) <= vmin * TAP_MOVE / 100;
+  if (isTap && !locked()) onTap(e.clientX, e.clientY);
+});
+O.addEventListener('pointercancel', e => { if (ptr && e.pointerId === ptr.id) ptr = null; });
+O.addEventListener('contextmenu', e => e.preventDefault());
+
+function onTap(sx, sy) {
+  const wx = hero.x + (sx - vw / 2) / ppt, wy = hero.y + (sy - vh / 2) / ppt;
+  // 住人（距離に関係なく反応。指が大きくてもあたるよう広めに判定）
+  let best = null, bd = 1.1;
+  NPCS.forEach(n => { const d = Math.hypot(wx - n.x, wy - (n.y - 0.6)); if (d < bd) { bd = d; best = n; } });
+  if (best) { showBubble(best); return; }
+  // 家
+  for (const h of HDEF) {
+    if (wx >= h.tx - .2 && wx <= h.tx + 3.2 && wy >= h.ty - .7 && wy <= h.ty + 3.3) { enterHouse(h); return; }
+  }
+}
+
+/* ---------- メインループ ---------- */
+let last = performance.now();
+function frame(now) {
+  const dt = Math.min(.05, (now - last) / 1000); last = now;
+  if (S.mode === 'outdoor') {
+    hero.moving = false;
+    if (ptr && !locked()) {
+      if (!ptr.hold && now - ptr.t0 >= HOLD_MS) ptr.hold = true;
+      if (ptr.hold) {
+        const dx = ptr.x - vw / 2, dy = ptr.y - vh / 2, d = Math.hypot(dx, dy);
+        if (d > vmin * .04) {
+          const ux = dx / d, uy = dy / d, st = SPEED * dt;
+          const nx = hero.x + ux * st, ny = hero.y + uy * st;
+          let moved = false;
+          if (canStand(nx, hero.y)) { hero.x = nx; moved = true; }
+          if (canStand(hero.x, ny)) { hero.y = ny; moved = true; }
+          hero.moving = moved;
+          if (Math.abs(ux) > .15) hero.f = ux < 0 ? -1 : 1;
+        }
+      }
+    }
+    camera();
+  }
+  requestAnimationFrame(frame);
+}
+requestAnimationFrame(frame);
+
+/* ---------- HUD ---------- */
+function renderHud() {
+  const h = $('hud'); h.innerHTML = '';
+  for (let i = 0; i < HUD_MAX; i++) {
+    const it = S.hud[i], d = document.createElement('div');
+    d.className = 'slot' + (it ? ' has' : '') + (it && it.uid === S.sel ? ' sel' : '') + (it && !it.checked ? ' new' : '');
+    if (it) { d.textContent = DEF[it.kind].icon; d.style.setProperty('--c', DEF[it.kind].col); }
+    d.addEventListener('click', () => onHudTap(i));
+    h.appendChild(d);
+  }
+}
+function onHudTap(i) {
+  const it = S.hud[i];
+  if (!it || locked() && S.mode !== 'home') return;
+  if (S.modal || msgOn) return;
+  if (S.mode === 'home' && it.checked) {
+    S.sel = S.sel === it.uid ? null : it.uid; sfx.tap(); renderHud(); renderHome();
+  } else toast(DEF[it.kind].name);
+}
+function removeHud(it) { S.hud = S.hud.filter(x => x !== it); if (S.sel === it.uid) S.sel = null; }
+
+/* ---------- 家に入る ---------- */
+function enterHouse(h) {
+  sfx.door();
+  if (h.own) enterHome(); else enterRoom(h);
+}
+
+/* ----- 住人の家：机の上に3つのアイテム ----- */
+function enterRoom(h) {
+  S.curHouse = h; setMode('room');
+  $('roomTitle').textContent = `${h.name}の いえ`;
+  renderRoom();
+}
+function renderRoom() {
+  const h = S.curHouse, desk = $('roomDesk'); desk.innerHTML = '';
+  const list = h.items.filter(it => it.state === 'house');
+  if (!list.length) { desk.innerHTML = '<div class="rempty">からっぽだよ</div>'; return; }
+  list.forEach(it => {
+    const d = DEF[it.kind], el = document.createElement('div');
+    el.className = 'ritem';
+    el.innerHTML = `<div class="plate" style="--c:${d.col}">${d.icon}</div><span>${d.name}</span>`;
+    el.addEventListener('click', () => { if (!locked() || S.mode === 'room' && !S.modal && !msgOn) openModal(it); });
+    desk.appendChild(el);
+  });
+}
+$('roomExit').addEventListener('click', () => { if (S.modal || msgOn) return; sfx.door(); exitTo(S.curHouse); });
+
+/* ----- アイテム確認モーダル（半透明の黒背景＋ゆっくり回転） ----- */
+let curInst = null;
+function openModal(it) {
+  curInst = it;
+  const d = DEF[it.kind];
+  document.querySelectorAll('#spin .l').forEach(l => l.style.setProperty('--c', d.col));
+  document.querySelector('#spin .l1').textContent = d.icon;
+  document.querySelector('#spin .l3').textContent = d.icon;
+  $('mname').textContent = d.name;
+  S.modal = true; $('modal').classList.remove('hidden'); sfx.pop();
+}
+function closeModal() { S.modal = false; $('modal').classList.add('hidden'); }
+$('no').addEventListener('click', () => { sfx.tap(); closeModal(); });
+$('yes').addEventListener('click', () => {
+  const it = curInst; closeModal();
+  if (!it) return;
+  if (S.hud.length >= HUD_MAX) { sfx.ng(); msg([{text:'もちものが いっぱいだよ。いえに もっていって つくえに ならべてね。'}]); return; }
+  it.state = 'hud'; it.checked = false; S.hud.push(it);
+  sfx.get(); renderHud(); renderRoom();
+});
+
+/* ----- 自分の家：おかあさん・机・判定・袋詰め ----- */
+function enterHome() {
+  setMode('home'); renderHome();
+  if (!S.started) {
+    S.started = true;
+    msg([
+      {who:'おかあさん', text:'おかえりなさい。ぼうさいグッズを あつめてきてちょうだい。'},
+      {who:'おかあさん', text:'むらの ねこさんたちが もっているわ。いえを でて、はなしかけてみてね。'},
+    ]);
+  } else judge();
+}
+function judge() {
+  const lines = [];
+  S.hud.filter(it => !it.checked).forEach(it => {
+    const d = DEF[it.kind];
+    if (d.ok) {
+      lines.push({who:'おかあさん', text:`${d.name}をもってきたのね。つくえにならべてちょうだい。`, fx:() => { it.checked = true; sfx.ok(); renderHud(); renderHome(); }});
+    } else {
+      lines.push({who:'おかあさん', text:`${d.name}は ぼうさいグッズではないのよ。かえしておくわ。`, fx:() => {
+        removeHud(it); it.state = 'house'; it.checked = false; sfx.ng(); renderHud(); renderHome();
+      }});
+    }
+  });
+  if (lines.length) msg(lines);
+}
+function renderHome() {
+  const desk = $('homeDesk'); desk.innerHTML = '';
+  S.desk.forEach((it, i) => {
+    const el = document.createElement('div');
+    const ready = !it && S.sel !== null && S.phase === 'collect';
+    el.className = 'hslot' + (it ? ' full' : '') + (ready ? ' ready' : '') + (S.phase === 'pack' && S.deskSel === i ? ' sel' : '');
+    if (it) { const d = DEF[it.kind]; el.innerHTML = `<div class="plate" style="--c:${d.col}">${d.icon}</div>`; }
+    el.addEventListener('click', () => onSlot(i));
+    desk.appendChild(el);
+  });
+  const pack = S.phase === 'pack';
+  $('packbox').classList.toggle('hidden', !pack);
+  $('home').classList.toggle('packing', pack);
+  $('homeExit').classList.toggle('hidden', pack);
+  $('bagcnt').textContent = `${S.bag}/6`;
+  $('packBtn').disabled = S.deskSel === null || !S.desk[S.deskSel];
+}
+function onSlot(i) {
+  if (S.modal || msgOn || S.ending) return;
+  if (S.phase === 'pack') {
+    if (S.desk[i]) { S.deskSel = S.deskSel === i ? null : i; sfx.tap(); renderHome(); }
+    return;
+  }
+  if (S.desk[i]) return;
+  const it = S.hud.find(x => x.uid === S.sel);
+  if (!it) { toast('したの アイテムを タップしてから、ここを タップしてね'); return; }
+  removeHud(it); it.state = 'desk'; S.desk[i] = it; S.sel = null;
+  sfx.place(); renderHud(); renderHome();
+  if (S.desk.every(Boolean)) {
+    msg([{who:'おかあさん', text:'ひじょうもちだしぶくろにつめよう！', fx:() => sfx.fanfare()}], () => { S.phase = 'pack'; S.deskSel = null; renderHome(); });
+  }
+}
+$('packBtn').addEventListener('click', () => {
+  if (S.modal || msgOn || S.ending) return;
+  const i = S.deskSel; if (i === null || !S.desk[i]) return;
+  S.desk[i].state = 'bag'; S.desk[i] = null; S.deskSel = null; S.bag++;
+  sfx.pack(); renderHome();
+  const bag = $('bag'); bag.classList.remove('pop'); void bag.offsetWidth; bag.classList.add('pop');
+  if (S.bag === 6) setTimeout(showEnding, 800);
+});
+$('homeExit').addEventListener('click', () => { if (S.modal || msgOn || S.ending) return; sfx.door(); exitTo(HOME); });
+$('mom').addEventListener('click', () => {
+  if (S.modal || msgOn || S.ending) return;
+  sfx.pop();
+  let t;
+  if (S.phase === 'pack') t = 'つくえの ぼうさいグッズを、ひとつずつ ふくろに いれてね。';
+  else if (S.hud.some(x => x.checked)) t = 'したの アイテムを えらんで、つくえに ならべてね。';
+  else if (S.desk.some(Boolean)) t = 'まだ たりないわ。むらの ねこさんの いえを さがしてね。';
+  else t = 'ぼうさいグッズを あつめてきてね。ねこさんが もっているわ。';
+  msg([{who:'おかあさん', text:t}]);
+});
+
+/* ----- エンディング ----- */
+function showEnding() {
+  S.ending = true;
+  const e = $('ending');
+  e.querySelectorAll('.cf').forEach(x => x.remove());
+  const cols = ['#ff6f61', '#ffd23f', '#58b368', '#4a90d9', '#d9638f'];
+  for (let i = 0; i < 36; i++) {
+    const c = document.createElement('i'); c.className = 'cf';
+    c.style.left = Math.random() * 100 + '%'; c.style.background = cols[i % cols.length];
+    c.style.animationDuration = (3 + Math.random() * 3) + 's'; c.style.animationDelay = (-Math.random() * 5) + 's';
+    e.appendChild(c);
+  }
+  e.classList.remove('hidden'); sfx.ending();
+}
+$('again').addEventListener('click', () => location.reload());
+
+/* ---------- 起動：スタートは自分の家 ---------- */
+setMode('home');
+renderHud();
+renderHome();
+msg([
+  {who:'おかあさん', text:'おかえりなさい。ぼうさいグッズを あつめてきてちょうだい。'},
+  {who:'おかあさん', text:'むらの ねこさんたちが もっているわ。いえを でて、はなしかけてみてね。'},
+]);
+S.started = true;
+</script>
+</body>
+</html>
