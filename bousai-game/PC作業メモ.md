@@ -19,7 +19,7 @@ git pull origin bousai-game-round1
 
 ### 3. パソコンの Claude Code に、次の文をそのまま貼り付ける
 ```
-bousai-game/assets/image-prompts.md を読んで、ai-media-generator スキルで、ChatGPT（chatgpt.com）に品物の絵を13枚つくってもらってください。
+bousai-game/assets/image-prompts.md を読んで、ai-media-generator スキルで、ChatGPT（chatgpt.com）に品物の絵を14枚つくってもらってください。
 ・共通の条件と前置きを、各品物の指示文の前に付けること。
 ・できた画像は、bousai-game/assets/items/ に、表のファイル名（water.png など）で保存すること。
 ・1枚ずつ、線の太さ・色あいがそろっているか確認し、ずれていたら、その1枚だけ作り直すこと。
@@ -30,13 +30,13 @@ bousai-game/assets/image-prompts.md を読んで、ai-media-generator スキル�
 
 ### 4. 確認する
 - `bousai-game/index.html` をダブルクリックで開き、「はじめる」→ おみせ に入ります。
-- 13個の絵が出ていれば成功です。**画像が無い品物だけ、今までの簡単な絵のまま**表示されます（ゲームは止まりません）。
+- 14個の絵が出ていれば成功です。**画像が無い品物だけ、今までの簡単な絵のまま**表示されます（ゲームは止まりません）。
 
 ## うまくいかないとき（手作業の方法）
 1. ChatGPT を開く。
 2. `assets/image-prompts.md` の「共通の前置き」＋「品物ごとの指示文」を貼り付けて、画像を作る。
 3. 画像を保存し、ファイル名を表どおりに直して（例：`toilet.png`）、`assets/items/` に入れる。
-4. 13個そろうまで繰り返す。
+4. 14個そろうまで繰り返す。
 
 ## 注意
 - 画像に文字やブランド名が入ったら、その品物だけ描き直してください。
