@@ -51,6 +51,26 @@ input[type=file]{display:none}
 .bar i{display:block;height:10px;border-radius:5px;background:#e7e2d6;position:relative;overflow:hidden}
 .bar i u{position:absolute;left:0;top:0;bottom:0;width:0;border-radius:5px;background:var(--accent)}
 .bar.f i u{background:#d99a5b}.bar.d i u{background:#7aa7c7}
+/* ---- 全画面（没入）モード ---- */
+#hud{display:none}
+body.immersive{background:#0b0f0e}
+body.immersive #app{display:block}
+body.immersive #panel{display:none}
+body.immersive #stageWrap{position:fixed;inset:0}
+body.immersive .chip{background:rgba(10,16,15,.55);border-color:rgba(255,255,255,.16);color:#eef6f3}
+body.immersive .chip span{color:rgba(230,240,236,.7)}
+body.immersive .chip b{font-size:30px}
+body.immersive #age-label{background:rgba(10,16,15,.55);border-color:rgba(255,255,255,.16);color:#eef6f3;top:calc(12px + env(safe-area-inset-top));right:calc(14px + env(safe-area-inset-right))}
+body.immersive #readout{top:calc(12px + env(safe-area-inset-top));left:calc(14px + env(safe-area-inset-left))}
+body.immersive #hud{display:flex;position:fixed;left:0;right:0;bottom:0;z-index:5;flex-wrap:wrap;gap:10px 14px;align-items:center;justify-content:center;
+  padding:14px 16px calc(14px + env(safe-area-inset-bottom));background:linear-gradient(to top,rgba(5,8,8,.82),rgba(5,8,8,0));
+  transition:opacity .35s;color:#eef6f3}
+body.immersive #hud.hide{opacity:0;pointer-events:none}
+#hud button{background:rgba(255,255,255,.14);border-color:rgba(255,255,255,.28);color:#fff;backdrop-filter:blur(6px);-webkit-backdrop-filter:blur(6px)}
+#hud button.primary{background:var(--accent);border-color:var(--accent-d)}
+#hud button.primary.on{background:#e08a5a;border-color:#b86a3d}
+#hud .hs{display:flex;align-items:center;gap:8px;font-size:14px}
+#hud .hs input{width:min(260px,34vw)}
 </style>
 </head>
 <body>
@@ -65,6 +85,19 @@ input[type=file]{display:none}
     <div id="age-label">新品</div>
     <div id="hint" hidden>モーターの力がたりなくて、回りだせません。「風の強さ」を上げてみよう。</div>
   </div>
+  <div id="hud" class="hide">
+    <button id="hPower" class="primary">スイッチ ON</button>
+    <label class="hs">風の強さ <input id="hLevel" type="range" min="10" max="100" value="65"></label>
+    <span class="row" style="margin:0">
+      <button class="small" data-hage="0">新品</button>
+      <button class="small" data-hage="5">5年</button>
+      <button class="small" data-hage="10">10年</button>
+      <button class="small" data-hage="20">20年</button>
+      <button class="small" id="hClean">🧽</button>
+      <button class="small" id="hMute">🔊</button>
+      <button class="small" id="hExit">✕ もどる</button>
+    </span>
+  </div>
 
   <div id="panel">
     <h1>マイ換気扇</h1>
@@ -72,6 +105,7 @@ input[type=file]{display:none}
     <div class="row">
       <button id="power" class="primary">スイッチ ON</button>
       <button id="mute" class="small">🔊 音あり</button>
+      <button id="fs" class="small">⛶ 全画面で見る</button>
     </div>
     <div class="slider wide"><span>風の強さ</span><input id="powerLevel" type="range" min="10" max="100" value="65"><output id="powerLevelOut">65</output></div>
 
@@ -400,17 +434,19 @@ if (window.ResizeObserver) new ResizeObserver(resize).observe(stage);
 
 const prog = { cv: mk(4, 4), side: 0 };
 const particles = [];
+let imm = false;                                       // 全画面（没入）モード
 function spawnParticles(dt, R) {
   const q = airflow() / QMAX;
-  const rate = 90 * q;
+  const rate = (imm ? 260 : 90) * q;
   let n = rate * dt + Math.random();
-  while (n >= 1 && particles.length < 320) {
+  while (n >= 1 && particles.length < (imm ? 800 : 320)) {
     n -= 1;
     particles.push({ a: Math.random() * TAU, r: R * (0.15 + Math.random() * 0.75), v: 0.5 + Math.random() * 0.7,
       life: 0, max: 1.4 + Math.random() * 1.2, s: 1 + Math.random() * 2.2, sw: (Math.random() - .5) * 0.6 });
   }
 }
 function drawBackground() {
+  if (imm) { ctx.fillStyle = '#0b0f0e'; ctx.fillRect(0, 0, W, H); return; }
   const g = ctx.createLinearGradient(0, 0, 0, H);
   g.addColorStop(0, '#f6f1e6'); g.addColorStop(1, '#e6efe6');
   ctx.fillStyle = g; ctx.fillRect(0, 0, W, H);
@@ -476,7 +512,8 @@ function drawParticles(dt, R, cx, cy) {
     const f = p.life / p.max, al = Math.sin(f * Math.PI) * 0.55;
     const px = cx + Math.cos(p.a) * p.r, py = cy + Math.sin(p.a) * p.r;
     const tail = Math.max(0, p.r - R * 0.12 * (0.4 + q));
-    ctx.strokeStyle = `rgba(120,185,175,${al * 0.9})`; ctx.lineWidth = p.s + 0.8;
+    ctx.strokeStyle = imm ? `rgba(225,248,242,${al * 0.75})` : `rgba(120,185,175,${al * 0.9})`;
+    ctx.lineWidth = (p.s + 0.8) * (imm ? 1.6 : 1);
     ctx.beginPath(); ctx.moveTo(cx + Math.cos(p.a) * tail, cy + Math.sin(p.a) * tail); ctx.lineTo(px, py); ctx.stroke();
   }
   ctx.restore();
@@ -484,14 +521,25 @@ function drawParticles(dt, R, cx, cy) {
 function render(dt, theta0) {
   ctx.setTransform(DPR, 0, 0, DPR, 0, 0);
   drawBackground();
-  const R = Math.min(W, H) * 0.42, cx = W / 2, cy = H / 2;
+  const R = Math.min(W, H) * (imm ? 0.6 : 0.42);        // 全画面では画面いっぱいに大きく (ふちは画面の外へはみ出す)
+  let cx = W / 2, cy = H / 2;
+  if (imm) {                                            // 速く回るほど、ブルブルふるえる (ガタつきや汚れが多いほど強い)
+    const amp = x * (0.6 + 2.4 * clamp(P.wobble + 0.5 * P.dust, 0, 1)) * (R / 300);
+    cx += (Math.random() - .5) * 2 * amp; cy += (Math.random() - .5) * 2 * amp;
+  }
   const hr = R * layers.cover.scale * 0.96;             // かべの穴 (プロペラの後ろの暗がり)
   const g = ctx.createRadialGradient(cx - hr * .15, cy - hr * .2, hr * .1, cx, cy, hr);
-  g.addColorStop(0, '#f5f8f8'); g.addColorStop(.75, '#dbe4e6'); g.addColorStop(1, '#b9c6ca');
+  if (imm) { g.addColorStop(0, '#d9e6e8'); g.addColorStop(.7, '#8ea0a6'); g.addColorStop(1, '#4b5a60'); }
+  else { g.addColorStop(0, '#f5f8f8'); g.addColorStop(.75, '#dbe4e6'); g.addColorStop(1, '#b9c6ca'); }
   ctx.fillStyle = g; ctx.beginPath(); ctx.arc(cx, cy, hr, 0, TAU); ctx.fill();
   drawPropLayer(theta0, theta, R, cx, cy);
   drawCover(R, cx, cy);
   spawnParticles(dt, R); drawParticles(dt, R, cx, cy);
+  if (imm) {                                            // まわりを暗くして、真ん中の換気扇を目立たせる
+    const v = ctx.createRadialGradient(W / 2, H / 2, Math.min(W, H) * 0.3, W / 2, H / 2, Math.hypot(W, H) * 0.55);
+    v.addColorStop(0, 'rgba(0,0,0,0)'); v.addColorStop(1, 'rgba(0,0,0,.6)');
+    ctx.fillStyle = v; ctx.fillRect(0, 0, W, H);
+  }
 }
 
 /* ---------- 音 ---------- */
@@ -517,7 +565,7 @@ function initAudio() {
 function updateAudio() {
   if (!au) return;
   const t = au.ctx.currentTime, tc = 0.08;
-  au.master.gain.setTargetAtTime(soundOn ? 0.7 : 0, t, 0.05);
+  au.master.gain.setTargetAtTime(soundOn ? (imm ? 1.0 : 0.7) : 0, t, 0.05);
   au.bp.frequency.setTargetAtTime(250 + 1500 * x, t, tc);
   au.wg.gain.setTargetAtTime(0.22 * Math.pow(x, 1.4) * (1 + 0.9 * P.noise), t, tc);
   au.rat.frequency.setTargetAtTime(Math.max(2, x * OMEGA0 / TAU * 1.0), t, tc);
@@ -526,16 +574,60 @@ function updateAudio() {
   au.sg.gain.setTargetAtTime(0.018 * P.noise * P.bearing * Math.min(1, x * 3), t, tc);
 }
 $('mute').addEventListener('click', () => {
-  soundOn = !soundOn; $('mute').textContent = soundOn ? '🔊 音あり' : '🔇 音なし'; initAudio();
+  soundOn = !soundOn; $('mute').textContent = soundOn ? '🔊 音あり' : '🔇 音なし'; $('hMute').textContent = soundOn ? '🔊' : '🔇'; initAudio();
 });
 
 /* ---------- 操作 ---------- */
 function setPower(v) {
   on = v; initAudio();
-  const b = $('power'); b.textContent = on ? 'スイッチ OFF' : 'スイッチ ON'; b.classList.toggle('on', on);
+  for (const id of ['power', 'hPower']) {
+    const b = $(id); b.textContent = on ? 'スイッチ OFF' : 'スイッチ ON'; b.classList.toggle('on', on);
+  }
 }
 $('power').addEventListener('click', () => setPower(!on));
-$('powerLevel').addEventListener('input', e => { power = +e.target.value / 100; $('powerLevelOut').textContent = e.target.value; });
+$('powerLevel').addEventListener('input', e => {
+  power = +e.target.value / 100; $('powerLevelOut').textContent = e.target.value; $('hLevel').value = e.target.value;
+});
+
+/* ---------- 全画面（没入）モード ---------- */
+let wakeLock = null, hudTimer = 0;
+function showHud() {
+  const h = $('hud'); h.classList.remove('hide');
+  clearTimeout(hudTimer); hudTimer = setTimeout(() => h.classList.add('hide'), 3500);
+}
+function enterImmersive() {
+  if (imm) return;
+  imm = true; document.body.classList.add('immersive'); showHud(); initAudio();
+  const el = document.documentElement, req = el.requestFullscreen || el.webkitRequestFullscreen;
+  if (req) { try { const r = req.call(el); if (r && r.catch) r.catch(() => {}); } catch (e) {} }  // 使えない端末でも、画面いっぱい表示にはなる
+  try { if (navigator.wakeLock) navigator.wakeLock.request('screen').then(l => { wakeLock = l; }).catch(() => {}); } catch (e) {}
+  resize();
+}
+function exitImmersive() {
+  if (!imm) return;
+  imm = false; document.body.classList.remove('immersive'); clearTimeout(hudTimer); $('hud').classList.add('hide');
+  const fe = document.fullscreenElement || document.webkitFullscreenElement;
+  if (fe) { try { const r = (document.exitFullscreen || document.webkitExitFullscreen).call(document); if (r && r.catch) r.catch(() => {}); } catch (e) {} }
+  if (wakeLock) { try { wakeLock.release(); } catch (e) {} wakeLock = null; }
+  resize();
+}
+$('fs').addEventListener('click', enterImmersive);
+$('hExit').addEventListener('click', exitImmersive);
+function onFsChange() { if (imm && !(document.fullscreenElement || document.webkitFullscreenElement) && fsWasOn) exitImmersive(); fsWasOn = !!(document.fullscreenElement || document.webkitFullscreenElement); }
+let fsWasOn = false;
+document.addEventListener('fullscreenchange', onFsChange);
+document.addEventListener('webkitfullscreenchange', onFsChange);
+document.addEventListener('keydown', e => { if (e.key === 'Escape') exitImmersive(); });
+document.addEventListener('visibilitychange', () => {   // 画面が戻ったとき、画面を消さない設定をかけなおす
+  if (imm && document.visibilityState === 'visible' && navigator.wakeLock) navigator.wakeLock.request('screen').then(l => { wakeLock = l; }).catch(() => {});
+});
+$('stageWrap').addEventListener('pointerdown', () => { if (imm) showHud(); });
+$('hud').addEventListener('pointerdown', () => { if (imm) showHud(); });
+$('hPower').addEventListener('click', () => setPower(!on));
+$('hLevel').addEventListener('input', e => { const pl = $('powerLevel'); pl.value = e.target.value; pl.dispatchEvent(new Event('input')); });
+document.querySelectorAll('[data-hage]').forEach(b => b.addEventListener('click', () => setAge(+b.dataset.hage)));
+$('hClean').addEventListener('click', () => $('clean').click());
+$('hMute').addEventListener('click', () => $('mute').click());
 
 /* ---------- メインループ ---------- */
 let last = performance.now(), tick = 0;
