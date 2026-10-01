@@ -1,0 +1,573 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no,viewport-fit=cover">
+<title>そなえろ！ぼうさいの森</title>
+<style>
+:root{--t:48px}
+*{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
+html,body{margin:0;height:100%;overflow:hidden;background:#2f6b3a;font-family:"Hiragino Maru Gothic ProN","Yu Gothic","Meiryo",sans-serif;font-size:4vmin;color:#4a2f14;touch-action:none;-webkit-user-select:none;user-select:none;overscroll-behavior:none}
+button{font-family:inherit;cursor:pointer}
+
+/* ===== マップ ===== */
+#stage{position:fixed;inset:0;z-index:1;overflow:hidden;background:#2f6b3a;touch-action:none}
+#world{position:absolute;left:0;top:0;background-color:#8fd18a;background-image:repeating-conic-gradient(#86c982 0% 25%,#8fd18a 0% 50%);background-size:calc(var(--t)*2) calc(var(--t)*2);will-change:transform}
+#world>*{position:absolute}
+.tree{width:var(--t);height:var(--t)}
+.tree::before{content:"";position:absolute;left:36%;top:42%;width:28%;height:58%;background:#7a4d26;border-radius:20%}
+.tree::after{content:"";position:absolute;left:-12%;top:-38%;width:124%;height:100%;background:radial-gradient(circle at 35% 30%,#4fae4a,#2d7d32);border-radius:50%;box-shadow:0 calc(var(--t)*.06) 0 #1f5a24}
+.rock{width:var(--t);height:var(--t)}
+.rock::after{content:"";position:absolute;left:12%;top:30%;width:76%;height:60%;background:radial-gradient(circle at 35% 30%,#b8bcc4,#7d828c);border-radius:45% 55% 40% 40%}
+.water{background:#4aa8e8;background-image:repeating-linear-gradient(0deg,#ffffff22 0 calc(var(--t)*.1),#0000 calc(var(--t)*.1) calc(var(--t)*.5));border:calc(var(--t)*.08) solid #3b8cc8;border-radius:calc(var(--t)*.15)}
+.pond{border-radius:45%}
+.bridge{background:repeating-linear-gradient(0deg,#b07a3c 0 calc(var(--t)*.32),#8f5f2a calc(var(--t)*.32) calc(var(--t)*.38));border-left:calc(var(--t)*.1) solid #5e3b18;border-right:calc(var(--t)*.1) solid #5e3b18}
+.flower{width:calc(var(--t)*.16);height:calc(var(--t)*.16);border-radius:50%;box-shadow:calc(var(--t)*.2) calc(var(--t)*.1) 0 #fff;pointer-events:none}
+.house{width:calc(var(--t)*4);height:calc(var(--t)*4)}
+.house .roof{position:absolute;left:calc(var(--t)*-.3);top:0;width:0;height:0;border-left:calc(var(--t)*2.3) solid transparent;border-right:calc(var(--t)*2.3) solid transparent;border-bottom:calc(var(--t)*1.6) solid var(--roof)}
+.house .wall{position:absolute;left:0;top:calc(var(--t)*1.5);width:100%;height:calc(var(--t)*2.5);background:var(--wall);border:calc(var(--t)*.07) solid #0002;border-radius:0 0 calc(var(--t)*.15) calc(var(--t)*.15)}
+.house .door{position:absolute;left:calc(var(--t)*1.55);bottom:0;width:calc(var(--t)*.9);height:calc(var(--t)*1.5);background:#8a5a2b;border-radius:calc(var(--t)*.45) calc(var(--t)*.45) 0 0;border:calc(var(--t)*.06) solid #5e3b18}
+.house .door::after{content:"";position:absolute;right:15%;top:55%;width:14%;height:12%;background:#ffd24a;border-radius:50%}
+.house .win{position:absolute;top:calc(var(--t)*2.1);width:calc(var(--t)*.8);height:calc(var(--t)*.8);background:#bfe6ff;border:calc(var(--t)*.07) solid #8a5a2b}
+.house .win.a{left:calc(var(--t)*.3)}.house .win.b{right:calc(var(--t)*.3)}
+.house .tag{position:absolute;left:calc(var(--t)*.9);top:calc(var(--t)*.75);width:calc(var(--t)*2.2);text-align:center;font-weight:bold;font-size:calc(var(--t)*.42);color:#fff;text-shadow:0 0 calc(var(--t)*.08) #0008;line-height:1}
+.house.own .tag{white-space:nowrap;font-size:calc(var(--t)*.36);background:#fff;color:#d6334f;border-radius:calc(var(--t)*.3);padding:calc(var(--t)*.06) 0;text-shadow:none;left:calc(var(--t)*.7);top:calc(var(--t)*2.15);width:calc(var(--t)*2.6)}
+.char{position:absolute;width:calc(var(--t)*.9);height:calc(var(--t)*1.15);margin-left:calc(var(--t)*-.45);margin-top:calc(var(--t)*-.95);pointer-events:none}
+.char .in{position:absolute;inset:0}
+.char .shadow{position:absolute;left:5%;bottom:-6%;width:90%;height:18%;background:#0003;border-radius:50%}
+.char .body{position:absolute;left:18%;bottom:6%;width:64%;height:48%;border-radius:45% 45% 25% 25%;background:var(--cloth,#e88)}
+.char .head{position:absolute;left:6%;top:6%;width:88%;height:60%;border-radius:50%;background:var(--skin,#fdb)}
+.char .head::before,.char .head::after{content:"";position:absolute;top:46%;width:11%;height:15%;background:#333;border-radius:50%}
+.char .head::before{left:27%}.char .head::after{right:27%}
+.char .ear{position:absolute;top:-3%;width:0;height:0;border-left:calc(var(--t)*.15) solid transparent;border-right:calc(var(--t)*.15) solid transparent;border-bottom:calc(var(--t)*.3) solid var(--skin,#fdb)}
+.char .ear.l{left:8%;transform:rotate(-12deg)}.char .ear.r{right:8%;transform:rotate(12deg)}
+.char .cap{position:absolute;left:4%;top:0;width:92%;height:30%;background:#e53935;border-radius:50% 50% 10% 10%/90% 90% 10% 10%}
+.char .bun{position:absolute;left:34%;top:-12%;width:32%;height:26%;background:#6b3f1d;border-radius:50%}
+.char .hair{position:absolute;left:6%;top:4%;width:88%;height:28%;background:#6b3f1d;border-radius:50% 50% 20% 20%}
+.char.walk .in{animation:bob .28s infinite}
+@keyframes bob{50%{transform:translateY(-8%)}}
+.char.idle .in{animation:idle 2.4s ease-in-out infinite}
+@keyframes idle{50%{transform:translateY(-4%)}}
+.mark{position:absolute;left:50%;top:-34%;width:calc(var(--t)*.45);height:calc(var(--t)*.45);margin-left:calc(var(--t)*-.225);background:#ffd24a;border:calc(var(--t)*.05) solid #fff;border-radius:50%;color:#a33;font-weight:bold;font-size:calc(var(--t)*.34);line-height:calc(var(--t)*.36);text-align:center;animation:hop .7s infinite}
+@keyframes hop{50%{transform:translateY(-25%)}}
+#ring{position:fixed;z-index:5;width:12vmin;height:12vmin;margin:-6vmin 0 0 -6vmin;border:1vmin solid #fff9;border-radius:50%;background:#fff3;pointer-events:none;display:none}
+#ring.on{display:block}
+
+/* ===== 家の中 ===== */
+#interior{position:fixed;inset:0;z-index:20;display:none;background:#e9cf9f}
+#interior.on{display:block}
+.wall{position:absolute;left:0;right:0;top:0;height:30%;background:linear-gradient(#f8e8c8,#ecd0a2);border-bottom:1.2vmin solid #b88a55}
+.floor{position:absolute;left:0;right:0;top:30%;bottom:0;background:repeating-linear-gradient(90deg,#d9a86a 0 12vmin,#cf9c5d 12vmin 12.6vmin)}
+.winp{position:absolute;right:6vmin;top:5%;width:20vmin;height:14vmin;background:#bfe6ff;border:1.2vmin solid #8a5a2b;box-shadow:inset 0 0 0 .6vmin #fff8}
+.sign{position:absolute;top:2vmin;left:50%;transform:translateX(-50%);background:#fff;border:.8vmin solid #8a5a2b;border-radius:3vmin;padding:1vmin 4vmin;font-weight:bold;font-size:5vmin;white-space:nowrap;box-shadow:0 .8vmin 0 #0003}
+.mother{position:absolute;left:13vmin;top:calc(10% + 20vmin);--t:20vmin;pointer-events:none}
+.mother .char{position:relative;margin:0}
+.desk{position:absolute;left:50%;top:34%;transform:translateX(-50%);background:#8a5a2b;border-radius:3vmin;padding:2vmin;box-shadow:0 2vmin 0 #5e3b18,inset 0 0 0 .8vmin #a8723a;display:grid;grid-template-columns:repeat(3,18vmin);gap:2vmin}
+.desk.house{display:flex;justify-content:center;min-width:76vmin;grid-template-columns:none;gap:2vmin;padding:2.5vmin}
+.slot,.hslot{width:18vmin;height:18vmin;background:#fff3d6;border:.7vmin dashed #c89b5a;border-radius:2.5vmin;display:flex;align-items:center;justify-content:center;position:relative}
+.hslot{width:22vmin;height:24vmin;border-style:solid;background:#fff8e6;border-color:#d8b070}
+.slot.full{border-style:solid;background:#fff8e6}
+.slot.ready{animation:pulse .8s infinite;border-color:#ff9f1c;background:#fff0c2}
+.slot.sel{outline:1.2vmin solid #ff5a5f;outline-offset:.3vmin}
+.slot .plus{font-size:8vmin;color:#c89b5a;font-weight:bold}
+@keyframes pulse{50%{transform:scale(1.07)}}
+.it{display:flex;flex-direction:column;align-items:center;justify-content:center;pointer-events:none;line-height:1.1}
+.it .e{font-size:9vmin}
+.it .n{font-size:2.3vmin;font-weight:bold;white-space:nowrap}
+.hslot .it .e{font-size:11vmin}.hslot .it .n{font-size:3vmin}
+.empty{align-self:center;font-weight:bold;color:#fff;font-size:5vmin;padding:3vmin}
+.bigbtn{border:.8vmin solid #5e3b18;border-radius:4vmin;background:#ffd24a;color:#4a2f14;font-weight:bold;font-size:5vmin;padding:0 4vmin;height:13vmin;min-width:30vmin;box-shadow:0 1vmin 0 #5e3b18}
+.bigbtn:active{transform:translateY(.8vmin);box-shadow:0 .2vmin 0 #5e3b18}
+.bigbtn:disabled{background:#ddd;color:#999;border-color:#999;box-shadow:0 1vmin 0 #999}
+.bigbtn.exit{position:absolute;left:3vmin;top:3vmin;z-index:3;background:#ffe9b0}
+.bigbtn.packbtn{position:absolute;left:50%;transform:translateX(-50%);bottom:24vmin;width:64vmin;background:#7ed957;font-size:5.6vmin}
+.bigbtn.packbtn:active{transform:translate(-50%,.8vmin)}
+.bag{position:absolute;right:4vmin;top:calc(10% + 4vmin);width:22vmin;height:26vmin}
+.bag .bagtop{position:absolute;left:25%;top:0;width:50%;height:22%;border:1.2vmin solid #e8761c;border-bottom:0;border-radius:3vmin 3vmin 0 0}
+.bag .bagbody{position:absolute;left:0;right:0;bottom:0;height:80%;background:#ff9f1c;border:.8vmin solid #c4710a;border-radius:3vmin 3vmin 5vmin 5vmin;display:flex;align-items:center;justify-content:center;font-size:5vmin;font-weight:bold;color:#fff;text-shadow:0 .3vmin 0 #a35a00}
+.bag.bounce{animation:pulse .5s}
+@media (min-aspect-ratio:5/4){
+ .bigbtn.packbtn{left:auto;right:3vmin;transform:none;bottom:auto;top:56%;width:36vmin;font-size:4.6vmin;height:12vmin}
+ .bigbtn.packbtn:active{transform:translateY(.8vmin)}
+}
+
+/* ===== HUD ===== */
+#hud{position:fixed;left:50%;bottom:2vmin;transform:translateX(-50%);z-index:40;display:flex;gap:1.6vmin;padding:1.6vmin;background:#4a2f14d9;border-radius:4vmin;box-shadow:0 .8vmin 0 #0005}
+#hud .hs{width:15vmin;height:15vmin;background:#fff3d6;border:.6vmin solid #c89b5a;border-radius:2.5vmin;display:flex;align-items:center;justify-content:center}
+#hud .hs.full{background:#fff8e6;border-color:#ffd24a}
+#hud .hs.sel{outline:1.2vmin solid #ff5a5f;outline-offset:.2vmin;transform:translateY(-1.5vmin)}
+#hud .it .e{font-size:7.5vmin}#hud .it .n{font-size:2.2vmin}
+
+/* ===== 吹き出し・各種表示 ===== */
+#bubble{position:fixed;z-index:100;display:none;max-width:82vmin;background:#fff;border:.8vmin solid #5a3a1a;border-radius:4vmin;padding:3vmin 4vmin 4.5vmin;font-size:4.6vmin;line-height:1.5;font-weight:bold;color:#4a2f14;box-shadow:0 1vmin 0 #0004;pointer-events:none}
+#bubble.show{display:block}
+#bubble::after{content:"";position:absolute;left:calc(var(--tx,50%) - 1.7vmin);bottom:-2vmin;width:3.4vmin;height:3.4vmin;background:#fff;border-right:.8vmin solid #5a3a1a;border-bottom:.8vmin solid #5a3a1a;transform:rotate(45deg)}
+#bubble .nx{position:absolute;right:3vmin;bottom:.6vmin;font-size:2.6vmin;color:#c07a2a;animation:hop .8s infinite}
+#toast{position:fixed;z-index:70;left:50%;top:14vmin;transform:translateX(-50%);max-width:90vw;background:#4a2f14e6;color:#fff;font-weight:bold;font-size:4.6vmin;padding:2vmin 5vmin;border-radius:5vmin;opacity:0;transition:opacity .2s;pointer-events:none;text-align:center}
+#toast.on{opacity:1}
+#banner{position:fixed;z-index:60;left:50%;top:2vmin;transform:translateX(-50%);max-width:94vw;background:#ffd24a;border:.8vmin solid #c4710a;border-radius:4vmin;padding:2vmin 4vmin;font-size:5vmin;font-weight:bold;text-align:center;display:none;box-shadow:0 1vmin 0 #0004;line-height:1.3}
+#banner.on{display:block;animation:pulse 1.2s infinite}
+#fade{position:fixed;inset:0;z-index:90;background:#000;opacity:0;transition:opacity .15s;pointer-events:none}
+#fade.on{opacity:1}
+#modal{position:fixed;inset:0;z-index:80;background:#000a;display:none;align-items:center;justify-content:center;flex-direction:column;color:#fff}
+#modal.on{display:flex}
+#modal .s3d{perspective:90vmin;width:40vmin;height:40vmin;display:flex;align-items:center;justify-content:center}
+#modal .spin{width:34vmin;height:34vmin;position:relative;transform-style:preserve-3d;animation:spin 8s linear infinite}
+@keyframes spin{to{transform:rotateY(360deg)}}
+#modal .face{position:absolute;inset:0;border-radius:50%;background:radial-gradient(circle at 35% 30%,#fffbe8,#ffd98a);border:1.2vmin solid #fff;display:flex;align-items:center;justify-content:center;font-size:20vmin;backface-visibility:hidden;box-shadow:0 0 6vmin #fff6}
+#modal .face.f{transform:translateZ(1.5vmin)}
+#modal .face.b{transform:rotateY(180deg) translateZ(1.5vmin)}
+#modal .mname{font-size:7vmin;font-weight:bold;margin-top:2vmin;text-shadow:0 .6vmin 0 #000}
+#modal .mq{font-size:6vmin;font-weight:bold;margin:2vmin 0 3vmin;text-shadow:0 .6vmin 0 #000;text-align:center}
+#modal .mb{display:flex;gap:5vmin}
+#modal .mb button{width:34vmin;height:16vmin;font-size:7vmin;font-weight:bold;border-radius:5vmin;border:1vmin solid #fff}
+#yes{background:#4cc35a;color:#fff}#no{background:#ff7a7a;color:#fff}
+#ending{position:fixed;inset:0;z-index:95;display:none;background:radial-gradient(circle,#fff6c2,#ffb347);align-items:center;justify-content:center;flex-direction:column;text-align:center}
+#ending.on{display:flex}
+#ending .big{font-size:13vmin;font-weight:bold;color:#d6334f;text-shadow:0 1vmin 0 #fff;animation:pulse 1.4s infinite}
+#ending .sub{font-size:6vmin;font-weight:bold;margin:3vmin 0 6vmin}
+#ending .star{position:absolute;font-size:8vmin;animation:fall 3s linear infinite}
+@keyframes fall{from{transform:translateY(-20vmin) rotate(0)}to{transform:translateY(120vh) rotate(360deg)}}
+</style>
+</head>
+<body>
+
+<div id="stage">
+  <div id="world"></div>
+</div>
+<div id="ring"></div>
+<div id="interior"></div>
+<div id="hud"></div>
+<div id="banner"></div>
+<div id="toast"></div>
+<div id="bubble"><span class="txt"></span><span class="nx">▼</span></div>
+<div id="modal">
+  <div class="s3d"><div class="spin"><div class="face f"></div><div class="face b"></div></div></div>
+  <div class="mname"></div>
+  <div class="mq">もっていきますか？</div>
+  <div class="mb"><button id="yes">はい</button><button id="no">いいえ</button></div>
+</div>
+<div id="ending">
+  <div class="star" style="left:10%;animation-delay:0s">⭐</div>
+  <div class="star" style="left:30%;animation-delay:1s">🌟</div>
+  <div class="star" style="left:55%;animation-delay:.5s">⭐</div>
+  <div class="star" style="left:78%;animation-delay:1.6s">🌟</div>
+  <div class="big">ごあんぜんに</div>
+  <div class="sub">ぼうさいグッズを じゅんびできたね！</div>
+  <button class="bigbtn" id="again">もういちど あそぶ</button>
+</div>
+<div id="fade"></div>
+
+<script>
+'use strict';
+/* =====================================================
+   そなえろ！ぼうさいの森（ぼう森）
+   ===================================================== */
+const $=s=>document.querySelector(s);
+const clamp=(v,a,b)=>Math.max(a,Math.min(b,v));
+const vmin=n=>Math.min(innerWidth,innerHeight)*n/100;
+
+/* ---------- 画面サイズ（1マスのpx） ---------- */
+let T=48;
+function fit(){T=Math.round(Math.min(innerWidth,innerHeight)*0.12);document.documentElement.style.setProperty('--t',T+'px');}
+addEventListener('resize',fit);fit();
+
+/* ---------- 効果音（WebAudio） ---------- */
+let AC=null;
+function ac(){if(!AC){try{AC=new(window.AudioContext||window.webkitAudioContext)()}catch(e){}}if(AC&&AC.state==='suspended')AC.resume();return AC;}
+function tone(f,d=.15,type='sine',v=.08,delay=0){const a=ac();if(!a)return;const t=a.currentTime+delay;const o=a.createOscillator(),g=a.createGain();o.type=type;o.frequency.setValueAtTime(f,t);g.gain.setValueAtTime(v,t);g.gain.exponentialRampToValueAtTime(.0001,t+d);o.connect(g);g.connect(a.destination);o.start(t);o.stop(t+d+.02);}
+const sfx={
+  tap(){tone(880,.05,'square',.03)},
+  pop(){tone(660,.1,'triangle',.07)},
+  ok(){tone(523,.1,'triangle');tone(784,.16,'triangle',.08,.1)},
+  ng(){tone(260,.18,'sawtooth',.04);tone(200,.22,'sawtooth',.04,.15)},
+  fanfare(){[[523,0],[523,.14],[523,.28],[659,.42],[784,.6],[659,.8],[784,.95],[1047,1.15]].forEach(([f,d])=>{tone(f,.28,'square',.05,d);tone(f/2,.28,'triangle',.05,d)})}
+};
+document.addEventListener('pointerdown',()=>ac(),{once:true,capture:true});
+
+/* ---------- データ ---------- */
+const GOODS=[
+  {id:'helmet',name:'ヘルメット',s:'ヘルメット',e:'⛑️'},
+  {id:'whistle',name:'ふえ',s:'ふえ',e:'📣'},
+  {id:'water',name:'みず',s:'みず',e:'💧'},
+  {id:'food',name:'ひじょうしょく',s:'ひじょうしょく',e:'🥫'},
+  {id:'light',name:'かいちゅうでんとう',s:'でんとう',e:'🔦'},
+  {id:'toilet',name:'けいたいトイレ',s:'トイレ',e:'🚽'}
+];
+const DUMMY=[
+  {id:'ice',name:'アイスクリーム',s:'アイス',e:'🍦'},{id:'cake',name:'ケーキ',s:'ケーキ',e:'🍰'},
+  {id:'bear',name:'ぬいぐるみ',s:'ぬいぐるみ',e:'🧸'},{id:'book',name:'えほん',s:'えほん',e:'📚'},
+  {id:'donut',name:'ドーナツ',s:'ドーナツ',e:'🍩'},{id:'game',name:'ゲームき',s:'ゲーム',e:'🎮'},
+  {id:'candy',name:'あめ',s:'あめ',e:'🍭'},{id:'balloon',name:'ふうせん',s:'ふうせん',e:'🎈'},
+  {id:'sock',name:'くつした',s:'くつした',e:'🧦'},{id:'juice',name:'ジュース',s:'ジュース',e:'🧃'},
+  {id:'cookie',name:'クッキー',s:'クッキー',e:'🍪'},{id:'kite',name:'ぼうし',s:'ぼうし',e:'🎩'}
+];
+const RES=[
+  {name:'ミケ',skin:'#f4a64a',cloth:'#ef6f6c'},{name:'タマ',skin:'#b9bec7',cloth:'#5aa9e6'},
+  {name:'クロ',skin:'#55555f',cloth:'#7bc96f'},{name:'シロ',skin:'#fafafa',cloth:'#f6c445'},
+  {name:'トラ',skin:'#d9923a',cloth:'#a58bd9'},{name:'ブチ',skin:'#e8d9c0',cloth:'#ff9fb2'}
+];
+/* 家（hx,hy は左上のマス。幅4×高さ3マス。ドアは下辺中央） */
+const HOUSES=[
+  {own:true,hx:8,hy:12,roof:'#e0566a',wall:'#fff1d6'},
+  {hx:3,hy:3,roof:'#4a90d9',wall:'#fdf3dc'},
+  {hx:12,hy:4,roof:'#e8a33d',wall:'#f4ead2'},
+  {hx:4,hy:21,roof:'#6bbf59',wall:'#fdf3dc'},
+  {hx:13,hy:22,roof:'#9b6bd6',wall:'#f4ead2'},
+  {hx:26,hy:4,roof:'#e86b4a',wall:'#fdf3dc'},
+  {hx:31,hy:13,roof:'#3fb5a8',wall:'#f4ead2'}
+];
+
+/* ---------- マップ（グリッド管理） ---------- */
+const W=40,H=30;
+const F=0,TREE=1,WATER=2,HOUSE=3,ROCK=4,BRIDGE=5;
+const grid=Array.from({length:H},()=>Array(W).fill(F));
+const keep=Array.from({length:H},()=>Array(W).fill(false));
+function area(x0,y0,x1,y1,fn){for(let y=y0;y<=y1;y++)for(let x=x0;x<=x1;x++)if(x>=0&&y>=0&&x<W&&y<H)fn(x,y);}
+function mulberry(a){return()=>{a|=0;a=a+0x6D2B79F5|0;let t=Math.imul(a^a>>>15,1|a);t=t+Math.imul(t^t>>>7,61|t)^t;return((t^t>>>14)>>>0)/4294967296;};}
+const RIVER={x:19,w:2},BRIDGES=[6,21],POND={x:26,y:20,w:5,h:4};
+function buildGrid(seed){
+  const rnd=mulberry(seed);
+  for(let y=0;y<H;y++)for(let x=0;x<W;x++){grid[y][x]=F;keep[y][x]=false;}
+  HOUSES.forEach(h=>{area(h.hx,h.hy,h.hx+3,h.hy+2,(x,y)=>grid[y][x]=HOUSE);area(h.hx-1,h.hy-1,h.hx+5,h.hy+5,(x,y)=>keep[y][x]=true);});
+  area(RIVER.x,0,RIVER.x+RIVER.w-1,H-1,(x,y)=>grid[y][x]=WATER);
+  area(POND.x,POND.y,POND.x+POND.w-1,POND.y+POND.h-1,(x,y)=>grid[y][x]=WATER);
+  BRIDGES.forEach(by=>{area(RIVER.x,by,RIVER.x+RIVER.w-1,by+1,(x,y)=>grid[y][x]=BRIDGE);area(RIVER.x-3,by-2,RIVER.x+RIVER.w+2,by+3,(x,y)=>keep[y][x]=true);});
+  area(POND.x-1,POND.y-1,POND.x+POND.w,POND.y+POND.h,(x,y)=>keep[y][x]=true);
+  for(let y=0;y<H;y++)for(let x=0;x<W;x++){
+    if(x===0||y===0||x===W-1||y===H-1){grid[y][x]=TREE;continue;}
+    if(grid[y][x]!==F||keep[y][x])continue;
+    const r=rnd();
+    if(r<.14)grid[y][x]=TREE;else if(r<.17)grid[y][x]=ROCK;
+  }
+}
+function solid(tx,ty){if(tx<0||ty<0||tx>=W||ty>=H)return true;const g=grid[ty][tx];return g!==F&&g!==BRIDGE;}
+/* 出発地点から全ての家の入口前に歩いて行けるか確認 */
+function reachable(){
+  const st=[Math.floor(HOUSES[0].hx+2),HOUSES[0].hy+3],seen=new Set([st.join()]),q=[st];
+  while(q.length){const [x,y]=q.pop();[[1,0],[-1,0],[0,1],[0,-1]].forEach(([dx,dy])=>{const nx=x+dx,ny=y+dy,k=nx+','+ny;if(!solid(nx,ny)&&!seen.has(k)){seen.add(k);q.push([nx,ny]);}});}
+  return HOUSES.every(h=>seen.has((h.hx+1)+','+(h.hy+3))&&seen.has((h.hx+2)+','+(h.hy+3)))&&HOUSES.slice(1).every(h=>seen.has((h.hx+4)+','+(h.hy+3)));
+}
+let SEED=7;buildGrid(SEED);while(!reachable()&&SEED<400){SEED++;buildGrid(SEED);}
+
+/* ---------- ゲーム状態 ---------- */
+let scene='home';        // 'home'(自分の家) / 'house'(住人の家) / 'map'
+let phase='play';        // 'play' → 'pack'(袋詰め) → 'end'
+let busy=false;          // 画面切り替え中
+let modalOpen=false;
+let curHouse=null;
+let hud=[];              // 最大5つ
+let desk=Array(6).fill(null);
+let bag=[];
+let sel=null;            // HUDで選択中のアイテム
+let deskSel=null;        // 机で選択中のスロット番号
+let bagBounce=false;
+const HUD_MAX=5;
+const p={x:HOUSES[0].hx+2,y:HOUSES[0].hy+3.6};
+
+/* 並び替え（毎回同じにならないよう軽くシャッフル） */
+function shuffle(a){a=a.slice();for(let i=a.length-1;i>0;i--){const j=Math.floor(Math.random()*(i+1));[a[i],a[j]]=[a[j],a[i]];}return a;}
+const order=shuffle(GOODS);
+const residents=[];
+HOUSES.forEach((h,i)=>{
+  if(h.own)return;
+  const k=i-1,good=Object.assign({good:true,house:h},order[k]);
+  const d1=Object.assign({good:false,house:h},DUMMY[k*2]),d2=Object.assign({good:false,house:h},DUMMY[k*2+1]);
+  h.items=shuffle([good,d1,d2]);
+  h.name=RES[k].name;h.goodItem=good;
+  const r=Object.assign({house:h,x:h.hx+4.6,y:h.hy+3.6,talked:false},RES[k]);
+  h.res=r;residents.push(r);
+});
+
+/* ---------- マップの描画（DOM） ---------- */
+const stage=$('#stage'),world=$('#world');
+world.style.width=`calc(var(--t)*${W})`;world.style.height=`calc(var(--t)*${H})`;
+function put(cls,x,y,w,h,z){const d=document.createElement('div');d.className=cls;d.style.left=`calc(var(--t)*${x})`;d.style.top=`calc(var(--t)*${y})`;if(w!=null){d.style.width=`calc(var(--t)*${w})`;d.style.height=`calc(var(--t)*${h})`;}d.style.zIndex=z;world.appendChild(d);return d;}
+(function drawMap(){
+  put('water',RIVER.x,0,RIVER.w,H,0);
+  put('water pond',POND.x,POND.y,POND.w,POND.h,0);
+  BRIDGES.forEach(by=>put('bridge',RIVER.x,by,RIVER.w,2,1));
+  const fr=mulberry(99);
+  for(let i=0;i<70;i++){const x=1+fr()*(W-2),y=1+fr()*(H-2);if(!solid(Math.floor(x),Math.floor(y))){const f=put('flower',x,y,null,null,1);f.style.background=['#ff7aa2','#ffd24a','#fff','#b28dff'][i%4];}}
+  for(let y=0;y<H;y++)for(let x=0;x<W;x++){
+    if(grid[y][x]===TREE)put('tree',x,y,1,1,(y+1)*10);
+    else if(grid[y][x]===ROCK)put('rock',x,y,1,1,(y+1)*10);
+  }
+  HOUSES.forEach(h=>{
+    const d=put('house'+(h.own?' own':''),h.hx,h.hy-1,4,4,(h.hy+3)*10);
+    d.style.setProperty('--roof',h.roof);d.style.setProperty('--wall',h.wall);
+    d.innerHTML='<div class="roof"></div><div class="wall"></div><div class="win a"></div><div class="win b"></div><div class="door"></div>'+(h.own?'<div class="tag">わたしの いえ</div>':'');
+    h.el=d;
+  });
+})();
+function charHTML(extra){return '<div class="in"><div class="shadow"></div>'+(extra.ears?'<div class="ear l"></div><div class="ear r"></div>':'')+'<div class="body"></div><div class="head"></div>'+(extra.cap?'<div class="cap"></div>':'')+(extra.mark?'<div class="mark">!</div>':'')+'</div>';}
+residents.forEach(r=>{
+  const d=put('char idle',r.x,r.y,null,null,Math.floor(r.y*10));
+  d.style.setProperty('--skin',r.skin);d.style.setProperty('--cloth',r.cloth);d.innerHTML=charHTML({ears:true,mark:true});
+  r.el=d;r.markEl=d.querySelector('.mark');
+});
+const playerEl=put('char',p.x,p.y,null,null,0);
+playerEl.style.setProperty('--skin','#ffd9b3');playerEl.style.setProperty('--cloth','#3b82f6');playerEl.innerHTML=charHTML({cap:true});
+
+/* ---------- 画面部品 ---------- */
+const interior=$('#interior'),hudEl=$('#hud'),bubbleEl=$('#bubble'),toastEl=$('#toast'),bannerEl=$('#banner'),fadeEl=$('#fade'),modalEl=$('#modal'),ringEl=$('#ring'),endEl=$('#ending');
+let toastTimer=null;
+function toast(msg){toastEl.textContent=msg;toastEl.classList.add('on');clearTimeout(toastTimer);toastTimer=setTimeout(()=>toastEl.classList.remove('on'),2200);}
+function itemHTML(it){return `<div class="it"><div class="e">${it.e}</div><div class="n">${it.s||it.name}</div></div>`;}
+
+/* ---------- 吹き出し（表示中は操作ロック） ---------- */
+let bubbleQ=[],bubbleAnchor=null,bubbleEnd=null,bubbleOpen=false;
+function say(lines,anchor,onEnd){bubbleQ=lines.slice();bubbleAnchor=anchor||null;bubbleEnd=onEnd||null;nextLine();}
+function nextLine(){
+  if(!bubbleQ.length){bubbleOpen=false;bubbleEl.classList.remove('show');const e=bubbleEnd;bubbleEnd=null;if(e)e();return;}
+  const l=bubbleQ.shift(),o=typeof l==='string'?{t:l}:l;
+  bubbleEl.querySelector('.txt').textContent=o.t;
+  bubbleEl.classList.add('show');bubbleOpen=true;sfx.pop();
+  if(o.fn)o.fn();
+  placeBubble();
+}
+function placeBubble(){
+  if(!bubbleOpen)return;
+  const a=bubbleAnchor?bubbleAnchor():{x:innerWidth/2,y:innerHeight*.3};
+  const w=bubbleEl.offsetWidth,h=bubbleEl.offsetHeight,m=vmin(2);
+  const left=clamp(a.x-w/2,m,innerWidth-w-m);
+  const top=Math.max(m,a.y-h-vmin(3.5));
+  bubbleEl.style.left=left+'px';bubbleEl.style.top=top+'px';
+  bubbleEl.style.setProperty('--tx',clamp(a.x-left,vmin(5),w-vmin(5))+'px');
+}
+const motherAnchor=()=>{const e=interior.querySelector('.mother .char');if(!e)return null;const r=e.getBoundingClientRect();return{x:r.left+r.width/2,y:r.top+r.height*.1};};
+const resAnchor=r=>()=>{const b=r.el.getBoundingClientRect();return{x:b.left+b.width/2,y:b.top+b.height*.05};};
+
+/* 吹き出し表示中は、画面のどこをタップしても吹き出しを閉じる（他の操作には渡さない） */
+let swallow=false;
+addEventListener('pointerdown',e=>{
+  if(bubbleOpen){e.stopPropagation();e.preventDefault();swallow=true;nextLine();return;}
+  swallow=false;
+},true);
+addEventListener('pointerup',e=>{if(swallow)e.stopPropagation();},true);
+addEventListener('click',e=>{if(swallow){e.stopPropagation();e.preventDefault();swallow=false;}},true);
+addEventListener('contextmenu',e=>e.preventDefault());
+
+const locked=()=>bubbleOpen||modalOpen||busy||phase==='end';
+
+/* ---------- HUD ---------- */
+function renderHud(){
+  hudEl.innerHTML=Array.from({length:HUD_MAX},(_,i)=>{const it=hud[i];return `<div class="hs ${it?'full':''} ${it&&it===sel?'sel':''}" data-i="${i}">${it?itemHTML(it):''}</div>`;}).join('');
+}
+hudEl.addEventListener('click',e=>{
+  if(locked())return;
+  const t=e.target.closest('.hs');if(!t)return;
+  const it=hud[+t.dataset.i];if(!it)return;
+  if(scene!=='home'||phase!=='play'||!it.judged){toast('おうちで つくえに ならべよう');return;}
+  sfx.tap();sel=(sel===it)?null:it;deskSel=null;renderHud();renderInterior();
+});
+
+/* ---------- 場面の切り替え ---------- */
+function goto(fn){
+  if(busy)return;busy=true;input.id=null;input.down=false;input.moving=false;ringEl.classList.remove('on');
+  fadeEl.classList.add('on');
+  setTimeout(()=>{fn();fadeEl.classList.remove('on');setTimeout(()=>{busy=false;},170);},170);
+}
+function showInterior(){stage.style.display='none';interior.classList.add('on');renderInterior();renderHud();}
+function showMap(h){
+  scene='map';curHouse=null;sel=null;deskSel=null;
+  interior.classList.remove('on');stage.style.display='block';
+  p.x=h.hx+2;p.y=h.hy+3.6;
+  renderHud();
+}
+let firstMap=true;
+function enterHouse(h){
+  if(h.own){
+    goto(()=>{
+      scene='home';sel=null;deskSel=null;showInterior();
+      const lines=judge();
+      if(lines.length)say(lines,motherAnchor);
+      else if(phase==='play'&&desk.some(x=>!x)){const left=6-desk.filter(Boolean).length;say([`あと${left}こ ひつようよ。ねこさんたちに きいてみてね。`],motherAnchor);}
+    });
+  }else{
+    goto(()=>{scene='house';curHouse=h;sel=null;deskSel=null;showInterior();});
+  }
+}
+function exitHouse(){
+  const h=scene==='home'?HOUSES[0]:curHouse;
+  goto(()=>{
+    showMap(h);
+    if(firstMap){firstMap=false;toast('ゆびを おしつづけると あるくよ！');}
+  });
+}
+
+/* ---------- 自分の家での判定 ---------- */
+function judge(){
+  const lines=[];
+  hud.filter(i=>!i.judged).forEach(it=>{
+    it.judged=true;
+    if(it.good)lines.push({t:`${it.name}をもってきたのね。つくえにならべてちょうだい。`,fn:()=>sfx.ok()});
+    else lines.push({t:`${it.name}は ぼうさいグッズではないのよ。かえしておくわ。`,fn:()=>{sfx.ng();hud=hud.filter(x=>x!==it);it.house.items.push(it);renderHud();}});
+  });
+  return lines;
+}
+
+/* ---------- 家の中の描画 ---------- */
+function motherHTML(){return '<div class="mother"><div class="char" style="--skin:#ffd9b3;--cloth:#ff8fa3"><div class="in"><div class="shadow"></div><div class="body"></div><div class="head"></div><div class="hair"></div><div class="bun"></div></div></div></div>';}
+function renderInterior(){
+  if(scene==='map')return;
+  let h='<div class="wall"></div><div class="floor"></div><div class="winp"></div>';
+  if(scene==='home'){
+    h+='<div class="sign">わたしの いえ</div>'+motherHTML();
+    h+='<div class="desk">'+desk.map((it,i)=>`<div class="slot ${it?'full':''} ${(!it&&sel)?'ready':''} ${deskSel===i?'sel':''}" data-act="slot" data-i="${i}">${it?itemHTML(it):'<span class="plus">＋</span>'}</div>`).join('')+'</div>';
+    if(phase==='pack'){
+      h+=`<div class="bag ${bagBounce?'bounce':''}"><div class="bagtop"></div><div class="bagbody">${bag.length}/6</div></div>`;
+      h+=`<button class="bigbtn packbtn" data-act="pack" ${deskSel==null?'disabled':''}>ふくろに いれる</button>`;
+      bagBounce=false;
+    }
+  }else{
+    h+=`<div class="sign">${curHouse.name}の いえ</div>`;
+    h+='<div class="desk house">'+(curHouse.items.length?curHouse.items.map((it,i)=>`<div class="hslot" data-act="hitem" data-i="${i}">${itemHTML(it)}</div>`).join(''):'<div class="empty">もう なにも ないよ</div>')+'</div>';
+  }
+  h+='<button class="bigbtn exit" data-act="exit">◀ そとへ でる</button>';
+  interior.innerHTML=h;
+}
+interior.addEventListener('click',e=>{
+  if(locked())return;
+  const t=e.target.closest('[data-act]');if(!t)return;
+  const a=t.dataset.act,i=+t.dataset.i;
+  if(a==='exit'){sfx.tap();exitHouse();}
+  else if(a==='hitem')openItem(curHouse.items[i]);
+  else if(a==='slot')slotTap(i);
+  else if(a==='pack')packIn();
+});
+
+/* ---------- アイテム確認（半透明の黒背景＋回転表示） ---------- */
+let modalItem=null;
+function openItem(it){
+  if(!it)return;
+  if(hud.length>=HUD_MAX){sfx.ng();toast('もういっぱいだよ。おうちに かえろう');return;}
+  sfx.pop();modalItem=it;modalOpen=true;
+  modalEl.querySelectorAll('.face').forEach(f=>f.textContent=it.e);
+  modalEl.querySelector('.mname').textContent=it.name;
+  modalEl.classList.add('on');
+}
+function closeModal(){modalOpen=false;modalItem=null;modalEl.classList.remove('on');}
+$('#no').addEventListener('click',()=>{sfx.tap();closeModal();});
+$('#yes').addEventListener('click',()=>{
+  const it=modalItem;if(!it)return;
+  closeModal();
+  if(hud.length>=HUD_MAX)return;
+  const house=scene==='house'?curHouse:it.house;
+  house.items=house.items.filter(x=>x!==it);
+  it.judged=false;hud.push(it);
+  sfx.ok();toast(`${it.name}を てにいれた！`);
+  renderHud();renderInterior();
+});
+
+/* ---------- 机への配置・袋詰め ---------- */
+function slotTap(i){
+  if(phase==='pack'){
+    if(desk[i]){sfx.tap();deskSel=(deskSel===i)?null:i;renderInterior();}
+    return;
+  }
+  if(desk[i])return;
+  if(!sel){toast(hud.some(x=>x.judged)?'したの アイテムを タップしてね':'ぼうさいグッズを あつめてこよう');return;}
+  desk[i]=sel;hud=hud.filter(x=>x!==sel);sel=null;
+  sfx.ok();renderHud();renderInterior();
+  if(desk.every(Boolean))startPack();
+}
+function startPack(){
+  phase='pack';deskSel=null;
+  sfx.fanfare();
+  bannerEl.textContent='ひじょうもちだしぶくろにつめよう！';bannerEl.classList.add('on');
+  renderInterior();
+}
+function packIn(){
+  if(deskSel==null)return;
+  const it=desk[deskSel];if(!it)return;
+  desk[deskSel]=null;bag.push(it);deskSel=null;bagBounce=true;
+  sfx.ok();renderInterior();
+  if(bag.length===desk.length){
+    phase='end';bannerEl.classList.remove('on');
+    setTimeout(()=>{sfx.fanfare();endEl.classList.add('on');},700);
+  }
+}
+$('#again').addEventListener('click',()=>location.reload());
+
+/* ---------- マップ操作：短いタップ＝イベント／長押し・ドラッグ＝移動 ---------- */
+const HOLD_MS=220,DRAG_PX=14,SPEED=3.4;
+const input={id:null,down:false,moving:false,x:0,y:0,sx:0,sy:0,t0:0};
+stage.addEventListener('pointerdown',e=>{
+  if(input.id!==null||scene!=='map'||locked())return;
+  Object.assign(input,{id:e.pointerId,down:true,moving:false,x:e.clientX,y:e.clientY,sx:e.clientX,sy:e.clientY,t0:performance.now()});
+  try{stage.setPointerCapture(e.pointerId);}catch(_){}
+});
+stage.addEventListener('pointermove',e=>{
+  if(e.pointerId!==input.id)return;
+  input.x=e.clientX;input.y=e.clientY;
+  if(!input.moving&&Math.hypot(input.x-input.sx,input.y-input.sy)>DRAG_PX&&!locked())input.moving=true;
+});
+function endPress(e,cancel){
+  if(e.pointerId!==input.id)return;
+  const isTap=!cancel&&!input.moving&&(performance.now()-input.t0<HOLD_MS)&&Math.hypot(e.clientX-input.sx,e.clientY-input.sy)<=DRAG_PX;
+  input.id=null;input.down=false;input.moving=false;ringEl.classList.remove('on');
+  if(isTap&&!locked())onTap(e.clientX,e.clientY);
+}
+stage.addEventListener('pointerup',e=>endPress(e,false));
+stage.addEventListener('pointercancel',e=>endPress(e,true));
+
+/* タップ位置を村の座標に直し、住人・家を判定（距離が離れていてもOK） */
+function onTap(sx,sy){
+  const r=stage.getBoundingClientRect();
+  const wx=p.x+(sx-(r.left+r.width/2))/T,wy=p.y+(sy-(r.top+r.height/2))/T;
+  for(const rs of residents){
+    if(Math.abs(wx-rs.x)<.8&&wy>rs.y-1.4&&wy<rs.y+.5){talk(rs);return;}
+  }
+  for(const h of HOUSES){
+    if(wx>=h.hx-.2&&wx<=h.hx+4.2&&wy>=h.hy-1.1&&wy<=h.hy+3.1){sfx.pop();enterHouse(h);return;}
+  }
+}
+function talk(r){
+  const g=r.house.goodItem;
+  const have=hud.includes(g)||desk.includes(g)||bag.includes(g);
+  r.talked=true;r.markEl.style.display='none';
+  say([have?`もう もっていったニャ🎵 ありがとニャ！`:`わたしのいえに ”${g.name}” があるからもっていってニャ🎵`],resAnchor(r));
+}
+
+/* ---------- 移動・当たり判定 ---------- */
+function blocked(x,y){const r=.3;return solid(Math.floor(x-r),Math.floor(y-r))||solid(Math.floor(x+r),Math.floor(y-r))||solid(Math.floor(x-r),Math.floor(y+r))||solid(Math.floor(x+r),Math.floor(y+r));}
+function tryMove(dx,dy){if(!blocked(p.x+dx,p.y))p.x+=dx;if(!blocked(p.x,p.y+dy))p.y+=dy;}
+let last=0,walking=false;
+function frame(ts){
+  const dt=Math.min(.05,(ts-last)/1000||0);last=ts;
+  if(scene==='map'){
+    const r=stage.getBoundingClientRect(),cx=r.left+r.width/2,cy=r.top+r.height/2;
+    walking=false;
+    if(input.down&&!locked()){
+      if(!input.moving&&ts-input.t0>=HOLD_MS)input.moving=true;
+      if(input.moving){
+        const vx=input.x-cx,vy=input.y-cy,len=Math.hypot(vx,vy);
+        if(len>T*.15){const st=Math.min(SPEED*dt,len/T);tryMove(vx/len*st,vy/len*st);walking=true;}
+        ringEl.style.left=input.x+'px';ringEl.style.top=input.y+'px';ringEl.classList.add('on');
+      }
+    }else ringEl.classList.remove('on');
+    /* カメラ追従：主人公を常に画面中央へ */
+    world.style.transform=`translate3d(${cx-r.left-p.x*T}px,${cy-r.top-p.y*T}px,0)`;
+    playerEl.style.left=`calc(var(--t)*${p.x})`;playerEl.style.top=`calc(var(--t)*${p.y})`;
+    playerEl.style.zIndex=Math.floor(p.y*10)+5;
+    playerEl.classList.toggle('walk',walking);
+  }
+  placeBubble();
+  requestAnimationFrame(frame);
+}
+requestAnimationFrame(frame);
+
+/* ---------- 開始：自分の家でお母さんからお使いを頼まれる ---------- */
+renderHud();showInterior();
+say([
+  'おかえり！ おつかいを おねがいしてもいい？',
+  'ぼうさいグッズを あつめてきてね。むらの ねこさんたちが もっているみたいよ。',
+  'あつめたら おうちに かえってきてね。いってらっしゃい！'
+],motherAnchor);
+
+/* 動作確認用（URLの末尾に #debug を付けたときだけ有効） */
+if(/debug/.test(location.hash))window.__g={p,grid,HOUSES,residents,get hud(){return hud},get desk(){return desk},get bag(){return bag},get phase(){return phase},get scene(){return scene},SEED,reachable};
+</script>
+</body>
+</html>
