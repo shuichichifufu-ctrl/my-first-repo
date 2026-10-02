@@ -1,0 +1,76 @@
+name: elliott-scan
+on:
+  schedule:
+    - cron: "30 21 * * 1-5"   # 平日 21:30 UTC（日本時間 翌朝6:30）。米国市場の引け後
+  workflow_dispatch:
+    inputs:
+      dry_run:
+        description: "通知せず結果だけ表示する"
+        type: boolean
+        default: true
+
+permissions:
+  contents: read
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    defaults:
+      run:
+        working-directory: elliott-scanner
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+          cache: pip
+          cache-dependency-path: elliott-scanner/requirements.txt
+      - run: pip install -r requirements.txt
+      - run: python -m pytest -q
+      - run: python -m scanner.verify
+
+  # テストが失敗してもスキャンと通知は止めない（テストは別ジョブで結果だけ見る）
+  scan:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    defaults:
+      run:
+        working-directory: elliott-scanner
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+          cache: pip
+          cache-dependency-path: elliott-scanner/requirements.txt
+      - run: pip install -r requirements.txt
+      - name: 通知済みの記録を復元
+        uses: actions/cache/restore@v4
+        with:
+          path: elliott-scanner/.state
+          key: elliott-state-${{ github.run_id }}
+          restore-keys: elliott-state-
+      - name: スキャン
+        env:
+          DISCORD_WEBHOOK_URL: ${{ secrets.DISCORD_WEBHOOK_URL }}
+        run: |
+          if [ "${{ github.event_name }}" = "workflow_dispatch" ] && [ "${{ inputs.dry_run }}" = "true" ]; then
+            python -m scanner.run --config tickers.yaml --dry-run
+          else
+            python -m scanner.run --config tickers.yaml
+          fi
+      - name: 通知済みの記録を保存
+        if: always()
+        uses: actions/cache/save@v4
+        with:
+          path: elliott-scanner/.state
+          key: elliott-state-${{ github.run_id }}
+      - name: 検出画像を保存
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: charts
+          path: elliott-scanner/out
+          if-no-files-found: ignore
+          retention-days: 7

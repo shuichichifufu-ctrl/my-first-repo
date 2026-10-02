@@ -1,0 +1,78 @@
+"""通知文の作成とDiscord送信。"""
+from __future__ import annotations
+
+import json
+import os
+from typing import Dict, List, Optional
+
+import requests
+
+from .waves import Candidate
+
+STATUS_JA = {"started": "入口（小3波が小1波の端を突破）", "approaching": "準備（小3波の直前）"}
+
+
+def _wave3_line(c: Candidate, ex: str) -> str:
+    passed = c.close > c.wave1_top if c.direction == "up" else c.close < c.wave1_top
+    if passed:
+        return f"大3波: 大1の{ex} {c.wave1_top:.5g} は既に超えており、大3波は本格化しています"
+    return f"大3波が本格化する価格: {c.wave1_top:.5g}（大1の{ex}を超えたら）"
+
+
+def format_candidate(c: Candidate) -> str:
+    d = "上昇" if c.direction == "up" else "下降"
+    ex = "高値" if c.direction == "up" else "安値"
+    return (
+        f"【サードオブサード候補】{c.name}（{c.symbol}） {d}\n"
+        f"局面: {STATUS_JA[c.status]}　形の整い具合: {c.score:.0f}/100（当たりやすさを示す数字ではありません）\n"
+        f"現在値: {c.close:.5g}\n"
+        f"・大きな波: 0={c.points['L0'][1]:.5g}（{c.dates['L0']}）→ 1={c.points['H1'][1]:.5g} → "
+        f"2={c.points['L2'][1]:.5g}（戻り率{c.r2 * 100:.0f}%）\n"
+        f"・小さな波: (i)={c.points['i'][1]:.5g} → (ii)={c.points['ii'][1]:.5g}（戻り率{c.rii * 100:.0f}%）\n"
+        f"・突破の目安: {c.entry:.5g}（(i)の{ex}）\n"
+        f"・{_wave3_line(c, ex)}\n"
+        f"・大1波の内側の脚: {c.wave1_legs}本（{'5本以上で推進波らしい' if c.wave1_legs >= 5 else '5本未満: 単純な動きで、推進波かは未確認'}）\n"
+        f"・無効になる価格: {c.invalidation_minor:.5g}（(ii)を割る/超えると小さな数え方が失敗）、"
+        f"{c.invalidation_major:.5g}（2を割る/超えると大きな数え方が失敗）\n"
+        f"・(iii)の目安: {c.target:.5g}\n"
+        f"※過去15年・26銘柄での検証では、この種の候補の20日後の値動きは、ランダムな日と統計的に区別できませんでした"
+        f"（「入口」の局面は平均でやや良い傾向ですが、件数が少なく有意ではありません）。"
+        f"機械的な判定です。チャートを見て最終判断してください。売買の助言ではありません。"
+    )
+
+
+def format_watch_digest(cands: List[Candidate]) -> str:
+    """「準備」の局面の候補を1通にまとめる（過去検証で裏づけが弱いため、個別の通知はしない）。"""
+    lines = []
+    for c in cands[:15]:
+        d = "上昇" if c.direction == "up" else "下降"
+        lines.append(f"・{c.name}（{c.symbol}）{d}　突破の目安 {c.entry:.5g}／無効化 {c.invalidation_minor:.5g}／現在値 {c.close:.5g}")
+    more = f"\n…ほか{len(cands) - 15}件" if len(cands) > 15 else ""
+    return ("【ウォッチリスト（準備の局面）】小3波の直前に見える銘柄です。過去検証では、この局面の候補に統計的な優位性は"
+            "確認できていません。参考としてご覧ください。\n" + "\n".join(lines) + more)
+
+
+def format_withdrawn(symbol: str, name: str, close: float, level: float, direction: str,
+                    major: Optional[float] = None) -> str:
+    d = "上昇" if direction == "up" else "下降"
+    beyond = major is not None and ((close < major) if direction == "up" else (close > major))
+    why = ("大きな数え方（大2波の起点）も割れたため、第3波の見立て自体が崩れました。" if beyond
+           else "小さな数え方（(ii)）が失敗しました。大きな数え方は残っている可能性があります。")
+    return (f"【取り下げ】{name}（{symbol}） {d}候補\n"
+            f"現在値 {close:.5g} が無効化価格 {level:.5g} を超えて逆行しました。{why}")
+
+
+def format_failures(failed: Dict[str, str]) -> str:
+    lines = [f"・{s}: {m}" for s, m in list(failed.items())[:20]]
+    return "【取得に失敗した銘柄】\n" + "\n".join(lines)
+
+
+def send_discord(webhook: str, text: str, image_path: Optional[str] = None) -> None:
+    text = text[:1900]
+    if image_path:
+        with open(image_path, "rb") as f:
+            r = requests.post(webhook, data={"payload_json": json.dumps({"content": text})},
+                              files={"file": (os.path.basename(image_path), f, "image/png")}, timeout=30)
+    else:
+        r = requests.post(webhook, json={"content": text}, timeout=30)
+    r.raise_for_status()
