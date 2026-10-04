@@ -1,0 +1,15 @@
+{
+  "_説明": "ea-lab DESIGN.md の『昇格ゲート』をここに転記する。書式は phase0.template.json と同じ。threshold が null のルールは『未転記』で、判定は保留になる。下の1件は書式の例。",
+  "name": "promotion",
+  "source": "ea-lab/DESIGN.md「昇格ゲート」から転記(節番号を書く)",
+  "rules": [
+    {
+      "name": "(例)ea-lab上の項目名をそのまま書く",
+      "metric": "n_trades",
+      "op": ">=",
+      "threshold": null,
+      "scope": "oos",
+      "source": "ea-lab/DESIGN.md の該当行から転記"
+    }
+  ]
+}

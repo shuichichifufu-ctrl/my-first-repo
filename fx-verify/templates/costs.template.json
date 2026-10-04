@@ -1,0 +1,12 @@
+{
+  "_説明": "ea-lab の既存設定(DESIGN.md / RUNBOOK.md など)のスプレッドとスリッページを pips 単位で転記する。null のままだと『未設定』扱いで、検証は保留になる(黙って0にはしない)。",
+  "source": "ここに出典を書く(例: ea-lab/RUNBOOK.md の「コスト設定」から転記)",
+  "spread_pips": {
+    "USDJPY": null,
+    "EURUSD": null,
+    "GBPUSD": null,
+    "EURJPY": null,
+    "AUDUSD": null
+  },
+  "slippage_pips": null
+}

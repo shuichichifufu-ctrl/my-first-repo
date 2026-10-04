@@ -1,0 +1,15 @@
+{
+  "_説明": "ea-lab DESIGN.md の『Phase-0 優位性証明ゲート』をここに転記する。rules の1件が ea-lab のゲート項目1つ。threshold が null のルールは『未転記』で、判定は保留になる。下の1件は書式の例。name / metric / op / threshold / scope を ea-lab の項目に合わせて書き換え・増減する。",
+  "name": "phase0_edge_proof",
+  "source": "ea-lab/DESIGN.md「Phase-0 優位性証明ゲート」から転記(節番号を書く)",
+  "rules": [
+    {
+      "name": "(例)ea-lab上の項目名をそのまま書く",
+      "metric": "pf",
+      "op": ">=",
+      "threshold": null,
+      "scope": "train",
+      "source": "ea-lab/DESIGN.md の該当行から転記"
+    }
+  ]
+}
