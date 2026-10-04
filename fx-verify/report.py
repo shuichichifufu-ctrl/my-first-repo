@@ -817,7 +817,15 @@ def _section4(result: Mapping[str, Any], synthetic: bool) -> str:
         if _uses_d10(chosen):
             lines += ["**注意: 追加フィルター(D10)を含む。原典準拠の結果とは別枠(このレポートの第5章 5-3)で見ること。**", ""]
     else:
-        lines += ["選べる設定が無かった(学習用期間で取引回数が足りない等)。", ""]
+        info0 = sc.get("selection_info") or {}
+        if info0.get("no_plateau"):
+            lines += [
+                "**台地を作れず、設定を選べなかった**(尖った山・符号の変わる点しか無い、または順序のある軸が無い)。"
+                "最高成績の点は選んでいない。段階D・Eは実行していない(検証用期間・他ペアは見ていない)。",
+                "",
+            ]
+        else:
+            lines += ["選べる設定が無かった(学習用期間で取引回数が足りない等)。", ""]
     lines += ["**選び方**: " + str(sc.get("selection_rule") or "(記録なし)"), ""]
     info = sc.get("selection_info")
     if info:

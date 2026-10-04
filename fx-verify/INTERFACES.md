@@ -420,7 +420,9 @@ def select_axes(stage_b_df: pd.DataFrame, top_k: int = 4) -> dict[str, list]
 def stage_c(datasets, cfg, split, *, pair="USDJPY", base=None, axes: dict[str, list]) -> dict
     # 限定グリッド(学習用期間のみ)。戻り値 {"results": DataFrame(各軸+指標), "n_trials": int, "axes": axes,
     #   "chosen_params": dict, "selection_rule": str}
-    # chosen: 最高成績の点ではなく「台地の中央」: 各点の近傍(各軸で隣の水準を含む)平均 avg_r が最大の点を選ぶ。
+    # chosen: 最高成績の点ではなく「台地の中央」。近傍は自分自身を除く(順序のある軸の隣の水準のみ)。
+    #   まず台地の点(近傍の有効な点すべてとPF差が pf_tol 以内・平均Rの符号が同じ)だけを候補にし、その中で近傍平均 avg_r が最大の点を選ぶ。
+    #   台地の点が無い/順序のある軸が無いときは選ばない(chosen_params=None, selection_info.no_plateau=True)。
     # n_trials = 段階A+B+Cで試した設定の総数(多重検定の目安としてレポートに載せる)。
 
 def stage_d(raw15: Dict[str, pd.DataFrame], cfg: Config, split: Split, chosen: Params, *,

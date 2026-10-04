@@ -119,9 +119,11 @@ def surface_b(p: Params):
 
 
 TABLE_C = [  # 行: hi_lookback 20/40/80、列: tp1_fraction 0.3/0.5/0.7
-    [0.90, 0.00, 0.10],
-    [0.00, 0.30, 0.32],
-    [0.10, 0.31, 0.33],
+    # 全体がなだらかな台地(平均R 0.29〜0.35)。最高点は角の (20, 0.3)=0.35。中央(40, 0.5)=0.30 は近傍8点とPF差が小さい。
+    # (平均Rが 0.29〜0.35 のとき PF=(1+r)/(1-r) は 1.82〜2.08。make_trades の仕様)
+    [0.35, 0.29, 0.30],
+    [0.29, 0.30, 0.34],
+    [0.30, 0.34, 0.33],
 ]
 
 
@@ -359,36 +361,128 @@ def test_neighbors_geometry():
         sb._neighbors((0,), (2,), (True,), "diamond")
 
 
+def test_neighbors_can_exclude_self():
+    assert (1, 1) not in sb._neighbors((1, 1), (3, 3), (True, True), "box", include_self=False)
+    assert len(sb._neighbors((1, 1), (3, 3), (True, True), "box", include_self=False)) == 8
+    assert sb._neighbors((2,), (5,), (True,), "box", include_self=False) == [(1,), (3,)]
+    assert sorted(sb._neighbors((1, 1), (3, 3), (True, True), "cross", include_self=False)) == [(0, 1), (1, 0), (1, 2), (2, 1)]
+    # 順序のない軸だけなら、近傍(自分以外)は空
+    assert sb._neighbors((1,), (3,), (False,), "box", include_self=False) == []
+    assert sb._neighbors((1,), (3,), (False,), "box") == [(1,)]  # 既定は従来どおり自分を含む
+
+
 def test_stage_c_picks_plateau_center_not_best_point(ds, split):
     r = FakeRunner(surface_c)
     res = sb.stage_c({"USDJPY": ds}, CFG, split, axes=AXES_C, runner=r)
     df = res["results"]
     assert len(df) == 9 and len(r.calls) == 9
-    # 最高成績の点は (hi=20, tp=0.3) の突出点(0.90)。選ばれるのは近傍が揃った中央(40, 0.5)
+    # 最高成績の点は角の (hi=20, tp=0.3)=0.35。選ばれるのは近傍が揃った台地の中央(40, 0.5)
     best = df.loc[df["avg_r"].idxmax()]
     assert (best["hi_lookback"], best["tp1_fraction"]) == (20, 0.3)
     ch = res["chosen_params"]
     assert (ch["hi_lookback"], ch["tp1_fraction"]) == (40, 0.5)
     chosen_row = df[df["is_chosen"]].iloc[0]
     assert df["is_chosen"].sum() == 1
-    assert chosen_row["nbr_slots"] == 9 and chosen_row["nbr_avg_r"] == pytest.approx(np.mean(sum(TABLE_C, [])))
+    # 近傍平均は『自分自身を除く』8点の平均(自分の 0.30 は入らない)
+    others = [v for i, row in enumerate(TABLE_C) for j, v in enumerate(row) if (i, j) != (1, 1)]
+    assert chosen_row["nbr_slots"] == 8 and chosen_row["nbr_valid"] == 8
+    assert chosen_row["nbr_avg_r"] == pytest.approx(np.mean(others))
+    assert chosen_row["nbr_avg_r"] != pytest.approx(np.mean(sum(TABLE_C, [])))  # 自分を含む平均ではない
+    assert bool(chosen_row["plateau_point"]) is True
     info = res["selection_info"]
     assert info["chosen_is_own_best"] is False and info["chosen_own_rank"] == 5
     assert info["best_own_values"] == {"hi_lookback": 20, "tp1_fraction": 0.3}
     assert "台地の中央" in res["selection_rule"] and "最高成績の点ではなく" in res["selection_rule"]
-    # 端の点(2,2)は近傍平均が最大(0.315)だが、近傍が揃っていないので選ばれない
+    assert "自分自身を除く" in res["selection_rule"]
+    # 端の点(2,2)は近傍平均が最大だが、近傍が揃っていないので選ばれない
     corner = df[(df["hi_lookback"] == 80) & (df["tp1_fraction"] == 0.7)].iloc[0]
     assert corner["nbr_avg_r"] > chosen_row["nbr_avg_r"] and not corner["is_chosen"]
     # 返す設定は Params に復元できる
     assert Params.from_dict(ch).hi_lookback == 40
 
 
+def test_stage_c_does_not_choose_a_sharp_peak(ds, split):
+    """平均Rが (低, 突出, 低) の尖った山: 中央が最高点でも、近傍とPF差が大きいので台地ではない → 選ばない。
+
+    以前は『自分を含む近傍平均』で中央(山の頂)が選ばれていた(再現済みのレビュー指摘)。
+    """
+    tbl = {0.3: 0.05, 0.5: 0.60, 0.7: 0.05}
+    res = sb.stage_c({"USDJPY": ds}, CFG, split, axes={"tp1_fraction": [0.3, 0.5, 0.7]},
+                     runner=FakeRunner(lambda p: (100, tbl[p.tp1_fraction])))
+    assert res["chosen_params"] is None
+    assert not res["results"]["is_chosen"].any()
+    info = res["selection_info"]
+    assert info["no_plateau"] is True and info["no_plateau_reason"] == "no_plateau_point"
+    assert "台地を作れず" in info["note"] and any("台地を作れない" in w for w in info["warnings"])
+    # 近傍平均は自分自身を除く: 山の頂の近傍平均は両端の平均(0.05)であって、自分を含む 0.233 ではない
+    top = res["results"].set_index("tp1_fraction").loc[0.5]
+    assert top["nbr_avg_r"] == pytest.approx(0.05) and top["nbr_slots"] == 2
+    assert bool(top["plateau_point"]) is False
+
+
+def test_stage_c_does_not_choose_a_valley_between_good_neighbors(ds, split):
+    """(良, 悪, 良): 谷の底は近傍平均が高いが、自分は近傍と違う → 台地ではない。端の点も隣と違うので選ばない。"""
+    tbl = {0.3: 0.50, 0.5: 0.00, 0.7: 0.50}
+    res = sb.stage_c({"USDJPY": ds}, CFG, split, axes={"tp1_fraction": [0.3, 0.5, 0.7]},
+                     runner=FakeRunner(lambda p: (100, tbl[p.tp1_fraction])))
+    assert res["chosen_params"] is None and res["selection_info"]["no_plateau"] is True
+
+
+def test_stage_c_picks_center_of_gentle_one_axis_plateau(ds, split):
+    tbl = {0.3: 0.30, 0.5: 0.33, 0.7: 0.31}
+    res = sb.stage_c({"USDJPY": ds}, CFG, split, axes={"tp1_fraction": [0.3, 0.5, 0.7]},
+                     runner=FakeRunner(lambda p: (100, tbl[p.tp1_fraction])))
+    assert res["chosen_params"]["tp1_fraction"] == 0.5
+    row = res["results"][res["results"]["is_chosen"]].iloc[0]
+    assert row["nbr_avg_r"] == pytest.approx((0.30 + 0.31) / 2)  # 自分(0.33)を含まない
+
+
+def test_stage_c_unordered_axes_only_cannot_form_a_plateau(ds, split):
+    """順序のない軸(d1_mode)だけのグリッド。以前は最高点(B=0.9)がそのまま選ばれていた。今は『台地を作れない』。"""
+    tbl = {"A": 0.10, "B": 0.90, "C": 0.20}
+    res = sb.stage_c({"USDJPY": ds}, CFG, split, axes={"d1_mode": ["A", "B", "C"]},
+                     runner=FakeRunner(lambda p: (100, tbl[p.d1_mode])))
+    assert res["chosen_params"] is None
+    info = res["selection_info"]
+    assert info["no_plateau"] is True and info["no_plateau_reason"] == "no_ordered_axis"
+    assert info["unordered_axes"] == ["d1_mode"] and info["ordered_axes"] == []
+    assert any("台地を作れない" in w for w in info["warnings"])
+    assert not res["results"]["is_chosen"].any()
+
+
+def test_stage_c_unordered_level_is_judged_by_its_ordered_neighbors(ds, split):
+    """順序のない軸(d1_mode)×順序のある軸(tp1_fraction)。B は一点だけ突出(0.9)。A は全体が台地。
+    以前は B の突出点が選ばれ得た。今は B の突出点は台地でないので、台地の A の中央が選ばれる。"""
+    def fn(p):
+        if p.d1_mode == "B":
+            return 100, {0.3: 0.05, 0.5: 0.90, 0.7: 0.05}[p.tp1_fraction]
+        return 100, {0.3: 0.14, 0.5: 0.16, 0.7: 0.15}[p.tp1_fraction]
+
+    res = sb.stage_c({"USDJPY": ds}, CFG, split, axes={"d1_mode": ["A", "B"], "tp1_fraction": [0.3, 0.5, 0.7]},
+                     runner=FakeRunner(fn))
+    ch = res["chosen_params"]
+    assert ch["d1_mode"] == "A" and ch["tp1_fraction"] == 0.5
+    info = res["selection_info"]
+    assert info["chosen_is_own_best"] is False and info["best_own_values"] == {"d1_mode": "B", "tp1_fraction": 0.5}
+    assert info["unordered_axes"] == ["d1_mode"] and info["ordered_axes"] == ["tp1_fraction"]
+    assert any("順序のない軸" in w for w in info["warnings"])
+
+
+def test_stage_c_warns_when_chosen_is_also_own_best(ds, split):
+    tbl = {0.3: 0.30, 0.5: 0.34, 0.7: 0.31}
+    res = sb.stage_c({"USDJPY": ds}, CFG, split, axes={"tp1_fraction": [0.3, 0.5, 0.7]},
+                     runner=FakeRunner(lambda p: (100, tbl[p.tp1_fraction])))
+    info = res["selection_info"]
+    assert info["chosen_is_own_best"] is True
+    assert any("最高" in w for w in info["warnings"])
+
+
 def test_stage_c_cross_neighborhood_option(ds, split):
     res = sb.stage_c({"USDJPY": ds}, CFG, split, axes=AXES_C, runner=FakeRunner(surface_c), neighborhood="cross")
     c = res["results"]
     mid = c[(c["hi_lookback"] == 40) & (c["tp1_fraction"] == 0.5)].iloc[0]
-    assert mid["nbr_slots"] == 5
-    assert mid["nbr_avg_r"] == pytest.approx(np.mean([0.30, 0.00, 0.32, 0.00, 0.31]))
+    assert mid["nbr_slots"] == 4  # 自分を除く(上下左右)
+    assert mid["nbr_avg_r"] == pytest.approx(np.mean([0.29, 0.34, 0.29, 0.34]))
 
 
 def test_stage_c_trial_count(ds, split):
@@ -474,12 +568,25 @@ def test_stage_c_relaxes_when_no_central_candidate(ds, split):
 
 def test_stage_b_then_select_then_stage_c_chain(ds, split):
     """段階B → 軸の選定 → 段階C がつながる(偽の実行関数)。"""
-    bdf = sb.stage_b({"USDJPY": ds}, CFG, split, runner=FakeRunner(surface_b))
+    def smooth_b(p):  # surface_b から pb_touch_ema の尖り(基準だけ突出)を取り除いたもの(なだらかな台地がある場合の配線確認)
+        n, avg = surface_b(p)
+        return n, avg + {20: 0.30, 40: 0.0, 80: 0.30}[p.pb_touch_ema] + {20: -0.01, 40: 0.0, 80: -0.01}[p.pb_touch_ema]
+
+    bdf = sb.stage_b({"USDJPY": ds}, CFG, split, runner=FakeRunner(smooth_b))
     axes = sb.select_axes(bdf, top_k=3)
-    res = sb.stage_c({"USDJPY": ds}, CFG, split, runner=FakeRunner(surface_b), axes=axes, stage_b_df=bdf)
+    res = sb.stage_c({"USDJPY": ds}, CFG, split, runner=FakeRunner(smooth_b), axes=axes, stage_b_df=bdf)
     assert set(res["axes"]) == set(axes)
     assert res["n_trials"] >= bdf.attrs["n_trials"]
     assert res["chosen_params"] is not None
+
+
+def test_stage_b_then_select_then_stage_c_with_spiky_axis_does_not_pick_the_peak(ds, split):
+    """surface_b は pb_touch_ema が『基準(40)だけ突出』の尖り。尖った軸を含むと台地が作れず、山の頂は選ばれない。"""
+    bdf = sb.stage_b({"USDJPY": ds}, CFG, split, runner=FakeRunner(surface_b))
+    axes = sb.select_axes(bdf, top_k=3)
+    assert "pb_touch_ema" in axes
+    res = sb.stage_c({"USDJPY": ds}, CFG, split, runner=FakeRunner(surface_b), axes=axes, stage_b_df=bdf)
+    assert res["chosen_params"] is None and res["selection_info"]["no_plateau"] is True
 
 
 # ======================================================================================

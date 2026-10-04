@@ -371,7 +371,11 @@ def run_pipeline(
     if train_blocked:
         notes.append("段階Cで学習用ゲートに届く設定が無かったため、段階D・Eは省略した(引継書 第4章)。")
     elif chosen is None:
-        limits.append("段階Cで設定を選べなかったため、段階D・Eを実行していない。")
+        info_c = ((result.get("stage_c") or {}).get("selection_info") or {})
+        limits.append(
+            "段階Cで設定を選べなかったため、段階D・Eを実行していない。"
+            + (f"理由: {info_c['note']}" if info_c.get("note") else "")
+        )
     else:
         reg_d = {"registry": reg} if reg is not None and _accepts(st.stage_d, "registry") else {}
         reg_e = {"registry": reg} if reg is not None and _accepts(st.stage_e, "registry") else {}

@@ -31,7 +31,9 @@ INTERFACES.md では `stages.py`(段階A〜E、別担当)が `fx-verify/` 直下
 - `d1_mode='D'`(日足条件なし)は「効き目を測る比較用」。軸の選定(効果の大きさの計算)と
   限定グリッドの水準からは除く。表には残す。
 - 限定グリッドの「近傍」は、順序のある軸では隣の水準(±1)、順序のない軸(モード切替・真偽値など)では
-  自分自身のみ。順序のない軸は隣り合う水準が意味を持たないため。
+  動かさない(隣り合う水準が意味を持たないため。各水準は順序のある軸方向の近傍で評価する)。近傍に自分自身は含めない。
+- 台地の中央選び: まず『台地の点』(近傍の有効な点すべてとPF差が pf_tol 以内で、平均Rの符号が同じ点)だけを候補にし、
+  その中で近傍平均 avg_r が最大の点を選ぶ。台地の点が無い・順序のある軸が無いときは選ばない(台地を作れない)。
 """
 from __future__ import annotations
 
@@ -734,11 +736,14 @@ def _axis_levels(axes: Mapping[str, Sequence[Any]]) -> Dict[str, List[Any]]:
     return out
 
 
-def _neighbors(idx: Tuple[int, ...], sizes: Sequence[int], ordinal: Sequence[bool], kind: str) -> List[Tuple[int, ...]]:
-    """格子点 idx の近傍(自分自身を含む)。順序のある軸のみ ±1。
+def _neighbors(
+    idx: Tuple[int, ...], sizes: Sequence[int], ordinal: Sequence[bool], kind: str, include_self: bool = True
+) -> List[Tuple[int, ...]]:
+    """格子点 idx の近傍。順序のある軸のみ ±1(順序のない軸は動かさない)。
 
     kind='box'  : 各軸で隣を含む組み合わせ全部(チェビシェフ距離1)
     kind='cross': 動かすのは1軸だけ(自分+各軸の隣)
+    include_self: True(既定)なら自分自身も含める。段階Cの選定は False(自分自身の成績を近傍の評価に混ぜない)で呼ぶ。
     """
     steps = [(-1, 0, 1) if o else (0,) for o in ordinal]
     out: List[Tuple[int, ...]] = []
@@ -759,6 +764,8 @@ def _neighbors(idx: Tuple[int, ...], sizes: Sequence[int], ordinal: Sequence[boo
                     out.append(tuple(nb))
     else:
         raise ValueError("neighborhood は 'box' か 'cross'")
+    if not include_self:
+        out = [nb for nb in out if nb != tuple(idx)]
     return out
 
 
@@ -778,8 +785,14 @@ def limited_grid(
 ) -> Dict[str, Any]:
     """段階Cの本体。学習用データ(TrainDataset)だけを受け取る。
 
-    axes の全組み合わせを回し、各点の『近傍平均 avg_r』が最大の点(=台地の中央付近)を選ぶ。
-    最高成績の点を選ぶことはしない(自分自身の avg_r は選定に使わない)。
+    axes の全組み合わせを回し、次の手順で『台地の中央』を選ぶ(最高成績の点は選ばない)。
+      1. 各点の近傍(自分自身を除く。順序のある軸の隣の水準だけ)を取る。
+      2. 『台地の点』= 取引数が足りて、近傍の有効な点すべてと「PF差が pf_tol 以内、かつ平均Rの符号が同じ」な点。
+         尖った山・谷・符号が変わる点はここで落ちる。台地の点が1つも無ければ選ばない(chosen_params=None)。
+      3. 台地の点のうち、近傍が揃っている(端でない)点から、近傍平均 avg_r(自分自身を除く)が最大の点を選ぶ。
+    順序のない軸(モード切替など)の水準どうしは隣と見なさない。各水準は、順序のある軸方向の近傍で評価する。
+    順序のある軸が1つも無いグリッドでは近傍が作れないので台地を判定できず、選ばない(『台地を作れない』と記録)。
+    自分自身の avg_r は選定に使わない(台地の判定で、近傍との差・符号の一致を見るときだけ使う)。
     戻り値は `stage_c` を参照。
     """
     crit = criteria or PlateauCriteria()
@@ -825,56 +838,78 @@ def limited_grid(
     if not points:
         raise ValueError("有効な設定が1つも無い")
 
-    # 近傍の集計
+    # 近傍の集計(近傍は自分自身を除く)と、台地の点の判定
     valid_of = {
         idx: bool(r["n_trades"] >= crit.min_trades_for_analysis and not math.isnan(r["avg_r"]))
         for idx, r in points.items()
     }
     for idx, r in points.items():
-        geo = _neighbors(idx, sizes, ordinal, neighborhood)  # 格子上の近傍(欠けた点を含む)
+        geo = _neighbors(idx, sizes, ordinal, neighborhood, include_self=False)  # 格子上の近傍(欠けた点を含む)
         existing = [nb for nb in geo if nb in points]
         vnb = [nb for nb in existing if valid_of[nb]]
         r["valid"] = valid_of[idx]
         r["nbr_slots"] = len(geo)
         r["nbr_valid"] = len(vnb)
+        r["nbr_avg_r"] = r["nbr_min_avg_r"] = r["nbr_max_pf_diff"] = float("nan")
+        r["plateau_point"] = False
         if valid_of[idx] and vnb:
             vals = np.array([points[nb]["avg_r"] for nb in vnb], dtype=float)
             r["nbr_avg_r"] = float(vals.mean())
             r["nbr_min_avg_r"] = float(vals.min())
-        else:
-            r["nbr_avg_r"] = float("nan")
-            r["nbr_min_avg_r"] = float("nan")
+            diffs = [_pf_diff(float(r["pf"]), float(points[nb]["pf"])) for nb in vnb]
+            if not any(math.isnan(d) for d in diffs):
+                r["nbr_max_pf_diff"] = float(max(diffs))
+            same_sign = all((points[nb]["avg_r"] > 0) == (r["avg_r"] > 0) for nb in vnb)
+            # nan(PFが算出できない)は『なだらか』と言えないので台地にしない
+            r["plateau_point"] = bool(all(d <= crit.pf_tol for d in diffs) and same_sign)
 
     cols = names + ["params_key", "is_base"] + METRIC_COLS + [
-        "n_setup_po", "valid", "nbr_slots", "nbr_valid", "nbr_avg_r", "nbr_min_avg_r",
+        "n_setup_po", "valid", "nbr_slots", "nbr_valid", "nbr_avg_r", "nbr_min_avg_r", "nbr_max_pf_diff",
+        "plateau_point",
     ]
     res = pd.DataFrame([points[i] for i in sorted(points)])[cols].reset_index(drop=True)
     res["is_chosen"] = False
 
-    # ---- 選定: 近傍平均 avg_r が最大の点(最高成績の点ではない) ----
+    # ---- 選定: 台地の点のうち、近傍平均 avg_r(自分自身を除く)が最大の点(最高成績の点ではない) ----
+    ordered_axes = [n for n, o in zip(names, ordinal) if o]
+    unordered_axes = [n for n, o in zip(names, ordinal) if not o]
     max_slots = int(res["nbr_slots"].max())
     note_relax: List[str] = []
-    cand = res[res["valid"] & res["nbr_avg_r"].notna()]
-    c1 = cand[(cand["nbr_valid"] / cand["nbr_slots"]) >= crit.min_valid_neighbor_frac]
+    warn: List[str] = []
+    n_plateau = int((res["valid"] & res["plateau_point"]).sum())
+    cand = res[res["valid"] & res["plateau_point"] & res["nbr_avg_r"].notna() & (res["nbr_slots"] > 0)]
+    c1 = cand[(cand["nbr_valid"] / cand["nbr_slots"].clip(lower=1)) >= crit.min_valid_neighbor_frac]
     if len(c1) == 0 and len(cand) > 0:
-        note_relax.append("近傍の有効点割合の条件を満たす点が無く、条件を緩めた")
+        note_relax.append("近傍の有効点割合の条件を満たす台地の点が無く、条件を緩めた")
         c1 = cand
     c2 = c1[c1["nbr_slots"] == max_slots]  # 近傍が最も揃っている(格子の中央寄り)点に限る
     if len(c2) == 0 and len(c1) > 0:
-        note_relax.append("近傍が揃った点が無く、端の点も候補に含めた")
+        note_relax.append("近傍が揃った台地の点が無く、端の点も候補に含めた")
         c2 = c1
 
     rule = (
-        "最高成績の点ではなく『台地の中央』を選ぶ: 各点の近傍"
-        f"({'各軸で隣の水準を含む全組み合わせ' if neighborhood == 'box' else '自分+各軸の隣'}。"
-        "順序のない軸は自分自身のみ)の平均 avg_r(取引数が足りる点のみ平均)が最大の点。"
-        f"候補は取引数{crit.min_trades_for_analysis}以上・近傍の有効点が{crit.min_valid_neighbor_frac:.0%}以上・"
-        "近傍が最も揃った点(端でない点)。同点は 近傍の有効点数→近傍の最悪avg_r→設定キー順。"
-        "自分自身の avg_r は選定に使わない。"
+        "最高成績の点ではなく『台地の中央』を選ぶ: 近傍は自分自身を除く"
+        f"({'各軸で隣の水準を含む全組み合わせ' if neighborhood == 'box' else '各軸の隣'}。"
+        "順序のない軸の水準どうしは隣と見なさず、順序のある軸方向の近傍で評価する)。"
+        f"まず『台地の点』= 取引数{crit.min_trades_for_analysis}以上で、近傍の有効な点すべてとPF差が{crit.pf_tol}以内かつ"
+        "平均Rの符号が同じ点だけを候補にする(尖った山・符号の変わる点は落ちる)。"
+        f"さらに近傍の有効点が{crit.min_valid_neighbor_frac:.0%}以上・近傍が最も揃った点(端でない点)に限り、"
+        "その中で近傍の平均 avg_r(自分自身を除く)が最大の点を選ぶ。"
+        "同点は 近傍の有効点数→近傍の最悪avg_r→設定キー順。"
+        "自分自身の avg_r は選定の順位づけには使わない(台地の判定で、近傍との差・符号の一致を見るときだけ使う)。"
+        "台地の点が無いときは選ばない。"
     )
 
     chosen_params: Optional[Dict[str, Any]] = None
-    info: Dict[str, Any] = {"relaxed": note_relax, "n_candidates": int(len(c2))}
+    info: Dict[str, Any] = {
+        "relaxed": note_relax, "n_candidates": int(len(c2)), "n_plateau_points": n_plateau,
+        "ordered_axes": ordered_axes, "unordered_axes": unordered_axes, "warnings": warn,
+    }
+    if unordered_axes:
+        warn.append(
+            "順序のない軸(" + "・".join(unordered_axes) + ")の水準どうしは隣と見なさない。各水準は、順序のある軸方向の近傍で"
+            "評価している(順序のある軸が無いと台地を判定できない)。"
+        )
     if len(c2) > 0:
         ordered = c2.sort_values(
             ["nbr_avg_r", "nbr_valid", "nbr_min_avg_r", "params_key"],
@@ -894,6 +929,7 @@ def limited_grid(
             chosen_params_key=chosen.key(),
             chosen_avg_r=float(pick["avg_r"]),
             chosen_nbr_avg_r=float(pick["nbr_avg_r"]),
+            chosen_nbr_max_pf_diff=float(pick["nbr_max_pf_diff"]),
             chosen_n_trades=int(pick["n_trades"]),
             chosen_own_rank=own_rank,
             chosen_is_own_best=bool(pick["params_key"] == best_own["params_key"]),
@@ -902,8 +938,30 @@ def limited_grid(
             best_own_nbr_avg_r=float(best_own["nbr_avg_r"]) if not math.isnan(best_own["nbr_avg_r"]) else None,
             chosen_nbr_avg_r_positive=bool(pick["nbr_avg_r"] > 0),
         )
-    else:
+        if info["chosen_is_own_best"]:
+            warn.append(
+                "選んだ点は、自分自身の成績も全点で最高だった。台地の点の条件(近傍とPF差が小さく符号が同じ)は満たしているが、"
+                "最高点と台地の中央が一致しただけで尖っていないか、近傍の値を見て確認すること。"
+            )
+    elif not points or not bool(res["valid"].any()):
         info["note"] = "取引数が足りる点が無く、選べなかった(chosen_params=None)。段階Dに進む設定が無い"
+    elif not ordered_axes or max_slots == 0:
+        info["no_plateau"] = True
+        info["no_plateau_reason"] = "no_ordered_axis"
+        info["note"] = (
+            "順序のある軸が1つも無い(または水準が1つしかない)ため、隣の水準が作れず台地を判定できない。"
+            "台地を作れず、選べなかった(chosen_params=None)。最高点をそのまま選ぶことはしない"
+        )
+        warn.append("台地を作れない: 順序のない軸だけのグリッドでは、台地の中央を選べない。")
+    else:
+        info["no_plateau"] = True
+        info["no_plateau_reason"] = "no_plateau_point"
+        info["note"] = (
+            "取引数が足りる点はあるが、近傍とPF差が小さく符号も同じ『台地の点』が1つも無かった"
+            f"(台地の点 {n_plateau} 件)。台地を作れず、選べなかった(chosen_params=None)。"
+            "最高点をそのまま選ぶことはしない(尖った山・曲線当てはめの疑い)"
+        )
+        warn.append("台地を作れない: 成績が設定ごとに大きく変わり、なだらかな領域が無い。")
 
     # ---- 試行総数(多重検定の目安): 段階A+B+C の重複を除いた設定数 ----
     keys_c = set(ev.keys)
@@ -962,12 +1020,13 @@ def stage_c(
     """INTERFACES §6 の段階C。学習用期間のみ。
 
     戻り値:
-      results           DataFrame(各軸+指標+近傍平均 nbr_avg_r など+is_chosen)
+      results           DataFrame(各軸+指標+近傍平均 nbr_avg_r(自分自身を除く)・nbr_max_pf_diff・plateau_point+is_chosen)
       n_trials          段階A+B+Cで試した設定の総数(重複を除く。多重検定の目安)。
                         stage_b_df を渡さないと段階Bを含まない下限値(n_trials_detail に明記)
       n_trials_detail   内訳 {A, B, C, C_new_vs_AB, grid_size, total_distinct, ...}
       axes              {field: 水準} 実際に使った軸
-      chosen_params     選んだ設定(Params.to_dict())。選べなければ None(Params.from_dict で復元)
+      chosen_params     選んだ設定(Params.to_dict())。選べなければ None(Params.from_dict で復元)。
+                        台地の点が無い・順序のある軸が無いときも None(selection_info に no_plateau=True と理由)
       selection_rule    選び方の説明(日本語)
       selection_info    選んだ点の詳細(自分自身の順位・最高点との違いなど)
     """

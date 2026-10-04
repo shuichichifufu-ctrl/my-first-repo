@@ -556,6 +556,25 @@ def test_統合_合成データで本物のstagesを通しで実行(tmp_path):
     assert code == 0, md
 
 
+@pytest.mark.skipif(_real_stages() is None, reason="stages.py(stages担当)がまだ揃っていない")
+def test_統合_本物のstagesで凍結記録が実行をまたぎ_検証後の設定変更を選び直しと検出する(tmp_path):
+    out = tmp_path / "out"
+    base = ["--synthetic", "--years", "1.2", "--seed", "0", "--n-runs", "2", "--top-k", "3", "--out", str(out)]
+    main(base)
+    d1 = json.loads((out / "result.json").read_text(encoding="utf-8"))
+    fz = d1["meta"]["freeze"]
+    assert fz["path"] == str(out / "freeze.json") and (out / "freeze.json").exists()
+    assert fz["validation_seen"] is True and fz["hash"] and d1["meta"]["reselected"] is False
+    assert fz["validation_seen_by"] == ["stage_d", "stage_e"]  # 同じ記録が段階Dと段階Eに渡っている
+    assert "なし(凍結記録" in (out / "report.md").read_text(encoding="utf-8")
+    # 検証用期間を見た後に、学習用期間の終わりを変えて再実行 → 設定の凍結記録と食い違い、選び直しとして検出される
+    main(base + ["--train-end", "2018-07-01"])
+    d2 = json.loads((out / "result.json").read_text(encoding="utf-8"))
+    assert d2["meta"]["reselected"] is True and d2["meta"]["freeze"]["reselected"] is True
+    md = (out / "report.md").read_text(encoding="utf-8")
+    assert "**選び直しの有無**: **あり" in md and "選び直した" in md
+
+
 # =============================================================================================
 # README に書いた手順(テンプレート)が実際に読めて、未転記は保留になること
 # =============================================================================================
@@ -581,3 +600,29 @@ def test_READMEにデータ形式と接続後の手順が書かれている():
     for w in ("USDJPY_M15.csv", "time,open,high,low,close,volume", "--source-tz", "ny_close_server",
               "PHASE0_GATE", "--gates-json", "--costs-json", "slippage_pips", "--train-end", "core/gates.py"):
         assert w in md, w
+
+
+# =============================================================================================
+# 段階Cで台地を作れず設定を選べなかったとき(最高点を選ばない)
+# =============================================================================================
+def test_台地を作れず設定を選べなければ段階DEを実行せず理由を残して保留(tmp_path):
+    fk = make_fake_stages()
+    orig = fk.stage_c
+
+    def stage_c_no_plateau(datasets, cfg, split, **kw):
+        sc = orig(datasets, cfg, split, **kw)
+        sc["chosen_params"] = None
+        sc["selection_info"] = {"no_plateau": True, "no_plateau_reason": "no_plateau_point",
+                                "note": "台地を作れず、選べなかった(テスト用)"}
+        return sc
+
+    fk.stage_c = stage_c_no_plateau
+    res = run_pipeline(tiny_raw15(), real_cfg(), gate_sets=DUMMY_GATES, data_source="テスト実データ", stages=fk,
+                       registry=fk.FreezeRegistry(str(tmp_path / "freeze.json")))
+    assert res["stage_d"] is None and res["stage_e"] is None
+    assert any("台地を作れず" in x for x in res["meta"]["limits"])
+    assert decide_verdict(res)["verdict"] == V_HOLD
+    from report import build_report
+
+    md = build_report(res)
+    assert "台地を作れず、設定を選べなかった" in md and "最高成績の点は選んでいない" in md
