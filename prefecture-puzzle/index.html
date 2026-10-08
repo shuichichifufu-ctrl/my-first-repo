@@ -103,6 +103,11 @@ dialog h2{margin:0 0 8px;font-size:1.1rem}
     <div id="alerts"></div>
   </section>
 
+  <section class="panel" id="overviewPanel">
+    <b>組み上がりの全体図</b>（「○番目」の順に、下から重ねて貼ります。しま模様は印刷不要）
+    <div id="overview"></div>
+  </section>
+
   <section class="panel notice" id="notice">
     <div class="chars" id="notice-chars"></div>
   </section>
@@ -113,7 +118,7 @@ dialog h2{margin:0 0 8px;font-size:1.1rem}
       <li>各ページの「行〇 - 列〇」が並びの目印です。左上が「行1 - 列1」です。</li>
       <li>貼る順番：「行1 - 列1」のページをいちばん下に置きます。右へ、次の段へと、あとのページほど上に重ねていきます。</li>
       <li>「上に重ねる側」のページ（2列目以降は左はし、2行目以降は上はし）は、灰色の点線「切り取り線」の外側（白い余白5mm）をはさみで切り落とします。「下に敷く側」のページは切りません。</li>
-      <li>切ったページの切り口を、下に敷くページの斜線ののりしろ（のりしろの内側の点線）にそろえて重ねます。切り口の赤い短い線を、下に敷くページの赤い「＋」の線につなげ、地図の線がつながったらのりづけします。</li>
+      <li>切ったページの切り口を、下に敷くページの斜線ののりしろ（のりしろの内側の点線）にそろえて重ねます（図の「○番目」の順に貼ります）。切り口の赤い短い線を、下に敷くページの赤い「＋」の線につなげ、地図の線がつながったらのりづけします。</li>
       <li>各ページの50mmの線を定規で測り、50mmになっていれば原寸で印刷できています。</li>
     </ol>
     <div class="figs">
@@ -146,7 +151,7 @@ dialog h2{margin:0 0 8px;font-size:1.1rem}
   </section>
 </main>
 <footer>
-  地図データ: dataofjapan/land（国土数値情報をもとにした日本の都道府県境データ）を簡略化して使用（紙面で約2mm角に満たない小さな島は省略）。ライセンス条件は利用前に各自でご確認ください。
+  地図データ: dataofjapan/land（国土数値情報をもとにした日本の都道府県境データ）を簡略化して使用（紙面で約1.7mm角（3mm²）に満たない小さな島は省略）。ライセンス条件は利用前に各自でご確認ください。
   投影法: 各都道府県の中心を基準にしたランベルト正積方位図法（d3-geo）。県の範囲での長さの誤差は0.5%未満です。
 </footer>
 
@@ -281,9 +286,22 @@ function inkCount(R, x, y, w, h){
 }
 
 // ===== 1ページ分のSVG =====
+// 全体の中でこのページがどこかを示す小さな位置図
+function miniMap(L, r, c, ug, x, y, w, h){
+  if(L.rows*L.cols>400) return "";
+  const k = Math.min(w/L.cols, h/L.rows);
+  const ox = x + (w-k*L.cols)/2, oy = y + (h-k*L.rows)/2;
+  let m = `<g stroke="#333" stroke-width=".15">`;
+  for(let i=0;i<L.rows;i++) for(let j=0;j<L.cols;j++){
+    const cur = (i===r && j===c);
+    m += `<rect x="${ox+j*k}" y="${oy+i*k}" width="${k}" height="${k}" fill="${cur?"#e00000":(ug[i][j]?"#cfcfcf":"#fff")}" ${ug[i][j]?"":'stroke-dasharray=".4 .4"'}/>`;
+  }
+  return m + `</g>`;
+}
 function pageSVG(map, L, r, c, label){
   const {PW,PH,W,H,sx,sy,cols,rows,offX,offY} = L;
-  const hasR = c<cols-1, hasB = r<rows-1, hasL = c>0, hasT = r>0;
+  const ug = label.ug;
+  const hasR = c<cols-1 && ug[r][c+1], hasB = r<rows-1 && ug[r+1][c], hasL = c>0 && ug[r][c-1], hasT = r>0 && ug[r-1][c];
   const id = `p${r}_${c}`;
   const tx = offX - c*sx, ty = offY - r*sy;
   let s = `<svg xmlns="${NS}" viewBox="0 0 ${PW} ${PH}" width="${PW}mm" height="${PH}mm" role="img" aria-label="行${r+1} - 列${c+1}">`;
@@ -305,8 +323,8 @@ function pageSVG(map, L, r, c, label){
   if(hasR) s += T(gl,`transform="translate(${W-GLUE/2+0.9} ${H/2}) rotate(90)" text-anchor="middle"`);
   if(hasB) s += T(gb,`x="${W/2}" y="${H-GLUE/2+0.9}" text-anchor="middle"`);
   // 切り取り線（上に重ねる側＝左・上のはし）: 灰色の点線。この線の外側（白い余白）を切り落とす
-  if(hasL) s += `<line x1="0.5" y1="0" x2="0.5" y2="${H}" stroke="#555" stroke-width=".3" stroke-dasharray="1 1.2"/>`+T("切り取り線",`transform="translate(3.4 ${H/2}) rotate(90)" text-anchor="middle"`);
-  if(hasT) s += `<line x1="0" y1="0.5" x2="${W}" y2="0.5" stroke="#555" stroke-width=".3" stroke-dasharray="1 1.2"/>`+T("切り取り線",`x="${W/2}" y="3.4" text-anchor="middle"`);
+  if(hasL) s += `<line x1="0.15" y1="0" x2="0.15" y2="${H}" stroke="#555" stroke-width=".3" stroke-dasharray="1 1.2"/>`;
+  if(hasT) s += `<line x1="0" y1="0.15" x2="${W}" y2="0.15" stroke="#555" stroke-width=".3" stroke-dasharray="1 1.2"/>`;
   // トンボ: 下になるページ（右・下に隣がある側）は、つぎ目の点線の上に赤い「＋」を置く。
   // 重ねる側のページは、切り口に赤い短い線を置き、下の＋のよこ線（たて線）につなげる。
   const hm=4;
@@ -323,7 +341,7 @@ function pageSVG(map, L, r, c, label){
   if(hasT){ const xs=[...xList]; if(hasR) xs.push(W-GLUE);
     for(const x of xs) s += `<path d="M${x} 0V5" stroke="#e00000" stroke-width=".4"/>`; }
   // ラベル（のりしろ・＋を避け、地図と重ならない場所を選ぶ）
-  const bw=56, bh=11;
+  const bw=84, bh=11;
   const fx0=(hasL?GLUE+3:12), fx1=W-(hasR?GLUE+3:12)-bw, fy0=(hasT?GLUE+3:3), fy1=H-(hasB?GLUE+3:3)-bh;
   const cands=[[fx0,fy0],[fx1,fy0],[fx0,fy1],[fx1,fy1]];
   for(const fy of [0,0.25,0.5,0.75,1]) for(const fx of [0,0.25,0.5,0.75,1]) cands.push([fx0+(fx1-fx0)*fx, fy0+(fy1-fy0)*fy]);
@@ -339,7 +357,8 @@ function pageSVG(map, L, r, c, label){
      + `<text x="${bx+bw-2}" y="${by+3.8}" font-size="2.3" text-anchor="end" font-family="sans-serif" fill="#333" stroke="#fff" stroke-width=".6" paint-order="stroke">${esc(label.name)} ${fmtScale(label.denom)}</text>`
      + `<line x1="${bx+3}" y1="${by+9.2}" x2="${bx+53}" y2="${by+9.2}" stroke="#000" stroke-width=".35"/>`
      + `<path d="M${bx+3} ${by+8}v2.4M${bx+53} ${by+8}v2.4" stroke="#000" stroke-width=".35"/>`
-     + `<text x="${bx+28}" y="${by+7.2}" font-size="2.2" text-anchor="middle" font-family="sans-serif" fill="#000" stroke="#fff" stroke-width=".6" paint-order="stroke">この線が50mmなら原寸</text></g>`;
+     + `<text x="${bx+28}" y="${by+7.2}" font-size="2.2" text-anchor="middle" font-family="sans-serif" fill="#000" stroke="#fff" stroke-width=".6" paint-order="stroke">この線が50mmなら原寸</text>`
+     + miniMap(L, r, c, ug, bx+58, by+1, 24, 9) + `</g>`;
   s += `</g></g></svg>`;
   return s;
 }
@@ -371,15 +390,16 @@ function render(){
   if(usedN>MAX_PAGES){
     $("stats").innerHTML = `<b>${usedN}枚</b>（行${L.rows} × 列${L.cols}）が必要です。<span class="note">${esc(map.name)}　縮尺 ${fmtScale(denom)}　完成サイズ 約${Math.round(map.w)}mm × ${Math.round(map.h)}mm</span>`;
     alerts.innerHTML = `<div class="warnline">${MAX_PAGES}枚を超えるため、プレビューと印刷は止めています。縮尺の数字を大きく（地図を小さく）してください。</div>`;
-    $("btnPrint").disabled = true; document.body.classList.add("blocked"); current=null; window.__puzzle=null; updateRemoteHint(idx,denom,orient,remote); return;
+    $("btnPrint").disabled = true; document.body.classList.add("blocked"); $("overview").innerHTML=""; current=null; window.__puzzle=null; updateRemoteHint(idx,denom,orient,remote); return;
   }
+  const ug=[]; for(let r=0;r<L.rows;r++){ ug.push([]); for(let c=0;c<L.cols;c++) ug[r].push(inks[r*L.cols+c]>0); }
   let used=0;
   const cells=[];
   for(let r=0;r<L.rows;r++) for(let c=0;c<L.cols;c++){
     const ink = inks[r*L.cols+c];
     if(ink===0){ cells.push(`<div class="sheet empty" data-row="${r+1}" data-col="${c+1}"><span>行${r+1} - 列${c+1}<br>地図が無いので印刷不要</span></div>`); continue; }
     used++;
-    cells.push(`<div class="sheet" data-row="${r+1}" data-col="${c+1}">${pageSVG(map,L,r,c,{name:map.name,denom,R})}</div>`);
+    cells.push(`<div class="sheet" data-row="${r+1}" data-col="${c+1}">${pageSVG(map,L,r,c,{name:map.name,denom,R,ug})}</div>`);
   }
   grid.style.setProperty("--cols", L.cols);
   grid.innerHTML = cells.join("");
@@ -387,12 +407,13 @@ function render(){
   if(sheets.length) sheets[sheets.length-1].classList.add("last");
   const emptyN = total-used;
   $("stats").innerHTML = `<b>必要なA4用紙：${used}枚</b>（行${L.rows} × 列${L.cols}${emptyN?`、地図の無い${emptyN}枚は印刷不要`:""}）`
-    + `<span class="note">${esc(map.name)}　縮尺 ${fmtScale(denom)}　完成サイズ 約${Math.round(map.w)}mm × ${Math.round(map.h)}mm（のりしろを重ねた後）</span>`;
+    + `<span class="note">${esc(map.name)}　縮尺 ${fmtScale(denom)}　${(remote&&emptyN>0)?"離島が離れているため、完成サイズは表示しません":`完成サイズ 約${Math.round(map.w)}mm × ${Math.round(map.h)}mm（のりしろを重ねた後）`}</span>`;
   let extra="";
-  if(map.skipped) extra += `<div class="warnline">紙面で約2mm角に満たない小さな島を${map.skipped}個、省略しています。</div>`;
+  if(map.skipped) extra += `<div class="warnline">紙面で約1.7mm角（3mm²）に満たない小さな島を${map.skipped}個、省略しています。</div>`;
   if(remote && emptyN>0) extra += `<div class="warnline">離島が本島から遠いため、地図が1枚につながらず、島ごとのページが点在します（地図の無い枠は印刷されません）。島どうしは貼り合わせられないので、島ごとに別々の地図として使うか、離島を含めない設定にしてください。</div>`;
   alerts.innerHTML = extra;
   if(used>WARN_PAGES) alerts.innerHTML += `<div class="warnline">${used}枚と多めです。紙とインクをたくさん使うので、縮尺を変えられないか先に考えてみてください。</div>`;
+  $("overview").innerHTML = overviewHTML(L, ug);
   $("btnPrint").disabled = false;
   if(grid.scrollWidth > grid.clientWidth+4) alerts.innerHTML += `<div class="warnline">プレビューは横にスクロールできます（${L.cols}列）。</div>`;
   updateRemoteHint(idx,denom,orient,remote);
@@ -400,10 +421,22 @@ function render(){
   window.__puzzle = current;
 }
 
+function overviewHTML(L, ug){
+  const cw=44, ch=32, pad=6;
+  const Wd=L.cols*cw+pad*2, Hd=L.rows*ch+pad*2;
+  let n=0, g="";
+  for(let r=0;r<L.rows;r++) for(let c=0;c<L.cols;c++){
+    const x=pad+c*cw, y=pad+r*ch;
+    if(ug[r][c]){ n++; g+=`<rect x="${x}" y="${y}" width="${cw}" height="${ch}" fill="#fff" stroke="#333"/><text x="${x+cw/2}" y="${y+14}" font-size="10" text-anchor="middle">行${r+1}-列${c+1}</text><text x="${x+cw/2}" y="${y+27}" font-size="10" text-anchor="middle" fill="#e00000" font-weight="700">${n}番目</text>`; }
+    else g+=`<rect x="${x}" y="${y}" width="${cw}" height="${ch}" fill="url(#ovh)" stroke="#bbb" stroke-dasharray="3 2"/>`;
+  }
+  return `<svg viewBox="0 0 ${Wd} ${Hd}" style="width:100%;max-width:${Math.min(Wd*1.6,900)}px;height:auto" role="img" aria-label="組み上がりの全体図">`
+    + `<defs><pattern id="ovh" width="6" height="6" patternUnits="userSpaceOnUse" patternTransform="rotate(45)"><rect width="6" height="6" fill="#f2f2f2"/><line x1="0" y1="0" x2="0" y2="6" stroke="#ccc"/></pattern></defs>${g}</svg>`;
+}
 function updateRemoteHint(idx,denom,orient,remote){
   const other = layoutPages(buildMap(idx,denom,!remote), orient);
   const n = other.rows*other.cols;
-  $("remoteHint").textContent = remote ? `（含めない場合の枠: ${other.rows}行×${other.cols}列）` : `（含めると枠が${other.rows}行×${other.cols}列に）`;
+  $("remoteHint").textContent = remote ? `（含めない場合の枠: ${other.rows}行×${other.cols}列）` : `（含めると枠が${other.rows}行×${other.cols}列に。含めないときは本島から約100km以内の島だけ描きます）`;
 }
 
 // ===== 起動 =====
