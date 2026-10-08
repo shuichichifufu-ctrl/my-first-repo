@@ -1,0 +1,178 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>都道府県 同縮尺パズルメーカー</title>
+<style id="pagestyle">@page { size: A4 portrait; margin: 0; }</style>
+<style>
+:root {
+  --ink: #1f2933; --sub: #52606d; --line: #d5dde5; --bg: #f3f6f9; --card: #fff;
+  --accent: #1f6fb2; --accent-d: #17588f; --warn: #b45309; --warn-bg: #fff4e0;
+}
+* { box-sizing: border-box; }
+html, body { margin: 0; }
+body { background: var(--bg); color: var(--ink); font-family: 'Noto Sans JP','Hiragino Sans','Yu Gothic','Meiryo','IPAGothic',sans-serif; line-height: 1.6; font-size: 15px; }
+.wrap { max-width: 1180px; margin: 0 auto; padding: 0 16px 48px; }
+header.top { background: var(--accent); color: #fff; padding: 14px 0; }
+header.top .wrap { padding-bottom: 0; display: flex; align-items: baseline; gap: 16px; flex-wrap: wrap; }
+header.top h1 { margin: 0; font-size: 20px; letter-spacing: .02em; }
+header.top p { margin: 0; font-size: 13px; opacity: .92; }
+.card { background: var(--card); border: 1px solid var(--line); border-radius: 10px; padding: 16px 18px; margin-top: 16px; }
+.card h2 { margin: 0 0 10px; font-size: 16px; }
+.controls { display: grid; grid-template-columns: repeat(auto-fit, minmax(190px, 1fr)); gap: 14px 22px; align-items: start; }
+.field > .lbl { display: block; font-weight: 700; font-size: 13px; color: var(--sub); margin-bottom: 4px; }
+select { font: inherit; padding: 6px 8px; border: 1px solid #aab6c2; border-radius: 6px; background: #fff; width: 100%; max-width: 240px; }
+.opt { display: flex; align-items: center; gap: 6px; margin: 2px 0; cursor: pointer; }
+.hint { font-size: 12px; color: var(--sub); margin: 3px 0 0; }
+.row2 { display: grid; grid-template-columns: minmax(0, 1.25fr) minmax(0, 1fr); gap: 16px; align-items: start; }
+@media (max-width: 860px) { .row2 { grid-template-columns: 1fr; } }
+#summary p { margin: 0 0 8px; }
+#summary .big { font-size: 18px; }
+#summary .count b { font-size: 18px; color: var(--accent-d); }
+#summary .warn { background: var(--warn-bg); color: var(--warn); padding: 8px 10px; border-radius: 6px; border: 1px solid #f1d29a; font-weight: 700; }
+#summary .note { font-size: 13px; color: var(--sub); }
+#overview { background: #eaf1f8; border-radius: 8px; padding: 8px; }
+#overview svg { display: block; width: 100%; max-height: 62vh; }
+.btn { font: inherit; font-weight: 700; padding: 10px 22px; border-radius: 8px; border: 1px solid var(--accent-d); background: var(--accent); color: #fff; cursor: pointer; }
+.btn:hover { background: var(--accent-d); }
+.btn.ghost { background: #fff; color: var(--accent-d); }
+.actions { display: flex; align-items: center; gap: 14px; margin-top: 12px; flex-wrap: wrap; }
+.steps { margin: 0; padding-left: 1.3em; }
+.steps li { margin: 4px 0; }
+#pages { display: flex; flex-wrap: wrap; gap: 14px; margin-top: 12px; }
+.sheet-wrap .cap { font-size: 12px; color: var(--sub); margin-bottom: 3px; }
+.sheet { background: #fff; padding: 5mm 0 0 5mm; overflow: hidden; border: 1px solid #b9c4cf; box-shadow: 0 1px 4px rgba(0,0,0,.15); zoom: .5; }
+.sheet svg { display: block; }
+.sheet-wrap { cursor: zoom-in; }
+#zoomBody svg { display: block; width: min(92vw, 820px); height: auto; }
+#zoomDialog { max-width: none; width: auto; }
+#zoomDialog .dlg-foot { padding-top: 6px; }
+footer.credit { margin-top: 20px; font-size: 12px; color: var(--sub); }
+#status { font-size: 12px; color: var(--sub); }
+dialog { border: none; border-radius: 14px; padding: 0; max-width: 640px; width: calc(100% - 32px); box-shadow: 0 10px 40px rgba(0,0,0,.35); }
+dialog::backdrop { background: rgba(20,30,40,.55); }
+.dlg-body { padding: 18px 22px 8px; }
+.dlg-body h3 { margin: 0 0 12px; font-size: 18px; }
+.chara { display: flex; gap: 12px; align-items: flex-start; margin: 12px 0; }
+.chara .face { flex: none; width: 58px; height: 58px; border-radius: 50%; display: grid; place-items: center; font-size: 28px; color: #fff; }
+.chara.dr .face { background: #2f7d5b; }
+.chara.ya .face { background: #c2410c; }
+.chara .name { font-size: 12px; font-weight: 700; color: var(--sub); }
+.bubble { background: #f3f6f9; border: 1px solid var(--line); border-radius: 12px; padding: 10px 14px; position: relative; flex: 1; }
+.bubble ul { margin: 4px 0 0; padding-left: 1.2em; }
+.bubble li { margin: 3px 0; }
+.dlg-foot { padding: 10px 22px 18px; display: flex; gap: 12px; justify-content: flex-end; flex-wrap: wrap; }
+.small { font-size: 12px; color: var(--sub); margin: 8px 0 0; }
+
+@media print {
+  html, body { background: #fff; }
+  body > :not(#printRoot) { display: none !important; }
+  #printRoot > :not(#pagesBox) { display: none !important; }
+  #pagesBox, #pages { display: block !important; margin: 0 !important; padding: 0 !important; border: 0 !important; background: none !important; box-shadow: none !important; }
+  .wrap { max-width: none; padding: 0; }
+  .card { border: 0; padding: 0; margin: 0; background: none; }
+  .card > :not(#pages) { display: none !important; }
+  .cap { display: none !important; }
+  .sheet-wrap { page-break-after: always; break-after: page; }
+  .sheet-wrap:last-child { page-break-after: auto; break-after: auto; }
+  .sheet { zoom: 1 !important; border: 0; box-shadow: none; margin: 0; }
+}
+</style>
+</head>
+<body>
+<header class="top"><div class="wrap">
+  <h1>都道府県 同縮尺パズルメーカー</h1>
+  <p>県を選んで印刷し、A4を貼り合わせると、同じ縮尺の地図になります。</p>
+</div></header>
+
+<div class="wrap" id="printRoot">
+  <section class="card">
+    <h2>1. 作りたい地図を選ぶ</h2>
+    <div class="controls">
+      <div class="field"><label class="lbl" for="pref">都道府県</label><select id="pref"></select></div>
+      <div class="field"><span class="lbl">縮尺</span>
+        <label class="opt"><input type="radio" name="denom" value="250000"> 1/25万（大きい）</label>
+        <label class="opt"><input type="radio" name="denom" value="500000" checked> 1/50万</label>
+        <label class="opt"><input type="radio" name="denom" value="1000000"> 1/100万（小さい）</label>
+      </div>
+      <div class="field"><span class="lbl">用紙の向き</span>
+        <label class="opt"><input type="radio" name="orient" value="portrait" checked> 縦</label>
+        <label class="opt"><input type="radio" name="orient" value="landscape"> 横</label>
+      </div>
+      <div class="field"><span class="lbl">離島の扱い</span>
+        <label class="opt"><input type="radio" name="islands" value="no" checked> 本土のみ</label>
+        <label class="opt"><input type="radio" name="islands" value="yes"> 離島を含む</label>
+        <p class="hint">本土のみ＝最大の陸地から50km以内</p>
+      </div>
+      <div class="field"><span class="lbl">空白ページ</span>
+        <label class="opt"><input type="checkbox" id="skipBlank" checked> 地図がないページは印刷しない</label>
+        <p class="hint">番号は欠番として残ります</p>
+        <label class="opt"><input type="checkbox" id="sample" checked> 貼り合わせ見本ページを最初に付ける</label>
+        <p class="hint">見本は番号の付かない1枚です</p>
+      </div>
+    </div>
+  </section>
+
+  <div class="row2">
+    <section class="card" id="resultBox">
+      <h2>2. 枚数を確かめる</h2>
+      <div id="summary"></div>
+      <div class="actions">
+        <button class="btn" id="printBtn" type="button">印刷する</button>
+        <span id="status"></span>
+      </div>
+      <p class="small">印刷は A4・倍率100%・余白なし。プリンタのポスター印刷機能は使いません。</p>
+    </section>
+    <section class="card">
+      <h2>全体図（青い枠が1枚の紙、数字がページ番号）</h2>
+      <div id="overview"></div>
+    </section>
+  </div>
+
+  <section class="card" id="guideBox">
+    <h2>貼り合わせ方</h2>
+    <ol class="steps">
+      <li>全ページを印刷し、スケールバー（長さ10cmの線）を定規で測って100mmか確かめます。</li>
+      <li>点線がある紙（行1-列1以外）は、点線の外側の白い余白（5mm）をはさみで切り落とします。行1-列1の紙は切りません。</li>
+      <li>左上のページ（行1-列1）から始め、右の紙・下の紙の順に、斜線ののりしろの上に重ねます。</li>
+      <li>赤い「＋」が上下の紙でぴったり重なるように合わせて、のりで貼ります。</li>
+    </ol>
+  </section>
+
+  <section class="card" id="pagesBox">
+    <h2>3. 各ページのプレビュー（縮小表示。クリックで拡大。印刷は実寸）</h2>
+    <div id="pages"></div>
+  </section>
+
+  <footer class="credit">
+    地図データ：地球地図日本（国土地理院）の都道府県境を、頂点を減らして簡略化して使用しています（非営利目的での利用。出典の明記が必要です）。
+    海岸線は簡略化されているため、1/25万では細かな形が実際と異なります。地図の描画：D3.js v7.9.0（ISCライセンス）。縮尺は球体で計算しており、約0.2%の誤差があります。
+  </footer>
+</div>
+
+<dialog id="zoomDialog"><div class="dlg-body" id="zoomBody"></div><div class="dlg-foot"><button class="btn ghost" id="zoomClose" type="button">閉じる</button></div></dialog>
+
+<dialog id="printDialog">
+  <div class="dlg-body">
+    <h3>印刷の前に確認してね</h3>
+    <div class="chara dr"><div class="face" aria-hidden="true">博</div>
+      <div class="bubble"><div class="name">ニルナーリ博士</div>
+        <ul><li>倍率は<b>100%</b>にしてね。「用紙に合わせる」は<b>オフ</b>だよ。</li><li>用紙はA4、向きはこの画面で選んだ向きだよ。</li></ul></div></div>
+    <div class="chara ya"><div class="face" aria-hidden="true">ヤ</div>
+      <div class="bubble"><div class="name">ヤクナーリくん</div>
+        <ul><li>余白は<b>「なし」</b>にしてね。</li><li>印刷したら、<b>10cmの線を定規で測って</b>ね！ 100mmなら成功だよ。</li></ul></div></div>
+    <p class="small">※余白なしに対応しないプリンタでは、紙の端が欠けることがあります。</p>
+  </div>
+  <div class="dlg-foot">
+    <button class="btn ghost" id="dlgCancel" type="button">やめる</button>
+    <button class="btn" id="dlgGo" type="button">確認した。印刷画面を開く</button>
+  </div>
+</dialog>
+
+<script>/*__D3__*/</script>
+<script>/*__DATA__*/</script>
+<script>/*__CORE__*/</script>
+<script>/*__APP__*/</script>
+</body>
+</html>
