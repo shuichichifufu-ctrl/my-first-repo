@@ -38,7 +38,8 @@ button.ghost{font-size:1rem;padding:10px 18px;min-height:44px;border:1px solid v
 .notice{background:var(--warn);border-color:var(--warn-line)}
 .guide ol{margin:6px 0 0;padding-left:1.3em;font-size:.92rem}
 .guide li{margin:2px 0}
-.guide-fig{width:100%;max-width:420px;height:auto;margin-top:8px}
+.figs{display:flex;flex-wrap:wrap;gap:12px}
+.guide-fig{width:100%;max-width:400px;height:auto;margin-top:8px;flex:1 1 280px}
 .grid{display:grid;grid-template-columns:repeat(var(--cols,1),minmax(150px,1fr));gap:10px;overflow-x:auto;padding-bottom:6px}
 .sheet{position:relative;background:#fff;border:1px solid #9aa5b1;box-shadow:0 1px 4px rgba(0,0,0,.12);aspect-ratio:var(--pw-n) / var(--ph-n)}
 .sheet svg{display:block;width:100%;height:auto}
@@ -110,19 +111,33 @@ dialog h2{margin:0 0 8px;font-size:1.1rem}
     <b>貼り合わせかた</b>
     <ol>
       <li>各ページの「行〇 - 列〇」が並びの目印です。左上が「行1 - 列1」です。</li>
-      <li>重ねる側（2列目以降の左はし、2行目以降の上はし）にある黒い実線の外側（白い余白5mm）を、はさみで切り落とします。左隣・上隣のページに重ねる側だけを切ります。</li>
-      <li>切ったページを、左隣（上隣）ページの斜線の「のりしろ」の上に重ねます。切り口を下のページの点線にそろえ、切り口の赤い短い線を、下のページの赤い「＋」の線につなげて合わせます。地図の線がつながったら、のりづけします。</li>
+      <li>貼る順番：「行1 - 列1」のページをいちばん下に置きます。右へ、次の段へと、あとのページほど上に重ねていきます。</li>
+      <li>「上に重ねる側」のページ（2列目以降は左はし、2行目以降は上はし）は、灰色の点線「切り取り線」の外側（白い余白5mm）をはさみで切り落とします。「下に敷く側」のページは切りません。</li>
+      <li>切ったページの切り口を、下に敷くページの斜線ののりしろ（のりしろの内側の点線）にそろえて重ねます。切り口の赤い短い線を、下に敷くページの赤い「＋」の線につなげ、地図の線がつながったらのりづけします。</li>
       <li>各ページの50mmの線を定規で測り、50mmになっていれば原寸で印刷できています。</li>
     </ol>
-    <svg class="guide-fig" viewBox="0 0 320 125" role="img" aria-label="貼り合わせの図: 右ページの左の余白を切り、左ページの斜線ののりしろに重ねる">
+    <div class="figs">
+    <svg class="guide-fig" viewBox="0 0 330 135" role="img" aria-label="横につなぐ図: 左の下に敷くページの斜線ののりしろに、右の上に重ねるページを重ねる">
       <defs><pattern id="gh" width="5" height="5" patternUnits="userSpaceOnUse" patternTransform="rotate(45)"><rect width="5" height="5" fill="#ddd"/><line x1="0" y1="0" x2="0" y2="5" stroke="#888" stroke-width="1"/></pattern></defs>
-      <rect x="10" y="10" width="130" height="90" fill="#fff" stroke="#333"/><rect x="104" y="10" width="36" height="90" fill="url(#gh)" stroke="#333" stroke-dasharray="3 2"/>
-      <text x="55" y="58" font-size="11" text-anchor="middle">左のページ</text><text x="122" y="113" font-size="9" text-anchor="middle">のりしろ</text>
-      <rect x="170" y="10" width="140" height="90" fill="#fff" stroke="#333"/><rect x="170" y="10" width="10" height="90" fill="#fde" stroke="#333"/>
-      <line x1="180" y1="6" x2="180" y2="104" stroke="#111" stroke-width="1.5"/><text x="245" y="118" font-size="9" text-anchor="middle" fill="#111">黒い実線の外側（白い余白）を切る</text>
-      <text x="245" y="58" font-size="11" text-anchor="middle">右のページ</text>
-      <path d="M150 55h14" stroke="#333" stroke-width="2"/><path d="M160 50l6 5-6 5" fill="none" stroke="#333" stroke-width="2"/>
+      <rect x="8" y="14" width="150" height="90" fill="#fff" stroke="#333"/><rect x="122" y="14" width="36" height="90" fill="url(#gh)"/>
+      <line x1="122" y1="14" x2="122" y2="104" stroke="#444" stroke-dasharray="3 2"/>
+      <rect x="122" y="14" width="200" height="90" fill="#fff" fill-opacity=".9" stroke="#333" stroke-dasharray="1 2"/>
+      <text x="58" y="62" font-size="11" text-anchor="middle">下に敷く側</text><text x="222" y="62" font-size="11" text-anchor="middle">上に重ねる側</text>
+      <g stroke="#e00000" stroke-width="1.4"><path d="M117 24h10M122 19v10M117 94h10M122 89v10"/><path d="M122 24h12M122 94h12" stroke-width="2.4"/></g>
+      <text x="122" y="10" font-size="8" text-anchor="middle" fill="#111">切り口＝点線にそろえる</text>
+      <text x="260" y="122" font-size="8.5" text-anchor="middle" fill="#e00000">赤い短い線を＋の線につなぐ</text>
+      <text x="85" y="122" font-size="8" text-anchor="middle" fill="#555">①左が先 ②右を上に重ねる</text>
     </svg>
+    <svg class="guide-fig" viewBox="0 0 330 150" role="img" aria-label="縦につなぐ図: 上の下に敷くページの斜線ののりしろに、下の上に重ねるページを重ねる">
+      <rect x="40" y="6" width="150" height="76" fill="#fff" stroke="#333"/><rect x="40" y="56" width="150" height="26" fill="url(#gh)"/>
+      <line x1="40" y1="56" x2="190" y2="56" stroke="#444" stroke-dasharray="3 2"/>
+      <rect x="40" y="56" width="150" height="90" fill="#fff" fill-opacity=".9" stroke="#333" stroke-dasharray="1 2"/>
+      <text x="115" y="34" font-size="11" text-anchor="middle">下に敷く側（上の段）</text><text x="115" y="104" font-size="11" text-anchor="middle">上に重ねる側（下の段）</text>
+      <g stroke="#e00000" stroke-width="1.4"><path d="M50 56h10M55 51v10M170 56h10M175 51v10"/><path d="M55 56v12M175 56v12" stroke-width="2.4"/></g>
+      <text x="200" y="60" font-size="8" fill="#111">切り口＝点線にそろえる</text>
+      <text x="200" y="76" font-size="8.5" fill="#e00000">赤い短い線を</text><text x="200" y="87" font-size="8.5" fill="#e00000">＋の線につなぐ</text>
+    </svg>
+    </div>
   </section>
 
   <p class="print-blocked-msg">枚数が多すぎるため印刷できません。縮尺を変えてからもう一度印刷してください。</p>
@@ -284,19 +299,17 @@ function pageSVG(map, L, r, c, label){
   if(hasB) s += `<line x1="0" y1="${H-GLUE}" x2="${W}" y2="${H-GLUE}" stroke="#444" stroke-width=".3" stroke-dasharray="2 1.5"/>`;
   const T = (txt,attrs)=>`<text ${attrs} font-size="2.4" fill="#222" stroke="#fff" stroke-width=".7" paint-order="stroke" stroke-opacity=".85" font-family="sans-serif">${txt}</text>`;
   const pill=(x,y,w,h)=>`<rect x="${x}" y="${y}" width="${w}" height="${h}" rx="1" fill="#fff" fill-opacity=".9"/>`;
-  const gl = "のりしろ：右隣ページを、左の白い余白を切って、ここに重ねる";
-  const gb = "のりしろ：下のページを、上の白い余白を切って、ここに重ねる";
+  const gl = "のりしろ（下に敷く側）：右隣のページを、ここに上から重ねる";
+  const gb = "のりしろ（下に敷く側）：下の段のページを、ここに上から重ねる";
   const hl = "↑重ねる側：この外の左余白を切る", ht = "重ねる側：この外の上余白を切る";
   if(hasR) s += T(gl,`transform="translate(${W-GLUE/2+0.9} ${H/2}) rotate(90)" text-anchor="middle"`);
   if(hasB) s += T(gb,`x="${W/2}" y="${H-GLUE/2+0.9}" text-anchor="middle"`);
-  // 切り取り線（重ねる側＝左・上のはし）: 黒い実線。この線の外側（白い余白）を切り落とす
-  if(hasL) s += `<line x1="0.2" y1="0" x2="0.2" y2="${H}" stroke="#111" stroke-width=".4"/>`;
-  if(hasT) s += `<line x1="0" y1="0.2" x2="${W}" y2="0.2" stroke="#111" stroke-width=".4"/>`;
-  if(hasL) for(let y=10;y<H;y+=20) s += `<path d="M0 ${y-1.6}L2.6 ${y}L0 ${y+1.6}Z" fill="#222"/>`;
-  if(hasT) for(let x=10;x<W;x+=20) s += `<path d="M${x-1.6} 0L${x} 2.6L${x+1.6} 0Z" fill="#222"/>`;
+  // 切り取り線（上に重ねる側＝左・上のはし）: 灰色の点線。この線の外側（白い余白）を切り落とす
+  if(hasL) s += `<line x1="0.5" y1="0" x2="0.5" y2="${H}" stroke="#555" stroke-width=".3" stroke-dasharray="1 1.2"/>`+T("切り取り線",`transform="translate(3.4 ${H/2}) rotate(90)" text-anchor="middle"`);
+  if(hasT) s += `<line x1="0" y1="0.5" x2="${W}" y2="0.5" stroke="#555" stroke-width=".3" stroke-dasharray="1 1.2"/>`+T("切り取り線",`x="${W/2}" y="3.4" text-anchor="middle"`);
   // トンボ: 下になるページ（右・下に隣がある側）は、つぎ目の点線の上に赤い「＋」を置く。
   // 重ねる側のページは、切り口に赤い短い線を置き、下の＋のよこ線（たて線）につなげる。
-  const hm=GLUE/2;
+  const hm=4;
   const yList=[hm,H-hm], xList=[hm,W-hm];
   const crossList=new Set();
   if(hasR){ for(const y of yList) crossList.add((W-GLUE)+","+y); if(hasB) crossList.add((W-GLUE)+","+(H-GLUE)); }
@@ -313,8 +326,7 @@ function pageSVG(map, L, r, c, label){
   const bw=56, bh=11;
   const fx0=(hasL?GLUE+3:12), fx1=W-(hasR?GLUE+3:12)-bw, fy0=(hasT?GLUE+3:3), fy1=H-(hasB?GLUE+3:3)-bh;
   const cands=[[fx0,fy0],[fx1,fy0],[fx0,fy1],[fx1,fy1]];
-  for(const fx of [0.5]) for(const fy of [0,0.25,0.5,0.75,1]) cands.push([fx0+(fx1-fx0)*fx, fy0+(fy1-fy0)*fy]);
-  for(const fy of [0.25,0.5,0.75]) for(const fx of [0,1]) cands.push([fx0+(fx1-fx0)*fx, fy0+(fy1-fy0)*fy]);
+  for(const fy of [0,0.25,0.5,0.75,1]) for(const fx of [0,0.25,0.5,0.75,1]) cands.push([fx0+(fx1-fx0)*fx, fy0+(fy1-fy0)*fy]);
   let best=cands[0], bestN=Infinity;
   for(const [bx,by] of cands){
     const n = label.R ? inkCount(label.R, c*sx+bx, r*sy+by, bw, bh) : 0;
@@ -378,10 +390,11 @@ function render(){
     + `<span class="note">${esc(map.name)}　縮尺 ${fmtScale(denom)}　完成サイズ 約${Math.round(map.w)}mm × ${Math.round(map.h)}mm（のりしろを重ねた後）</span>`;
   let extra="";
   if(map.skipped) extra += `<div class="warnline">紙面で約2mm角に満たない小さな島を${map.skipped}個、省略しています。</div>`;
-  if(remote && used < total*0.5) extra += `<div class="warnline">離島が遠くにあるため、地図が1枚につながらず、島ごとに点在します。地図の無い枠は印刷されません。</div>`;
+  if(remote && emptyN>0) extra += `<div class="warnline">離島が本島から遠いため、地図が1枚につながらず、島ごとのページが点在します（地図の無い枠は印刷されません）。島どうしは貼り合わせられないので、島ごとに別々の地図として使うか、離島を含めない設定にしてください。</div>`;
   alerts.innerHTML = extra;
   if(used>WARN_PAGES) alerts.innerHTML += `<div class="warnline">${used}枚と多めです。紙とインクをたくさん使うので、縮尺を変えられないか先に考えてみてください。</div>`;
   $("btnPrint").disabled = false;
+  if(grid.scrollWidth > grid.clientWidth+4) alerts.innerHTML += `<div class="warnline">プレビューは横にスクロールできます（${L.cols}列）。</div>`;
   updateRemoteHint(idx,denom,orient,remote);
   current = {map, L, used, total, denom, orient};
   window.__puzzle = current;
