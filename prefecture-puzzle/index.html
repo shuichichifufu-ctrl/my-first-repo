@@ -110,8 +110,8 @@ dialog h2{margin:0 0 8px;font-size:1.1rem}
     <b>貼り合わせかた</b>
     <ol>
       <li>各ページの「行〇 - 列〇」が並びの目印です。左上が「行1 - 列1」です。</li>
-      <li>重ねる側（2列目以降の左はし、2行目以降の上はし）の白い余白5mmを、はさみで切り落とします。左隣・上隣のページに重ねる側の余白だけを切ります。</li>
-      <li>切ったページを、左隣（上隣）ページの斜線の「のりしろ」の上に重ねます。くさび形の目印の外側が切る側です。切り口を点線にそろえ、赤い「＋」と地図の線がつながるように合わせてのりづけします。</li>
+      <li>重ねる側（2列目以降の左はし、2行目以降の上はし）にある黒い実線の外側（白い余白5mm）を、はさみで切り落とします。左隣・上隣のページに重ねる側だけを切ります。</li>
+      <li>切ったページを、左隣（上隣）ページの斜線の「のりしろ」の上に重ねます。切り口を下のページの点線にそろえ、切り口の赤い短い線を、下のページの赤い「＋」の線につなげて合わせます。地図の線がつながったら、のりづけします。</li>
       <li>各ページの50mmの線を定規で測り、50mmになっていれば原寸で印刷できています。</li>
     </ol>
     <svg class="guide-fig" viewBox="0 0 320 125" role="img" aria-label="貼り合わせの図: 右ページの左の余白を切り、左ページの斜線ののりしろに重ねる">
@@ -119,7 +119,7 @@ dialog h2{margin:0 0 8px;font-size:1.1rem}
       <rect x="10" y="10" width="130" height="90" fill="#fff" stroke="#333"/><rect x="104" y="10" width="36" height="90" fill="url(#gh)" stroke="#333" stroke-dasharray="3 2"/>
       <text x="55" y="58" font-size="11" text-anchor="middle">左のページ</text><text x="122" y="113" font-size="9" text-anchor="middle">のりしろ</text>
       <rect x="170" y="10" width="140" height="90" fill="#fff" stroke="#333"/><rect x="170" y="10" width="10" height="90" fill="#fde" stroke="#333"/>
-      <line x1="180" y1="6" x2="180" y2="104" stroke="#d00" stroke-width="1.5" stroke-dasharray="4 2"/><text x="180" y="118" font-size="9" text-anchor="middle" fill="#d00">ここを切る（白い余白）</text>
+      <line x1="180" y1="6" x2="180" y2="104" stroke="#111" stroke-width="1.5"/><text x="245" y="118" font-size="9" text-anchor="middle" fill="#111">黒い実線の外側（白い余白）を切る</text>
       <text x="245" y="58" font-size="11" text-anchor="middle">右のページ</text>
       <path d="M150 55h14" stroke="#333" stroke-width="2"/><path d="M160 50l6 5-6 5" fill="none" stroke="#333" stroke-width="2"/>
     </svg>
@@ -209,12 +209,12 @@ function buildMap(prefIdx, denom, includeRemote){
   const lon0=(minLon+maxLon)/2, lat0=(minLat+maxLat)/2;
   const proj = d3.geoAzimuthalEqualArea().rotate([-lon0,-lat0]).translate([0,0]).scale(EARTH_R_MM/denom);
   let x0=1e9,y0=1e9,x1=-1e9,y1=-1e9;
-  const parts=[];
+  const parts=[]; let skipped=0;
   for(const rings of polys){
     { // 紙面で約1.7mm角（3mm²）に満たない小島は省く（1枚を使うほどの価値がないため）
       let a=1e9,b=1e9,c=-1e9,d=-1e9;
       for(const p of rings[0]){ const q=proj(p); if(!q) continue; if(q[0]<a)a=q[0]; if(q[0]>c)c=q[0]; if(q[1]<b)b=q[1]; if(q[1]>d)d=q[1]; }
-      if((c-a)*(d-b) < 3 && polys.length>1) continue;
+      if((c-a)*(d-b) < 3 && polys.length>1){ skipped++; continue; }
     }
     for(const ring of rings){
       let seg="", n=0, lx=null, ly=null;
@@ -229,7 +229,7 @@ function buildMap(prefIdx, denom, includeRemote){
       if(n>=3) parts.push(seg+"Z");
     }
   }
-  return {name, d:parts.join(""), x0, y0, x1, y1, w:x1-x0, h:y1-y0, lon0, lat0, proj};
+  return {skipped, name, d:parts.join(""), x0, y0, x1, y1, w:x1-x0, h:y1-y0, lon0, lat0, proj};
 }
 
 function layoutPages(map, orient){
@@ -282,28 +282,35 @@ function pageSVG(map, L, r, c, label){
   if(hasB) s += `<rect x="0" y="${H-GLUE}" width="${W}" height="${GLUE}" fill="url(#hatch-${id})"/>`;
   if(hasR) s += `<line x1="${W-GLUE}" y1="0" x2="${W-GLUE}" y2="${H}" stroke="#444" stroke-width=".3" stroke-dasharray="2 1.5"/>`;
   if(hasB) s += `<line x1="0" y1="${H-GLUE}" x2="${W}" y2="${H-GLUE}" stroke="#444" stroke-width=".3" stroke-dasharray="2 1.5"/>`;
-  const T = (txt,attrs)=>`<text ${attrs} font-size="2.4" fill="#222" font-family="sans-serif">${txt}</text>`;
+  const T = (txt,attrs)=>`<text ${attrs} font-size="2.4" fill="#222" stroke="#fff" stroke-width=".7" paint-order="stroke" stroke-opacity=".85" font-family="sans-serif">${txt}</text>`;
   const pill=(x,y,w,h)=>`<rect x="${x}" y="${y}" width="${w}" height="${h}" rx="1" fill="#fff" fill-opacity=".9"/>`;
   const gl = "のりしろ：右隣ページを、左の白い余白を切って、ここに重ねる";
   const gb = "のりしろ：下のページを、上の白い余白を切って、ここに重ねる";
   const hl = "↑重ねる側：この外の左余白を切る", ht = "重ねる側：この外の上余白を切る";
-  if(hasR) s += pill(W-GLUE+3.2,H/2-34,5.2,68)+T(gl,`transform="translate(${W-GLUE/2+0.9} ${H/2}) rotate(90)" text-anchor="middle"`);
-  if(hasB) s += pill(W/2-34,H-GLUE+3.2,68,5.2)+T(gb,`x="${W/2}" y="${H-GLUE/2+0.9}" text-anchor="middle"`);
-  // 切り取りの目印: 重ねる側（左・上）の端に、内側へ向く小さなくさび（ここの外側を切る）
+  if(hasR) s += T(gl,`transform="translate(${W-GLUE/2+0.9} ${H/2}) rotate(90)" text-anchor="middle"`);
+  if(hasB) s += T(gb,`x="${W/2}" y="${H-GLUE/2+0.9}" text-anchor="middle"`);
+  // 切り取り線（重ねる側＝左・上のはし）: 黒い実線。この線の外側（白い余白）を切り落とす
+  if(hasL) s += `<line x1="0.2" y1="0" x2="0.2" y2="${H}" stroke="#111" stroke-width=".4"/>`;
+  if(hasT) s += `<line x1="0" y1="0.2" x2="${W}" y2="0.2" stroke="#111" stroke-width=".4"/>`;
   if(hasL) for(let y=10;y<H;y+=20) s += `<path d="M0 ${y-1.6}L2.6 ${y}L0 ${y+1.6}Z" fill="#222"/>`;
   if(hasT) for(let x=10;x<W;x+=20) s += `<path d="M${x-1.6} 0L${x} 2.6L${x+1.6} 0Z" fill="#222"/>`;
-  // トンボ（赤い＋）: のりしろの帯の両端の中心。隣のページと絶対位置が一致する
-  const pts=new Set(); const hm=GLUE/2;
-  if(hasR){ pts.add((W-hm)+","+hm); pts.add((W-hm)+","+(H-hm)); }
-  if(hasL){ pts.add(hm+","+hm); pts.add(hm+","+(H-hm)); }
-  if(hasB){ pts.add(hm+","+(H-hm)); pts.add((W-hm)+","+(H-hm)); }
-  if(hasT){ pts.add(hm+","+hm); pts.add((W-hm)+","+hm); }
-  for(const q of pts){
+  // トンボ: 下になるページ（右・下に隣がある側）は、つぎ目の点線の上に赤い「＋」を置く。
+  // 重ねる側のページは、切り口に赤い短い線を置き、下の＋のよこ線（たて線）につなげる。
+  const hm=GLUE/2;
+  const yList=[hm,H-hm], xList=[hm,W-hm];
+  const crossList=new Set();
+  if(hasR){ for(const y of yList) crossList.add((W-GLUE)+","+y); if(hasB) crossList.add((W-GLUE)+","+(H-GLUE)); }
+  if(hasB){ for(const x of xList) crossList.add(x+","+(H-GLUE)); }
+  for(const q of crossList){
     const [x,y]=q.split(",").map(Number);
     s += `<path d="M${x-2.5} ${y}H${x+2.5}M${x} ${y-2.5}V${y+2.5}" stroke="#e00000" stroke-width=".4" fill="none"/>`;
   }
+  if(hasL){ const ys=[...yList]; if(hasB) ys.push(H-GLUE);
+    for(const y of ys) s += `<path d="M0 ${y}H5" stroke="#e00000" stroke-width=".4"/>`; }
+  if(hasT){ const xs=[...xList]; if(hasR) xs.push(W-GLUE);
+    for(const x of xs) s += `<path d="M${x} 0V5" stroke="#e00000" stroke-width=".4"/>`; }
   // ラベル（のりしろ・＋を避け、地図と重ならない場所を選ぶ）
-  const bw=56, bh=10;
+  const bw=56, bh=11;
   const fx0=(hasL?GLUE+3:12), fx1=W-(hasR?GLUE+3:12)-bw, fy0=(hasT?GLUE+3:3), fy1=H-(hasB?GLUE+3:3)-bh;
   const cands=[[fx0,fy0],[fx1,fy0],[fx0,fy1],[fx1,fy1]];
   for(const fx of [0.5]) for(const fy of [0,0.25,0.5,0.75,1]) cands.push([fx0+(fx1-fx0)*fx, fy0+(fy1-fy0)*fy]);
@@ -318,9 +325,9 @@ function pageSVG(map, L, r, c, label){
   s += `<g><rect x="${bx}" y="${by}" width="${bw}" height="${bh}" fill="#fff" fill-opacity="${bestN===0?.95:0}" stroke="#444" stroke-opacity="${bestN===0?1:.5}" stroke-width=".25"/>`
      + `<text x="${bx+2}" y="${by+4.3}" font-size="3.6" font-weight="700" font-family="sans-serif" fill="#000" stroke="#fff" stroke-width=".7" paint-order="stroke">行${r+1} - 列${c+1}</text>`
      + `<text x="${bx+bw-2}" y="${by+3.8}" font-size="2.3" text-anchor="end" font-family="sans-serif" fill="#333" stroke="#fff" stroke-width=".6" paint-order="stroke">${esc(label.name)} ${fmtScale(label.denom)}</text>`
-     + `<line x1="${bx+3}" y1="${by+8}" x2="${bx+53}" y2="${by+8}" stroke="#000" stroke-width=".35"/>`
-     + `<path d="M${bx+3} ${by+6.8}v2.4M${bx+53} ${by+6.8}v2.4" stroke="#000" stroke-width=".35"/>`
-     + `<text x="${bx+28}" y="${by+6.9}" font-size="2.2" text-anchor="middle" font-family="sans-serif" fill="#000" stroke="#fff" stroke-width=".6" paint-order="stroke">この線が50mmなら原寸</text></g>`;
+     + `<line x1="${bx+3}" y1="${by+9.2}" x2="${bx+53}" y2="${by+9.2}" stroke="#000" stroke-width=".35"/>`
+     + `<path d="M${bx+3} ${by+8}v2.4M${bx+53} ${by+8}v2.4" stroke="#000" stroke-width=".35"/>`
+     + `<text x="${bx+28}" y="${by+7.2}" font-size="2.2" text-anchor="middle" font-family="sans-serif" fill="#000" stroke="#fff" stroke-width=".6" paint-order="stroke">この線が50mmなら原寸</text></g>`;
   s += `</g></g></svg>`;
   return s;
 }
@@ -369,7 +376,11 @@ function render(){
   const emptyN = total-used;
   $("stats").innerHTML = `<b>必要なA4用紙：${used}枚</b>（行${L.rows} × 列${L.cols}${emptyN?`、地図の無い${emptyN}枚は印刷不要`:""}）`
     + `<span class="note">${esc(map.name)}　縮尺 ${fmtScale(denom)}　完成サイズ 約${Math.round(map.w)}mm × ${Math.round(map.h)}mm（のりしろを重ねた後）</span>`;
-  if(used>WARN_PAGES) alerts.innerHTML = `<div class="warnline">${used}枚と多めです。紙とインクをたくさん使うので、縮尺を変えられないか先に考えてみてください。</div>`;
+  let extra="";
+  if(map.skipped) extra += `<div class="warnline">紙面で約2mm角に満たない小さな島を${map.skipped}個、省略しています。</div>`;
+  if(remote && used < total*0.5) extra += `<div class="warnline">離島が遠くにあるため、地図が1枚につながらず、島ごとに点在します。地図の無い枠は印刷されません。</div>`;
+  alerts.innerHTML = extra;
+  if(used>WARN_PAGES) alerts.innerHTML += `<div class="warnline">${used}枚と多めです。紙とインクをたくさん使うので、縮尺を変えられないか先に考えてみてください。</div>`;
   $("btnPrint").disabled = false;
   updateRemoteHint(idx,denom,orient,remote);
   current = {map, L, used, total, denom, orient};
