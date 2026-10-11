@@ -349,7 +349,7 @@
     const proj = ds.proj(denom);
     // 交差の検査は、紙の上の座標（0.01mmに丸めたもの）で行う
     const mapFn = (c) => { const q = proj(c); return [Math.round(q[0] * 100) / 100, Math.round(q[1] * 100) / 100]; };
-    const sm = PM.smoothArcsSafe(D.arcs, refs, PM.toleranceDeg(denom, level), PM.SMOOTH[level].iter, 12, mapFn);
+    const sm = PM.smoothArcsSafe(D.arcs, refs, PM.toleranceDeg(denom, level), PM.SMOOTH[level].iter, 14, mapFn, PM.MIN_GAP_MM);
     const path = d3.geoPath(proj).digits(2);
     const pieces = [];
     let droppedFar = 0, droppedSmall = 0;
@@ -477,14 +477,18 @@
     const biggest = [...model.pieces].sort((a, b) => b.w * b.h - a.w * a.h)[0];
     let sum = `<p class="big"><b>${ds.title}</b>を ${scaleName(state.denom)}（${state.paper}）で作ります。</p>`;
     sum += `<p class="size">全体をすき間なく並べた大きさ：<b>横 ${cm(model.gx1 - model.gx0)} × 縦 ${cm(model.gy1 - model.gy0)}</b></p>`;
-    sum += `<p class="count">${ds.count}${ds.unit}のピースを、<b>${model.pages.length}枚</b>に並べました。見本ページ1枚が先頭に入るので、印刷は合計${model.pages.length + 1}ページです。</p>`;
+    const placed = model.pieces.length - model.unfit.length;
+    sum += `<p class="count">${ds.count}${ds.unit}のうち<b>${placed}個</b>のピースを、<b>${model.pages.length}枚</b>に並べました。見本ページ1枚が先頭に入るので、印刷は合計${model.pages.length + 1}ページです。</p>`;
     sum += `<p class="note">いちばん大きいピース：${esc(biggest.name)}（横${cm(biggest.w)} × 縦${cm(biggest.h)}）。</p>`;
+    const small = model.pieces.filter((q) => Math.min(q.w, q.h) < 8).map((q) => q.name);
+    if (small.length) sum += `<p class="note">小さいピース（短い辺が8mm未満）：${small.map(esc).join('、')}。ハサミで切りにくいので、縮尺を大きくすると切りやすくなります。</p>`;
     if (model.unfit.length) {
       sum += `<p class="warn">⚠ 用紙に入らないピースがあります：${model.unfit.map((id) => esc(unitName(ds, id))).join('、')}。縮尺を小さくするか、${state.paper === 'A4' ? '用紙をA3にするか、' : ''}向きを変えてください。これらは印刷されません。</p>`;
     }
-    sum += `<p class="note">${ds.edge}のなめらかさ：${PM.SMOOTH[state.smooth].label}（紙の上で約${PM.SMOOTH[state.smooth].tolMm}mm以下の細かい出入りをならし、角を丸めています。隣り合う${ds.unit}の境は、どちらのピースも同じ線です）。</p>`;
+    sum += `<p class="note">${ds.edge}のなめらかさ：${PM.SMOOTH[state.smooth].label}（紙の上で約${PM.SMOOTH[state.smooth].tolMm}mm以下の細かい出入りをならし、角を丸め、幅${PM.MIN_GAP_MM}mm未満の細い切れ込みやくびれは、ならして広げています。隣り合う${ds.unit}の境は、どちらのピースも同じ線です）。</p>`;
     sum += `<p class="note">ハサミで切れない小さな島や飛び地（紙の上で${PM.MIN_PAPER_MM2}mm²未満）${model.droppedSmall}か所` + (ds.far ? `と、本土から50km以上離れた島${model.droppedFar}か所` : '') + `は、ピースに入れていません。</p>`;
-    sum += `<p class="note">縮尺：ピースごとにその中心で縮尺を合わせてあります。ピースの中でのずれは最大で${model.worstK < 0.0001 ? '0.01%未満' : 'およそ' + (model.worstK * 100).toFixed(2) + '%'}です。</p>`;
+    if (ds.key === 'aichi') sum += `<p class="warn">⚠ 名古屋市と、大府市・あま市・豊山町の境は、元のデータの線が食い違っているため、並べると最大で約1mm（1/30万のとき）の重なりやすき間が出ます。ほかの境は、完全に同じ線です。</p>`;
+    sum += `<p class="note">縮尺：ピースごとにその中心で縮尺を合わせてあります（図法の上でのピース内のずれは最大で${model.worstK < 0.0001 ? '0.01%未満' : 'およそ' + (model.worstK * 100).toFixed(2) + '%'}）。地球を球として計算しているため、実際の地面との差は、およそ0.2〜0.4%あります。</p>`;
     $('summary').innerHTML = sum;
     $('overview').innerHTML = japanSampleSVG(model).replace('class="pg sample"', 'class="ov"').replace(/width="[\d.]+mm" height="[\d.]+mm"/, '');
     const parts = [];
@@ -587,6 +591,7 @@
     const jp = state.mode === 'japan' || state.mode === 'aichi';
     for (const id of ['prefField', 'islandField', 'blankField']) $(id).hidden = jp;
     $('smoothField').hidden = !jp;
+    $('smoothLbl').textContent = state.mode === 'aichi' ? '市町村の境のなめらかさ' : '県境のなめらかさ';
     $('guidePref').hidden = jp;
     $('guideJapan').hidden = !jp;
     $('subtitle').textContent = jp ? (state.mode === 'aichi' ? '愛知県の市町村をハサミで切り抜いて、並べて遊ぶパズルを作ります。' : '日本地図を、県ごとにハサミで切り抜いて、並べて遊ぶパズルを作ります。') : '県を選んで印刷し、A4を貼り合わせると、同じ縮尺の地図になります。';

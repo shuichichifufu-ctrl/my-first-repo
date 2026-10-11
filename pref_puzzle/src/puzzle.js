@@ -93,42 +93,73 @@ const PuzzleMode = (function () {
     const o = (p, q, r) => (q[0] - p[0]) * (r[1] - p[1]) - (q[1] - p[1]) * (r[0] - p[0]);
     return o(a, b, c) * o(a, b, d) < 0 && o(c, d, a) * o(c, d, b) < 0;
   }
-  function ringCrossings(arcs, refs, mapFn) {
-    // 戻り値: 交差している辺の組が属する弧番号の組の一覧
-    const pts = [], segArc = [];
+  function ptSeg(px, py, a, b) {
+    const dx = b[0] - a[0], dy = b[1] - a[1], l2 = dx * dx + dy * dy;
+    let t = l2 === 0 ? 0 : ((px - a[0]) * dx + (py - a[1]) * dy) / l2;
+    t = Math.max(0, Math.min(1, t));
+    return Math.hypot(px - (a[0] + t * dx), py - (a[1] + t * dy));
+  }
+  function segGap(a, b, c, d) {
+    if (segCross(a, b, c, d)) return 0;
+    return Math.min(ptSeg(a[0], a[1], c, d), ptSeg(b[0], b[1], c, d), ptSeg(c[0], c[1], a, b), ptSeg(d[0], d[1], a, b));
+  }
+  // 環の問題を探す。交差（gapMm=0でも見つかる）と、輪郭の離れた2か所が gapMm より近づく「細い切れ込み・くびれ」。
+  // mapFn を渡すと、その座標（紙の上のmm）で調べる。戻り値は、問題の辺の組が属する弧番号の組の一覧。
+  function ringIssues(arcs, refs, mapFn, gapMm) {
+    const pts = [];
+    const sa = [];
     for (const r of refs) {
       const id = r >= 0 ? r : ~r;
       const a = r >= 0 ? arcs[id] : arcs[id].slice().reverse();
-      for (let i = pts.length ? 1 : 0; i < a.length; i++) { pts.push(mapFn ? mapFn(a[i]) : [a[i][0] * COS_MID, a[i][1]]); if (i > 0 || pts.length > 1) segArc.push(id); }
+      for (let i = pts.length ? 1 : 0; i < a.length; i++) pts.push(mapFn ? mapFn(a[i]) : [a[i][0] * COS_MID, a[i][1]]);
+      for (let i = 0; i < a.length - 1; i++) sa.push(id);
     }
-    // segArc[k] は辺 pts[k]→pts[k+1] の弧
     const n = pts.length - 1;
-    const sa = [];
-    { let k = 0; for (const r of refs) { const id = r >= 0 ? r : ~r; const len = arcs[id].length - 1; for (let i = 0; i < len; i++) sa[k++] = id; } }
+    const gap = gapMm || 0;
+    const minIdx = 6; // 輪郭の上で近い辺どうし（曲がり角のすぐそば）は調べない
     const out = [];
     const bx0 = new Float64Array(n), bx1 = new Float64Array(n), by0 = new Float64Array(n), by1 = new Float64Array(n);
-    for (let i = 0; i < n; i++) { bx0[i] = Math.min(pts[i][0], pts[i + 1][0]); bx1[i] = Math.max(pts[i][0], pts[i + 1][0]); by0[i] = Math.min(pts[i][1], pts[i + 1][1]); by1[i] = Math.max(pts[i][1], pts[i + 1][1]); }
+    for (let i = 0; i < n; i++) { bx0[i] = Math.min(pts[i][0], pts[i + 1][0]) - gap; bx1[i] = Math.max(pts[i][0], pts[i + 1][0]) + gap; by0[i] = Math.min(pts[i][1], pts[i + 1][1]) - gap; by1[i] = Math.max(pts[i][1], pts[i + 1][1]) + gap; }
     for (let i = 0; i < n; i++) {
       for (let j = i + 2; j < n; j++) {
         if (i === 0 && j === n - 1) continue;
         if (bx1[i] < bx0[j] || bx1[j] < bx0[i] || by1[i] < by0[j] || by1[j] < by0[i]) continue;
-        if (segCross(pts[i], pts[i + 1], pts[j], pts[j + 1])) out.push([sa[i], sa[j]]);
+        const near = gap > 0 && j - i >= minIdx && n - (j - i) >= minIdx && n >= 12;
+        if (segCross(pts[i], pts[i + 1], pts[j], pts[j + 1])) out.push([sa[i], sa[j], 'x']);
+        else if (near && segGap(pts[i], pts[i + 1], pts[j], pts[j + 1]) < gap) out.push([sa[i], sa[j], 'g']);
       }
     }
     return out;
   }
-  function smoothArcsSafe(arcs, ringRefs, tolDeg, iter, maxRounds, mapFn) {
+  function ringCrossings(arcs, refs, mapFn) { return ringIssues(arcs, refs, mapFn, 0); }
+  function ringGaps(arcs, refs, mapFn, gapMm) { return ringIssues(arcs, refs, mapFn, gapMm).filter((x) => x[2] === 'g'); }
+  function smoothArcsSafe(arcs, ringRefs, tolDeg, iter, maxRounds, mapFn, gapMm) {
     const factor = new Float64Array(arcs.length).fill(1);
-    let sm = arcs.map((a, i) => smoothArc(a, tolDeg, iter));
-    let remaining = 0, rounds = 0;
-    for (; rounds < (maxRounds || 8); rounds++) {
-      const bad = new Set();
-      remaining = 0;
-      for (const refs of ringRefs) for (const [a, b] of ringCrossings(sm, refs, mapFn)) { bad.add(a); bad.add(b); remaining++; }
+    const sm = arcs.map((a) => smoothArc(a, tolDeg, iter));
+    // 交差は重大なので、細い切れ込みの1000倍の重みで数える
+    const count = (gap) => { let n = 0, x = 0; const bad = new Set(); for (const refs of ringRefs) for (const [a, b, k] of ringIssues(sm, refs, mapFn, gap)) { bad.add(a); bad.add(b); n += k === 'x' ? 1000 : 1; if (k === 'x') x++; } return { n, bad, x }; };
+    const rounds1 = maxRounds || 8;
+    let rounds = 0;
+    // 1. 交差がなくなるまで、交差している弧だけ間引きを強める
+    for (; rounds < rounds1; rounds++) {
+      const { bad } = count(0);
       if (!bad.size) break;
-      for (const id of bad) { factor[id] *= 2; sm[id] = smoothArc(arcs[id], tolDeg * factor[id], iter); }
+      for (const id of bad) { if (factor[id] < 64) factor[id] *= 2; sm[id] = smoothArc(arcs[id], tolDeg * factor[id], iter); }
     }
-    return { arcs: sm, remaining, rounds };
+    // 2. 細い切れ込み・くびれを、交差を増やさない範囲で、ならして広げる
+    if (gapMm > 0) {
+      let cur = count(gapMm);
+      for (let k = 0; k < 8 && cur.n > 0; k++) {
+        const saved = new Map();
+        for (const id of cur.bad) { saved.set(id, [sm[id], factor[id]]); if (factor[id] < 64) factor[id] *= 2; sm[id] = smoothArc(arcs[id], tolDeg * factor[id], iter); }
+        const nxt = count(gapMm);
+        if (nxt.n < cur.n) { cur = nxt; rounds++; }
+        else { for (const [id, [a, f]] of saved) { sm[id] = a; factor[id] = f; } break; }
+      }
+      return { arcs: sm, remaining: cur.n, crossings: cur.x, narrow: cur.n - cur.x * 1000, rounds };
+    }
+    const fin = count(0);
+    return { arcs: sm, remaining: fin.n, crossings: fin.x, narrow: 0, rounds };
   }
 
   function decodeRing(arcs, refs) {
@@ -213,6 +244,6 @@ const PuzzleMode = (function () {
   const MIN_PAPER_MM2 = 25;
   function minKm2(denom) { return MIN_PAPER_MM2 * (denom / 1e6) ** 2; }
 
-  return { R_M, keptPolygons, keptRingRefs, smoothArcsSafe, ringCrossings, REGION_NAMES, REGION_COLORS, regionOf, smoothArcs, decodeRing, buildPrefGeometry, japanProjection, kFactor, packPieces, SMOOTH, toleranceDeg, minKm2, MIN_PAPER_MM2, PARALLELS };
+  return { R_M, ringIssues, ringGaps, MIN_GAP_MM: 1.0, keptPolygons, keptRingRefs, smoothArcsSafe, ringCrossings, REGION_NAMES, REGION_COLORS, regionOf, smoothArcs, decodeRing, buildPrefGeometry, japanProjection, kFactor, packPieces, SMOOTH, toleranceDeg, minKm2, MIN_PAPER_MM2, PARALLELS };
 })();
 if (typeof module !== 'undefined') module.exports = PuzzleMode;

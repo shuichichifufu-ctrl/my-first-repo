@@ -62,7 +62,9 @@ for (const denom of [1000000, 2000000, 3000000, 5000000]) {
   for (const it of list) { if (!it.outer) continue; const pp = PM.decodeRing(J.arcs, it.refs).map((c) => proj(c)); raw.selfX += selfIntersections(pp); raw.sharp += turnStats(PM.decodeRing(J.arcs, it.refs), denom).sharp; }
   for (const level of ['weak', 'normal', 'strong']) {
     const sm = PM.SMOOTH[level];
-    const r = PM.smoothArcsSafe(J.arcs, list.map((x) => x.refs), PM.toleranceDeg(denom, level), sm.iter, 12);
+    const mapFn = (c) => { const q = proj(c); return [Math.round(q[0] * 100) / 100, Math.round(q[1] * 100) / 100]; };
+    const r = PM.smoothArcsSafe(J.arcs, list.map((x) => x.refs), PM.toleranceDeg(denom, level), sm.iter, 14, mapFn, PM.MIN_GAP_MM);
+    let narrow = 0; for (const it of list) narrow += PM.ringGaps(r.arcs, it.refs, mapFn, 1.0).length;
     let rings = 0, notClosed = 0, selfX = 0, sharp = 0, vertsRaw = 0, vertsSm = 0, maxAreaDiff = 0;
     const perPref = new Map();
     for (const it of list) {
@@ -82,7 +84,7 @@ for (const denom of [1000000, 2000000, 3000000, 5000000]) {
     const diffs = [...perPref.values()].map((e) => Math.abs(e.a1 - e.a0) / e.a0).sort((a, b) => a - b);
     maxAreaDiff = diffs[diffs.length - 1];
     const med = diffs[Math.floor(diffs.length / 2)];
-    pass(`1/${denom / 10000}万 なめらかさ${sm.label}: 環${rings}本・閉じていない${notClosed}・自己交差 ${raw.selfX}→${selfX}・頂点 ${vertsRaw}→${vertsSm}・鋭い曲がり(60度超) ${raw.sharp}→${sharp}か所・面積の変化 中央値${(med * 100).toFixed(1)}%/最大${(maxAreaDiff * 100).toFixed(1)}%・修復${r.rounds}回`, notClosed === 0 && selfX === 0);
+    pass(`1/${denom / 10000}万 なめらかさ${sm.label}: 環${rings}本・閉じていない${notClosed}・自己交差 ${raw.selfX}→${selfX}・頂点 ${vertsRaw}→${vertsSm}・鋭い曲がり(60度超) ${raw.sharp}→${sharp}か所・幅1mm未満の細い切れ込み ${narrow}・面積の変化 中央値${(med * 100).toFixed(1)}%/最大${(maxAreaDiff * 100).toFixed(1)}%・修復${r.rounds}回`, notClosed === 0 && selfX === 0);
   }
 }
 

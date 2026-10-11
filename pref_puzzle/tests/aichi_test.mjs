@@ -60,14 +60,16 @@ for (const denom of [100000, 200000, 300000, 500000]) {
   for (const u of J.prefs) for (const i of PM.keptPolygons(u, opts).kept) u.p[i].r.forEach((refs, ri) => list.push({ u, refs, outer: ri === 0 }));
   for (const level of ['weak', 'normal', 'strong']) {
     const sm = PM.SMOOTH[level];
-    const r = PM.smoothArcsSafe(J.arcs, list.map((x) => x.refs), PM.toleranceDeg(denom, level), sm.iter, 12, mapFn);
+    const r = PM.smoothArcsSafe(J.arcs, list.map((x) => x.refs), PM.toleranceDeg(denom, level), sm.iter, 14, mapFn, PM.MIN_GAP_MM);
     // 紙の上の座標での交差を、別の書き方で数え直す
-    let selfX = 0, sharpRaw = 0, sharpSm = 0, notClosed = 0;
+    let selfX = 0, sharpRaw = 0, sharpSm = 0, notClosed = 0, narrow = 0, narrowRaw = 0;
     const per = new Map();
     for (const it of list) {
       const ring = PM.decodeRing(r.arcs, it.refs), raw = PM.decodeRing(J.arcs, it.refs);
       if (ring[0][0] !== ring[ring.length - 1][0] || ring[0][1] !== ring[ring.length - 1][1]) notClosed++;
       selfX += PM.ringCrossings(r.arcs, it.refs, mapFn).length;
+      narrow += PM.ringGaps(r.arcs, it.refs, mapFn, 1.0).length;
+      narrowRaw += PM.ringGaps(J.arcs, it.refs, mapFn, 1.0).length;
       if (!it.outer) continue;
       sharpRaw += turnSharp(raw, proj); sharpSm += turnSharp(ring, proj);
       const e = per.get(it.u.id) || { a0: 0, a1: 0 };
@@ -75,7 +77,7 @@ for (const denom of [100000, 200000, 300000, 500000]) {
       per.set(it.u.id, e);
     }
     const diffs = [...per.values()].map((e) => Math.abs(e.a1 - e.a0) / e.a0).sort((a, b) => a - b);
-    pass(`1/${denom / 10000}万 なめらかさ${sm.label}: 環${list.length}本・閉じていない${notClosed}・自己交差${selfX}（修復${r.rounds}回）・鋭い曲がり(60度超) ${sharpRaw}→${sharpSm}・面積の変化 中央値${(diffs[diffs.length >> 1] * 100).toFixed(1)}%/最大${(diffs[diffs.length - 1] * 100).toFixed(1)}%`, notClosed === 0 && selfX === 0);
+    pass(`1/${denom / 10000}万 なめらかさ${sm.label}: 環${list.length}本・閉じていない${notClosed}・自己交差${selfX}（修復${r.rounds}回）・鋭い曲がり(60度超) ${sharpRaw}→${sharpSm}・幅1mm未満の細い切れ込み ${narrowRaw}→${narrow}・面積の変化 中央値${(diffs[diffs.length >> 1] * 100).toFixed(1)}%/最大${(diffs[diffs.length - 1] * 100).toFixed(1)}%`, notClosed === 0 && selfX === 0);
     if (denom === 300000) {
       // 隣り合う境の一致
       let pairs = 0, mismatch = 0;

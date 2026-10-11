@@ -142,10 +142,10 @@ dialog::backdrop { background: rgba(20,30,40,.55); }
         <label class="opt"><input type="radio" name="islands" value="yes"> 離島を含む</label>
         <p class="hint">本土のみ＝最大の陸地から50km以内</p>
       </div>
-      <div class="field" id="smoothField" hidden><span class="lbl">県境のなめらかさ</span>
+      <div class="field" id="smoothField" hidden><span class="lbl" id="smoothLbl">県境のなめらかさ</span>
         <label class="opt"><input type="radio" name="smooth" value="weak"> 弱（細かい形を残す）</label>
         <label class="opt"><input type="radio" name="smooth" value="normal" checked> ふつう</label>
-        <label class="opt"><input type="radio" name="smooth" value="strong"> 強（ハサミで切りやすい）</label>
+        <label class="opt"><input type="radio" name="smooth" value="strong"> 強（ハサミで切りやすい。形は少し変わる）</label>
         <p class="hint">強いほど、細かい出入りがなくなり、切りやすくなります</p>
       </div>
       <div class="field" id="blankField"><span class="lbl">空白ページ</span>
