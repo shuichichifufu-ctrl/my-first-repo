@@ -31,22 +31,32 @@ select { font: inherit; padding: 6px 8px; border: 1px solid #aab6c2; border-radi
 #summary .big { font-size: 18px; }
 #summary .count b { font-size: 18px; color: var(--accent-d); }
 #summary .warn { background: var(--warn-bg); color: var(--warn); padding: 8px 10px; border-radius: 6px; border: 1px solid #f1d29a; font-weight: 700; }
+#summary .size { background: #eef5fb; border-left: 4px solid var(--accent); padding: 6px 10px; border-radius: 4px; }
 #summary .note { font-size: 13px; color: var(--sub); }
 #overview { background: #eaf1f8; border-radius: 8px; padding: 8px; }
+#overview svg.ov { display: block; width: 100%; height: auto; max-height: 70vh; }
 #overview svg { display: block; width: 100%; max-height: 62vh; }
 .btn { font: inherit; font-weight: 700; padding: 10px 22px; border-radius: 8px; border: 1px solid var(--accent-d); background: var(--accent); color: #fff; cursor: pointer; }
 .btn:hover { background: var(--accent-d); }
+.btn:disabled { opacity: .45; cursor: not-allowed; }
 .btn.ghost { background: #fff; color: var(--accent-d); }
 .actions { display: flex; align-items: center; gap: 14px; margin-top: 12px; flex-wrap: wrap; }
 .steps { margin: 0; padding-left: 1.3em; }
 .steps li { margin: 4px 0; }
-#pages { display: flex; flex-wrap: wrap; gap: 14px; margin-top: 12px; }
+#pages { display: flex; flex-wrap: wrap; gap: 14px; margin-top: 12px; --z: .5; }
+#pages.gridmode { display: grid; grid-template-columns: repeat(var(--cols), max-content); }
+#pages.gridmode .sheet-wrap:first-child:has(svg.sample) { grid-column: 1 / -1; }
+.ph { border: 2px dashed #b9c4cf; border-radius: 6px; display: grid; place-items: center; color: #8795a3; font-size: 13px; text-align: center; min-height: 120px; }
 .sheet-wrap .cap { font-size: 12px; color: var(--sub); margin-bottom: 3px; }
-.sheet { background: #fff; padding: 5mm 0 0 5mm; overflow: hidden; border: 1px solid #b9c4cf; box-shadow: 0 1px 4px rgba(0,0,0,.15); zoom: .5; }
+.sheet { background: #fff; padding: 5mm 0 0 5mm; overflow: hidden; border: 1px solid #b9c4cf; box-shadow: 0 1px 4px rgba(0,0,0,.15); zoom: var(--z); }
 .sheet svg { display: block; }
 .sheet-wrap { cursor: zoom-in; }
-#zoomBody svg { display: block; width: min(92vw, 820px); height: auto; }
-#zoomDialog { max-width: none; width: auto; }
+#zoomBody svg { display: block; }
+#zoomBody { overflow: auto; }
+.zbar { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
+.zbar .btn { padding: 5px 12px; }
+#zoomPct { min-width: 3.5em; text-align: center; font-weight: 700; }
+#zoomDialog { max-width: none; width: auto; max-height: 96vh; overflow: auto; }
 #zoomDialog .dlg-foot { padding-top: 6px; }
 footer.credit { margin-top: 20px; font-size: 12px; color: var(--sub); }
 #status { font-size: 12px; color: var(--sub); }
@@ -75,7 +85,8 @@ dialog::backdrop { background: rgba(20,30,40,.55); }
   .card > :not(#pages) { display: none !important; }
   .cap { display: none !important; }
   .sheet-wrap { page-break-after: always; break-after: page; }
-  .sheet-wrap:last-child { page-break-after: auto; break-after: auto; }
+  .sheet-wrap:last-of-type { page-break-after: auto; break-after: auto; }
+  .ph { display: none !important; }
   .sheet { zoom: 1 !important; border: 0; box-shadow: none; margin: 0; }
 }
 </style>
@@ -83,29 +94,61 @@ dialog::backdrop { background: rgba(20,30,40,.55); }
 <body>
 <header class="top"><div class="wrap">
   <h1>都道府県 同縮尺パズルメーカー</h1>
-  <p>県を選んで印刷し、A4を貼り合わせると、同じ縮尺の地図になります。</p>
+  <p id="subtitle">県を選んで印刷し、A4を貼り合わせると、同じ縮尺の地図になります。</p>
 </div></header>
 
 <div class="wrap" id="printRoot">
   <section class="card">
     <h2>1. 作りたい地図を選ぶ</h2>
     <div class="controls">
-      <div class="field"><label class="lbl" for="pref">都道府県</label><select id="pref"></select></div>
-      <div class="field"><span class="lbl">縮尺</span>
-        <label class="opt"><input type="radio" name="denom" value="250000"> 1/25万（大きい）</label>
-        <label class="opt"><input type="radio" name="denom" value="500000" checked> 1/50万</label>
-        <label class="opt"><input type="radio" name="denom" value="1000000"> 1/100万（小さい）</label>
+      <div class="field"><span class="lbl">作るもの</span>
+        <label class="opt"><input type="radio" name="mode" value="pref" checked> 県ごとに分割して印刷</label>
+        <label class="opt"><input type="radio" name="mode" value="japan"> 日本地図パズル（全国・切り抜き）</label>
+        <label class="opt"><input type="radio" name="mode" value="aichi"> 愛知県の市町村パズル（切り抜き）</label>
+        <p class="hint">パズルは、県や市町村をハサミで切り抜くピースにします</p>
+      </div>
+      <div class="field" id="prefField"><label class="lbl" for="pref">都道府県</label><select id="pref"></select></div>
+      <div class="field"><label class="lbl" for="denomSel">縮尺</label>
+        <select id="denomSel">
+          <option value="50000">1/5万（とても大きい）</option>
+          <option value="100000">1/10万</option>
+          <option value="150000">1/15万</option>
+          <option value="200000">1/20万</option>
+          <option value="250000">1/25万（大きい）</option>
+          <option value="300000">1/30万</option>
+          <option value="400000">1/40万</option>
+          <option value="500000" selected>1/50万</option>
+          <option value="1000000">1/100万（小さい）</option>
+          <option value="2000000">1/200万（とても小さい）</option>
+          <option value="3000000">1/300万</option>
+          <option value="4000000">1/400万</option>
+          <option value="5000000">1/500万</option>
+          <option value="custom">自分で数を入れる…</option>
+        </select>
+        <div id="customBox" hidden style="margin-top:6px">1/ <input id="denomCustom" type="number" min="5000" max="10000000" step="1000" value="300000" style="width:9em;font:inherit;padding:4px 6px"> <span id="customMsg" class="hint"></span></div>
+        <p class="hint">大きいほど細かく、枚数が増えます</p>
+      </div>
+      <div class="field"><span class="lbl">用紙</span>
+        <label class="opt"><input type="radio" name="paper" value="A4" checked> A4</label>
+        <label class="opt"><input type="radio" name="paper" value="A3"> A3</label>
+        <p class="hint">A3はA3が印刷できるプリンタが必要です</p>
       </div>
       <div class="field"><span class="lbl">用紙の向き</span>
         <label class="opt"><input type="radio" name="orient" value="portrait" checked> 縦</label>
         <label class="opt"><input type="radio" name="orient" value="landscape"> 横</label>
       </div>
-      <div class="field"><span class="lbl">離島の扱い</span>
+      <div class="field" id="islandField"><span class="lbl">離島の扱い</span>
         <label class="opt"><input type="radio" name="islands" value="no" checked> 本土のみ</label>
         <label class="opt"><input type="radio" name="islands" value="yes"> 離島を含む</label>
         <p class="hint">本土のみ＝最大の陸地から50km以内</p>
       </div>
-      <div class="field"><span class="lbl">空白ページ</span>
+      <div class="field" id="smoothField" hidden><span class="lbl">県境のなめらかさ</span>
+        <label class="opt"><input type="radio" name="smooth" value="weak"> 弱（細かい形を残す）</label>
+        <label class="opt"><input type="radio" name="smooth" value="normal" checked> ふつう</label>
+        <label class="opt"><input type="radio" name="smooth" value="strong"> 強（ハサミで切りやすい）</label>
+        <p class="hint">強いほど、細かい出入りがなくなり、切りやすくなります</p>
+      </div>
+      <div class="field" id="blankField"><span class="lbl">空白ページ</span>
         <label class="opt"><input type="checkbox" id="skipBlank" checked> 地図がないページは印刷しない</label>
         <p class="hint">番号は欠番として残ります</p>
         <label class="opt"><input type="checkbox" id="sample" checked> 貼り合わせ見本ページを最初に付ける</label>
@@ -122,47 +165,54 @@ dialog::backdrop { background: rgba(20,30,40,.55); }
         <button class="btn" id="printBtn" type="button">印刷する</button>
         <span id="status"></span>
       </div>
-      <p class="small">印刷は A4・倍率100%・余白なし。プリンタのポスター印刷機能は使いません。</p>
+      <p class="small">印刷は <span id="paperTxt">A4</span>・倍率100%・余白なし。プリンタのポスター印刷機能は使いません。</p>
     </section>
     <section class="card">
-      <h2>全体図（青い枠が1枚の紙、数字がページ番号）</h2>
+      <h2 id="ovTitle">全体図（青い枠が1枚の紙、数字がページ番号）</h2>
       <div id="overview"></div>
     </section>
   </div>
 
   <section class="card" id="guideBox">
-    <h2>貼り合わせ方</h2>
-    <ol class="steps">
+    <h2>作り方</h2>
+    <ol class="steps" id="guideJapan" hidden>
+      <li>全ページを印刷し、スケールバー（長さ10cmの線）を定規で測って100mmか確かめます。</li>
+      <li>ピースを、実線にそってハサミで切ります。境はなめらかにしてあるので、曲線にそって切れます。</li>
+      <li>見本ページを見ながら、ピースを並べます。隣り合うピースの境は、同じ線でできています。</li>
+      <li>色は地方（地域）ごとに違います。見本ページに色の凡例があります。</li>
+    </ol>
+    <ol class="steps" id="guidePref">
       <li>全ページを印刷し、スケールバー（長さ10cmの線）を定規で測って100mmか確かめます。</li>
       <li>点線がある紙（行1-列1以外）は、点線の外側の白い余白（5mm）をはさみで切り落とします。行1-列1の紙は切りません。</li>
       <li>左上のページ（行1-列1）から始め、右の紙・下の紙の順に、斜線ののりしろの上に重ねます。</li>
-      <li>赤い「＋」が上下の紙でぴったり重なるように合わせて、のりで貼ります。</li>
+      <li>上の紙を少し透かして、赤い「＋」が下の紙の「＋」とぴったり重なるように合わせ、のりで貼ります。</li>
     </ol>
   </section>
 
   <section class="card" id="pagesBox">
-    <h2>3. 各ページのプレビュー（縮小表示。クリックで拡大。印刷は実寸）</h2>
+    <h2 id="pagesTitle">3. 各ページのプレビュー（縮小表示。クリックで拡大。印刷は実寸）</h2>
     <div id="pages"></div>
   </section>
 
   <footer class="credit">
     地図データ：地球地図日本（国土地理院）の都道府県境を、頂点を減らして簡略化して使用しています（非営利目的での利用。出典の明記が必要です）。
-    海岸線は簡略化されているため、1/25万では細かな形が実際と異なります。地図の描画：D3.js v7.9.0（ISCライセンス）。縮尺は球体で計算しており、約0.2%の誤差があります。
+    海岸線は簡略化されているため、1/25万では細かな形が実際と異なります。愛知県の市町村境：国土数値情報（行政区域データ N03-20200101）（国土交通省）を、JapanCityGeoJson（niiyz氏が市区町村ごとに分けたもの）をもとに、名古屋市の区をまとめ、簡略化して使用しています。出典の明記が必要です。地図の描画：D3.js v7.9.0（ISCライセンス）。縮尺は球体で計算しており、約0.2%の誤差があります。
   </footer>
 </div>
 
-<dialog id="zoomDialog"><div class="dlg-body" id="zoomBody"></div><div class="dlg-foot"><button class="btn ghost" id="zoomClose" type="button">閉じる</button></div></dialog>
+<dialog id="zoomDialog"><div class="dlg-foot zbar" style="padding:8px 16px 0;justify-content:flex-start"><button class="btn ghost" id="zoomClose" type="button">閉じる</button><button class="btn ghost" id="zoomOut" type="button" aria-label="縮小">－</button><span id="zoomPct">100%</span><button class="btn ghost" id="zoomIn" type="button" aria-label="拡大">＋</button><button class="btn ghost" id="zoomReal" type="button">実寸（100%）</button><button class="btn ghost" id="zoomFit" type="button">全体</button></div><div class="dlg-body" id="zoomBody" style="padding-top:6px"></div></dialog>
 
 <dialog id="printDialog">
   <div class="dlg-body">
     <h3>印刷の前に確認してね</h3>
     <div class="chara dr"><div class="face" aria-hidden="true">博</div>
       <div class="bubble"><div class="name">ニルナーリ博士</div>
-        <ul><li>倍率は<b>100%</b>にしてね。「用紙に合わせる」は<b>オフ</b>だよ。</li><li>用紙はA4、向きはこの画面で選んだ向きだよ。</li></ul></div></div>
+        <ul><li>倍率は<b>100%</b>にしてね。「用紙に合わせる」は<b>オフ</b>だよ。</li><li>用紙は<b id="dlgPaper">A4</b>、向きはこの画面で選んだ向きだよ。</li></ul></div></div>
     <div class="chara ya"><div class="face" aria-hidden="true">ヤ</div>
       <div class="bubble"><div class="name">ヤクナーリくん</div>
-        <ul><li>余白は<b>「なし」</b>にしてね。</li><li>印刷したら、<b>10cmの線を定規で測って</b>ね！ 100mmなら成功だよ。</li></ul></div></div>
+        <ul><li>余白は<b>「なし」</b>にしてね。「ヘッダーとフッター」も<b>オフ</b>だよ。</li><li>印刷したら、<b>10cmの線を定規で測って</b>ね！ 100mmなら成功だよ。</li></ul></div></div>
     <p class="small">※余白なしに対応しないプリンタでは、紙の端が欠けることがあります。</p>
+    <p class="small" id="dlgWarn" style="color:#b45309"></p>
   </div>
   <div class="dlg-foot">
     <button class="btn ghost" id="dlgCancel" type="button">やめる</button>
@@ -172,7 +222,10 @@ dialog::backdrop { background: rgba(20,30,40,.55); }
 
 <script>/*__D3__*/</script>
 <script>/*__DATA__*/</script>
+<script>/*__JAPAN__*/</script>
+<script>/*__AICHI__*/</script>
 <script>/*__CORE__*/</script>
+<script>/*__PUZZLE__*/</script>
 <script>/*__APP__*/</script>
 </body>
 </html>

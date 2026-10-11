@@ -2,7 +2,7 @@
 import { Core, pass } from './common.mjs';
 const G = 15;
 let bad = 0, cases = 0;
-const sizes = [[200, 287], [287, 200]];
+const sizes = [[200, 287], [287, 200], [287, 410], [410, 287]];
 const maxs = [];
 for (let m = 1; m <= 2600; m += 7.3) maxs.push(m);
 maxs.push(200, 287, 200.0000001, 199.999, 185, 185.0001, 370, 370.0001, 385, 385.0001, 555, 740, 15, 1, 570);
@@ -28,6 +28,11 @@ for (const [W, H] of sizes) {
 }
 pass(`分割の式 ${cases}通り`, bad === 0, `不一致 ${bad}`);
 
+// 用紙：A4・A3の描画範囲（四辺5mmを除く）
+for (const [paper, o, W, H] of [['A4', 'portrait', 200, 287], ['A4', 'landscape', 287, 200], ['A3', 'portrait', 287, 410], ['A3', 'landscape', 410, 287]]) {
+  const z = Core.sheetSize(paper, o);
+  pass(`${paper}${o} の描画範囲 ${W}×${H}mm`, z.W === W && z.H === H);
+}
 // 具体例（手計算）
 const ex = [[200, 200, 1], [200.1, 200.1, 2], [385, 385, 2], [385.01, 385.01, 3], [555, 555, 3]];
 for (const [mw, , cols] of ex) {

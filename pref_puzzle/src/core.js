@@ -10,6 +10,15 @@ const PuzzleCore = (function () {
     landscape: { W: 287, H: 200 },
   };
 
+  // 用紙。四辺5mmは描画しないので、描画できる範囲は用紙より10mm小さい
+  const PAPERS = { A4: { w: 210, h: 297 }, A3: { w: 297, h: 420 } };
+  function sheetSize(paper, orient) {
+    const pp = PAPERS[paper] || PAPERS.A4;
+    const w = orient === 'landscape' ? pp.h : pp.w;
+    const h = orient === 'landscape' ? pp.w : pp.h;
+    return { paperW: w, paperH: h, W: w - 10, H: h - 10 };
+  }
+
   // 列数(行数)。地図の長さM、描画幅W、のりしろG
   function gridCount(M, W, G) {
     if (M <= W + EPS) return 1;
@@ -83,6 +92,11 @@ const PuzzleCore = (function () {
     const ys = new Set([round3(MARK_INSET), round3(lay.totalH - MARK_INSET)]);
     for (let c = 1; c < lay.cols; c++) xs.add(round3(c * (lay.W - lay.G) + lay.G / 2));
     for (let r = 1; r < lay.rows; r++) ys.add(round3(r * (lay.H - lay.G) + lay.G / 2));
+    // 縦の帯が長いので、各行の途中(紙の高さの1/4と3/4)にも1つずつ。横の帯は説明の文字があるので増やさない
+    for (let r = 0; r < lay.rows; r++) {
+      ys.add(round3(r * (lay.H - lay.G) + lay.H * 0.25));
+      ys.add(round3(r * (lay.H - lay.G) + lay.H * 0.75));
+    }
     return { xs: [...xs].sort((a, b) => a - b), ys: [...ys].sort((a, b) => a - b) };
   }
   function round3(v) {
@@ -116,6 +130,6 @@ const PuzzleCore = (function () {
     return byPage;
   }
 
-  return { R_M, GLUE, MARK_LEN, MARK_INSET, SHEETS, gridCount, layout, fixRings, buildGeometry, buildProjection, markGrid, marksForPages, pagesHoldingMark };
+  return { R_M, GLUE, MARK_LEN, MARK_INSET, SHEETS, PAPERS, sheetSize, gridCount, layout, fixRings, buildGeometry, buildProjection, markGrid, marksForPages, pagesHoldingMark };
 })();
 if (typeof module !== 'undefined') module.exports = PuzzleCore;

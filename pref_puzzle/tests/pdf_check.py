@@ -20,18 +20,20 @@ def is_land(c):
 for jf in sorted(glob.glob(os.path.join(sys.argv[1], '*.json'))):
     name = os.path.basename(jf)[:-5]
     meta = json.load(open(jf))
+    if meta.get('mode') in ('japan', 'aichi'): continue
     pdf = pdfplumber.open(jf[:-5] + '.pdf')
     printed = [p for p in meta['pages'] if p['printed']]
-    print(f"== {name}: {meta['name']} 1/{meta['denom']} {meta['rows']}行×{meta['cols']}列 向き={meta['orient']}")
+    print(f"== {name}: {meta['name']} 1/{meta['denom']} {meta['rows']}行×{meta['cols']}列 {meta.get('paper','A4')} 向き={meta['orient']}")
     report('ページ数', len(pdf.pages) == meta['printCount'], f"PDF {len(pdf.pages)}枚 / 想定 {meta['printCount']}枚")
-    wantW, wantH = (210, 297) if meta['orient'] == 'portrait' else (297, 210)
+    pw, ph = (210, 297) if meta.get('paper', 'A4') == 'A4' else (297, 420)
+    wantW, wantH = (pw, ph) if meta['orient'] == 'portrait' else (ph, pw)
     szs = {(round(mm(p.width), 1), round(mm(p.height), 1)) for p in pdf.pages}
     report('用紙サイズ', all(abs(a - wantW) < 0.3 and abs(b - wantH) < 0.3 for a, b in szs), f"{szs} mm")
     per = {}
     for pm, pg in zip(printed, pdf.pages):
         W, H = meta['W'], meta['H']
         # スケールバー: 水平で長さ約100mmの線
-        bars = [l for l in pg.lines if abs(l['y0'] - l['y1']) < 0.01 and abs(mm(l['x1'] - l['x0']) - 100) < 1.5]
+        bars = [l for l in pg.lines if abs(l['y0'] - l['y1']) < 0.01 and abs(mm(l['x1'] - l['x0']) - 100) < 1.5 and (l.get('stroking_color') in [(0.0, 0.0, 0.0), [0.0, 0.0, 0.0], (0,), None] or max(l.get('stroking_color') or (0,)) < 0.05)]
         blen = [mm(l['x1'] - l['x0']) for l in bars]
         # 合わせマーク
         reds = [l for l in pg.lines if is_red(l.get('stroking_color'))]
