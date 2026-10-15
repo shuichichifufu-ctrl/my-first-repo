@@ -1,0 +1,1955 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<title>✕ボタンさがし れんしゅう</title>
+<style>
+/* ===== 基本 ===== */
+:root{
+  --frame:#1f9d4a; --frame-w:6px;
+  --bg:#f4f6f8; --ink:#1d2430; --muted:#6b7480;
+  --pri:#2b6fe0; --pri-ink:#fff; --ok:#1f9d4a; --ng:#d6453a; --warn:#e8a11b;
+  --card:#fff; --line:#dfe3e8; --radius:14px;
+  --safe-t: env(safe-area-inset-top,0px); --safe-b: env(safe-area-inset-bottom,0px);
+  --hud-h: 88px;   /* ゲーム画面の上部バー（HUD）の高さ。広告レイヤーの上余白と共有 */
+}
+*{box-sizing:border-box; -webkit-tap-highlight-color:transparent;}
+html,body{margin:0; padding:0; height:100%; overflow:hidden; overscroll-behavior:none;}
+body{
+  position:fixed; inset:0; width:100%; height:100%;
+  font-family:-apple-system,BlinkMacSystemFont,"Hiragino Sans","Hiragino Kaku Gothic ProN","Noto Sans JP","Yu Gothic",Meiryo,sans-serif;
+  color:var(--ink); background:var(--bg);
+  -webkit-user-select:none; user-select:none; -webkit-touch-callout:none;
+  touch-action:manipulation;
+  font-size:16px; line-height:1.4;
+}
+button{font:inherit; color:inherit; background:none; border:0; padding:0; margin:0; cursor:pointer; touch-action:manipulation; -webkit-user-select:none; user-select:none;}
+button:focus-visible{outline:3px solid #ffbf47; outline-offset:2px;}
+input,select{font:inherit;}
+.hidden{display:none !important;}
+
+/* ===== 練習中の枠 ===== */
+#frame{
+  position:fixed; inset:0; pointer-events:none; z-index:9000;
+  border:var(--frame-w) solid var(--frame);
+}
+#frame-label{
+  position:absolute; top:0; left:50%; transform:translateX(-50%); pointer-events:auto;
+  background:var(--frame); color:#fff; font-size:16px; font-weight:800;
+  padding:calc(var(--safe-t) + 3px) 18px 4px; border-radius:0 0 12px 12px; letter-spacing:.15em;
+}
+
+/* ===== 画面共通 ===== */
+.screen{
+  position:absolute; inset:0; display:none; flex-direction:column;
+  padding:calc(var(--safe-t) + 32px) 16px calc(var(--safe-b) + 16px);
+  overflow:auto; -webkit-overflow-scrolling:touch; overscroll-behavior:none;
+}
+.screen.active{display:flex;}
+.screen h1{font-size:clamp(22px,5vw,32px); margin:8px 0 4px; text-align:center;}
+.screen h2{font-size:18px; margin:18px 0 8px;}
+.sub{color:var(--muted); text-align:center; margin:0 0 12px; font-size:14px;}
+.screen > *{flex:none;}
+.card{background:var(--card); border:1px solid var(--line); border-radius:var(--radius); padding:14px; margin:0 auto 12px; width:100%; max-width:640px;}
+.row{display:flex; gap:10px; flex-wrap:wrap; align-items:center;}
+.grow{flex:1 1 auto;}
+.btn{
+  display:inline-flex; align-items:center; justify-content:center; gap:8px;
+  min-height:52px; padding:10px 18px; border-radius:14px; font-weight:700; font-size:18px;
+  background:#e9edf2; color:var(--ink); border:2px solid transparent;
+}
+.btn:active{transform:scale(.97);}
+.btn.primary{background:var(--pri); color:var(--pri-ink);}
+.btn.ok{background:var(--ok); color:#fff;}
+.btn.ghost{background:transparent; border-color:var(--line);}
+.btn.big{min-height:64px; font-size:22px; width:100%;}
+.btn.small{min-height:40px; font-size:15px; padding:6px 12px;}
+.btn[disabled]{opacity:.45;}
+.btn.selected{border-color:var(--pri); background:#e4edfc;}
+.stack{display:flex; flex-direction:column; gap:10px;}
+.center{text-align:center;}
+.note{font-size:13px; color:var(--muted);}
+.badge{display:inline-block; padding:2px 8px; border-radius:999px; font-size:12px; font-weight:700; background:#e9edf2;}
+
+/* プレイヤー */
+.player-list{display:flex; flex-wrap:wrap; gap:8px; justify-content:center;}
+.pchip{display:inline-flex; align-items:center; gap:6px; padding:8px 14px; border-radius:999px; border:2px solid var(--line); background:#fff; font-size:18px; min-height:48px;}
+.pchip.selected{border-color:var(--pri); background:#e4edfc;}
+.pchip .ico{font-size:24px;}
+.icon-grid{display:grid; grid-template-columns:repeat(6,1fr); gap:8px;}
+@media (max-width:420px){.icon-grid{grid-template-columns:repeat(4,1fr);}}
+.icon-grid button{font-size:34px; min-height:60px; border-radius:12px; background:#f1f3f6; border:2px solid transparent;}
+.icon-grid button.selected{border-color:var(--pri); background:#e4edfc;}
+.name-input{width:100%; min-height:48px; font-size:18px; padding:8px 12px; border:2px solid var(--line); border-radius:12px; -webkit-user-select:text; user-select:text;}
+
+/* モード */
+.mode-grid{display:grid; grid-template-columns:repeat(3,1fr); gap:10px;}
+@media (max-width:420px){.mode-grid{grid-template-columns:1fr;}}
+.mode-btn{flex-direction:column; min-height:84px; padding:10px; line-height:1.25;}
+.mode-btn small{font-weight:400; font-size:12px; color:var(--muted);}
+
+/* 設定 */
+.setting{display:flex; align-items:center; justify-content:space-between; gap:10px; padding:10px 0; border-bottom:1px solid var(--line); flex-wrap:wrap;}
+.setting:last-child{border-bottom:0;}
+.setting label{font-weight:600;}
+.setting .ctl{display:flex; align-items:center; gap:8px;}
+.seg{display:inline-flex; border:2px solid var(--line); border-radius:10px; overflow:hidden;}
+.seg button{min-height:40px; padding:6px 12px; font-weight:700; background:#fff;}
+.seg button.selected{background:var(--pri); color:#fff;}
+.toggle{width:58px; height:34px; border-radius:999px; background:#c9ced6; position:relative; transition:background .15s;}
+.toggle::after{content:""; position:absolute; top:3px; left:3px; width:28px; height:28px; border-radius:50%; background:#fff; transition:left .15s;}
+.toggle.on{background:var(--ok);}
+.toggle.on::after{left:27px;}
+.pat-list{display:grid; grid-template-columns:1fr; gap:6px;}
+.pat-item{display:flex; align-items:center; justify-content:space-between; gap:10px; padding:8px 10px; background:#f7f8fa; border-radius:10px;}
+.pat-item .pname{font-weight:700;}
+.pat-item .pdesc{font-size:12px; color:var(--muted);}
+.pat-item .tag{font-size:11px; padding:1px 6px; border-radius:6px; background:#ffe6c2; color:#7a4b00; margin-left:6px;}
+.num{display:inline-flex; align-items:center; border:2px solid var(--line); border-radius:10px; overflow:hidden;}
+.num button{width:44px; min-height:40px; font-size:20px; font-weight:700; background:#fff;}
+.num span{min-width:56px; text-align:center; font-weight:700;}
+
+/* 結果・記録 */
+.stat-grid{display:grid; grid-template-columns:repeat(2,1fr); gap:10px;}
+.stat{background:#f7f8fa; border-radius:12px; padding:10px; text-align:center;}
+.stat .v{font-size:28px; font-weight:800;}
+.stat .k{font-size:12px; color:var(--muted);}
+table.pt{width:100%; border-collapse:collapse; font-size:14px;}
+table.pt th,table.pt td{padding:6px 4px; border-bottom:1px solid var(--line); text-align:left;}
+table.pt td.n{text-align:right; font-variant-numeric:tabular-nums;}
+tr.weak td{background:#fff1ef;}
+.rec-item{padding:10px 0; border-bottom:1px solid var(--line); font-size:14px;}
+.rec-item:last-child{border-bottom:0;}
+textarea.json{width:100%; height:140px; font-family:ui-monospace,Menlo,monospace; font-size:12px; -webkit-user-select:text; user-select:text;}
+
+/* ===== ゲーム画面 ===== */
+#game{padding:0; overflow:hidden;}
+.hud{
+  position:absolute; left:0; right:0; top:0; z-index:35;   /* 広告(30)より上、ストア(50)より下 */
+  padding:calc(var(--safe-t) + 30px) 12px 6px; background:rgba(255,255,255,.92);
+  border-bottom:1px solid var(--line);
+}
+.hud-row{display:flex; align-items:center; gap:10px; font-size:14px; font-weight:700;}
+.hud-row .sp{flex:1;}
+.tbar{height:10px; border-radius:6px; background:#e2e6ec; overflow:hidden; margin-top:6px;}
+.tbar > div{height:100%; width:100%; background:var(--ok); transition:width .25s linear, background .3s;}
+.tbar > div.low{background:var(--ng);}
+.stage{position:absolute; inset:0; overflow:hidden; background:#222;}
+
+/* 架空ゲーム背景 */
+.fg{position:absolute; inset:0; display:flex; flex-direction:column; align-items:center; justify-content:center; padding-top:70px;}
+.fg-puzzle{background:linear-gradient(160deg,#20315c,#0f1a33);}
+.fg-puzzle .board{display:grid; grid-template-columns:repeat(6,1fr); gap:4px; width:min(84vw,360px); padding:8px; background:rgba(255,255,255,.08); border-radius:14px;}
+.fg-puzzle .gem{aspect-ratio:1; border-radius:8px; box-shadow:inset 0 -4px 0 rgba(0,0,0,.25);}
+.fg-title{color:#fff; font-weight:800; font-size:20px; margin-bottom:10px; text-shadow:0 2px 4px rgba(0,0,0,.4);}
+.fg-runner{background:linear-gradient(#8fd3ff 0 60%,#7ccf6b 60% 62%,#5a9c48 62%);}
+.fg-runner .ground{position:absolute; left:0; right:0; bottom:0; height:38%; background:repeating-linear-gradient(90deg,#5a9c48 0 40px,#4e8a3e 40px 80px); background-size:80px 100%; animation:scroll-x 1.2s linear infinite;}
+.fg-runner .cloud{position:absolute; top:22%; width:90px; height:36px; background:#fff; border-radius:30px; opacity:.85; animation:cloud 9s linear infinite;}
+.fg-runner .hero{position:absolute; left:22%; bottom:38%; font-size:60px; animation:hop .55s ease-in-out infinite alternate;}
+.fg-runner .coin{position:absolute; bottom:52%; font-size:28px; animation:coin 2.4s linear infinite;}
+@keyframes scroll-x{to{background-position:-80px 0;}}
+@keyframes cloud{from{left:100%;} to{left:-100px;}}
+@keyframes hop{from{transform:translateY(0);} to{transform:translateY(-14px);}}
+@keyframes coin{from{left:110%;} to{left:-40px;}}
+.fg-score{position:absolute; top:calc(var(--safe-t) + var(--hud-h) + 6px); left:16px; color:#fff; font-weight:800; font-size:18px; text-shadow:0 2px 3px rgba(0,0,0,.5);}
+.fg-hint{position:absolute; bottom:calc(var(--safe-b) + 30px); left:0; right:0; text-align:center; color:#fff; font-size:16px; font-weight:700; text-shadow:0 1px 3px rgba(0,0,0,.6); opacity:.9;}
+
+/* ===== 広告レイヤー ===== */
+.ad-layer{position:absolute; inset:0; z-index:30; display:flex; align-items:center; justify-content:center; background:rgba(0,0,0,.72); padding:calc(var(--safe-t) + var(--hud-h)) 8px calc(var(--safe-b) + 8px);}
+.ad-layer.banner-mode{background:transparent; pointer-events:none;}
+.ad-layer.banner-mode > *{pointer-events:auto;}
+.ad-layer.banner-mode .ad{pointer-events:none;}
+.ad-layer.banner-mode .ad > *{pointer-events:auto;}   /* 後から追加される確認ダイアログにも効く */
+.ad{
+  position:relative; width:min(100%, 420px); height:100%; max-height:calc(min(100%, 720px));
+  aspect-ratio:9/16; background:#fff; border-radius:12px; overflow:hidden;
+  box-shadow:0 12px 40px rgba(0,0,0,.5); display:flex; flex-direction:column;
+}
+.ad.compact{height:auto; aspect-ratio:auto; max-height:100%;}
+.ad-body{position:relative; flex:1; overflow:hidden; display:flex; flex-direction:column; align-items:center; justify-content:center; text-align:center; padding:16px;}
+.ad-body img.ad-img{position:absolute; inset:0; width:100%; height:100%; object-fit:cover;}
+.ad-brand{font-size:clamp(22px,7vw,34px); font-weight:900; color:#fff; text-shadow:0 2px 8px rgba(0,0,0,.35); letter-spacing:.02em;}
+.ad-copy{font-size:clamp(14px,4vw,18px); color:#fff; margin-top:6px; text-shadow:0 1px 4px rgba(0,0,0,.4);}
+.ad-hero{font-size:clamp(70px,24vw,120px); line-height:1; margin:10px 0; filter:drop-shadow(0 6px 8px rgba(0,0,0,.3));}
+.ad-cta{margin-top:12px; padding:14px 30px; border-radius:999px; font-weight:900; font-size:20px; color:#fff; background:linear-gradient(#ffb02e,#f27d00); box-shadow:0 4px 0 #b95d00;}
+.ad-mark{position:absolute; left:6px; bottom:6px; font-size:10px; padding:1px 5px; background:rgba(255,255,255,.75); color:#333; border-radius:3px; font-weight:700;}
+.ad-mark.trap{cursor:pointer;}
+.ad-foot{background:#f4f4f4; padding:10px 12px; display:flex; align-items:center; gap:10px; border-top:1px solid #ddd;}
+.ad-foot .appicon{width:44px; height:44px; border-radius:11px; flex:none;}
+.ad-foot .t{font-weight:800; font-size:14px;}
+.ad-foot .s{font-size:12px; color:#666;}
+.ad-foot .get{margin-left:auto; padding:8px 16px; border-radius:999px; background:var(--pri); color:#fff; font-weight:800; font-size:14px;}
+.stars{color:#f5a623; font-size:12px;}
+
+/* 閉じるボタン系 */
+.close-x{
+  position:absolute; z-index:5; display:flex; align-items:center; justify-content:center;
+  border-radius:50%; background:rgba(0,0,0,.55); color:#fff; font-weight:700; line-height:1;
+  border:2px solid rgba(255,255,255,.8);
+}
+.close-x .hit{position:absolute; border-radius:50%;}
+.close-x.tiny{background:rgba(0,0,0,.18); border-color:rgba(255,255,255,.35); color:rgba(255,255,255,.55);}
+.close-x.gray{background:#bfbfbf; border-color:#a8a8a8; color:#7a7a7a;}
+.close-x.white{background:#fff; border-color:#fff; color:#222; box-shadow:0 1px 4px rgba(0,0,0,.4);}
+.close-x.fake-deco{background:transparent; border:2px solid rgba(255,255,255,.9); color:#fff; box-shadow:none;}
+.close-x.vanish, .real-wrap.vanish{visibility:hidden;}
+.real-wrap{transition:transform .35s ease-out;}
+/* 失敗・時間切れのあと「本物はここ」を示す（点滅ではなく、ゆっくり2回ふくらむ） */
+.real-wrap.reveal > .close-x, .real-wrap.reveal > .txtbtn{outline:4px solid #ffbf47; box-shadow:0 0 0 8px rgba(255,191,71,.5); visibility:visible; animation:reveal .5s ease-in-out 4 alternate;}
+@keyframes reveal{from{transform:scale(1);} to{transform:scale(1.25);}}
+.ghost-link{position:absolute; z-index:4; background:transparent;}
+.debug .ghost-link{background:rgba(255,0,0,.25);}
+.debug .close-x .hit{outline:2px dashed #0f0;}
+.txtbtn{
+  position:absolute; z-index:5; padding:8px 14px; border-radius:8px; font-weight:800; font-size:14px;
+  background:rgba(255,255,255,.92); color:#222; box-shadow:0 1px 4px rgba(0,0,0,.35);
+}
+.txtbtn.dark{background:rgba(0,0,0,.6); color:#fff;}
+.trap-icon{position:absolute; z-index:5; font-size:20px; width:36px; height:36px; display:flex; align-items:center; justify-content:center; border-radius:50%; background:rgba(0,0,0,.45); color:#fff; border:1.5px solid rgba(255,255,255,.7);}
+.cd-circle{position:absolute; z-index:6; width:44px; height:44px; border-radius:50%; display:flex; align-items:center; justify-content:center; color:#fff; font-weight:800; font-size:13px; background:conic-gradient(var(--cd-color,#fff) var(--cd-deg,0deg), rgba(255,255,255,.25) 0); }
+.cd-circle .inner{width:34px; height:34px; border-radius:50%; background:rgba(0,0,0,.6); display:flex; align-items:center; justify-content:center;}
+.cd-circle .inner .x{font-size:11px; opacity:.6; margin-left:2px;}
+.cd-text{position:absolute; z-index:6; font-size:13px; font-weight:700; color:#fff; background:rgba(0,0,0,.55); padding:6px 10px; border-radius:8px;}
+.swap-btn{position:absolute; z-index:7; padding:8px 14px; border-radius:999px; background:var(--pri); color:#fff; font-weight:800; font-size:14px; box-shadow:0 2px 6px rgba(0,0,0,.4); transition:transform .35s ease-out; }
+
+/* 動画風 */
+.video-scene{position:absolute; inset:0; overflow:hidden; background:linear-gradient(#2a2a4a,#101026);}
+.video-scene .orb{position:absolute; width:120px; height:120px; border-radius:50%; filter:blur(2px); opacity:.85; animation:orb 4s ease-in-out infinite alternate;}
+.video-scene .char{position:absolute; bottom:30%; left:10%; font-size:70px; animation:walk 3s linear infinite;}
+.video-scene .bar{position:absolute; left:0; right:0; bottom:0; height:4px; background:rgba(255,255,255,.25);}
+.video-scene .bar > div{height:100%; background:#ff5c5c; width:0; animation:prog var(--vlen,15s) linear forwards;}
+@keyframes orb{from{transform:translate(0,0) scale(1);} to{transform:translate(120px,80px) scale(1.4);}}
+@keyframes walk{0%{left:-15%;} 100%{left:100%;}}
+@keyframes prog{to{width:100%;}}
+
+/* プレイアブル */
+.play-board{display:grid; grid-template-columns:repeat(5,1fr); gap:6px; width:min(70%,260px); margin:10px auto;}
+.play-board div{aspect-ratio:1; border-radius:8px; background:#fff3; border:2px solid #fff6; display:flex; align-items:center; justify-content:center; font-size:26px;}
+.play-hand{position:absolute; font-size:44px; animation:hand 1.4s ease-in-out infinite; pointer-events:none; z-index:3;}
+@keyframes hand{0%,100%{transform:translate(0,0);} 50%{transform:translate(-6px,-10px) scale(.9);}}
+
+/* バナー＋ポップアップ */
+.banner{position:absolute; left:0; right:0; bottom:calc(var(--safe-b) + 0px); height:64px; background:linear-gradient(90deg,#ff7a59,#ff3d7f); color:#fff; display:flex; align-items:center; gap:10px; padding:0 12px; font-weight:800; box-shadow:0 -4px 12px rgba(0,0,0,.3);}
+.banner .b-ico{font-size:34px;}
+.banner .b-t{font-size:15px; line-height:1.15;}
+.banner .b-s{font-size:11px; font-weight:400; opacity:.9;}
+.banner .b-cta{margin-left:auto; padding:8px 12px; background:#fff; color:#d0206c; border-radius:999px; font-size:13px;}
+.popup{position:absolute; left:50%; top:50%; transform:translate(-50%,-50%); width:min(88%,340px); background:#fff; border-radius:16px; overflow:hidden; box-shadow:0 12px 40px rgba(0,0,0,.5);}
+.popup .p-art{height:180px; display:flex; align-items:center; justify-content:center; font-size:80px; color:#fff;}
+.popup .p-body{padding:14px; text-align:center;}
+.popup .p-t{font-weight:900; font-size:18px;}
+.popup .p-s{font-size:13px; color:#666; margin:4px 0 10px;}
+.popup .p-cta{display:inline-block; padding:12px 26px; border-radius:999px; background:var(--pri); color:#fff; font-weight:800;}
+
+/* 偽の警告 */
+.alert-box{position:relative; width:min(88%,320px); background:#f2f2f7; border-radius:14px; padding:18px 16px 12px; text-align:center; box-shadow:0 12px 40px rgba(0,0,0,.5); pointer-events:auto;}
+.al-title{font-weight:800; font-size:18px; color:#c0392b;}
+.al-text{font-size:14px; color:#333; margin:8px 0 10px; line-height:1.5;}
+.al-bar{height:8px; background:#ddd; border-radius:4px; overflow:hidden; margin-bottom:12px;}
+.al-bar > div{height:100%; width:0; background:#c0392b; animation:prog 4s linear forwards;}
+.al-btn{display:block; width:100%; min-height:44px; border-top:1px solid #d6d6db; font-size:16px; color:var(--pri); font-weight:600;}
+.al-btn.primary{background:var(--ng); color:#fff; border-radius:10px; font-weight:800; margin-bottom:6px; border:0;}
+/* 記事風 */
+.native-body{background:#fff; color:#222; align-items:stretch; justify-content:flex-start; text-align:left; padding:14px;}
+.nv-head{font-size:12px; color:#888; margin-bottom:6px;}
+.nv-pr{display:inline-block; background:#eee; color:#666; font-size:10px; padding:1px 5px; border-radius:3px; margin-right:4px;}
+.nv-thumb{height:120px; border-radius:10px; display:flex; align-items:center; justify-content:center; font-size:60px;}
+.nv-title{font-weight:800; font-size:17px; margin:8px 0 4px; line-height:1.35;}
+.nv-text{font-size:13px; color:#555; line-height:1.5;}
+.nv-more{color:var(--pri); font-weight:800; font-size:15px; margin-top:6px; text-align:left;}
+.nv-rel{font-size:13px; color:#333; padding:6px 0; border-top:1px solid #eee;}
+.txtbtn.back{background:transparent; color:#fff; box-shadow:none; font-size:16px; text-shadow:0 1px 3px rgba(0,0,0,.6);}
+/* 報酬型 */
+.reward-box{background:rgba(0,0,0,.35); border:2px dashed rgba(255,255,255,.7); border-radius:14px; padding:12px 18px; color:#fff; font-weight:800; margin-top:10px;}
+.reward-btn{position:absolute; z-index:5; left:50%; transform:translateX(-50%); bottom:70px; padding:12px 20px; white-space:nowrap; border-radius:999px; background:linear-gradient(#5ee07a,#1f9d4a); color:#fff; font-weight:900; font-size:17px; box-shadow:0 4px 0 #136b31;}
+
+/* 確認ダイアログ */
+.dlg-back{position:absolute; inset:0; z-index:40; background:rgba(0,0,0,.55); display:flex; align-items:center; justify-content:center; padding:20px; pointer-events:auto;}
+.dlg{background:#fff; border-radius:16px; padding:18px; width:min(100%,320px); text-align:center;}
+.dlg .d-t{font-weight:800; font-size:18px; margin-bottom:6px;}
+.dlg .d-s{font-size:13px; color:#666; margin-bottom:14px;}
+.dlg .d-btns{display:flex; gap:10px;}
+.dlg .d-btns button{flex:1; min-height:48px; border-radius:10px; font-weight:800; font-size:16px;}
+.dlg .d-btns .big{flex:1.6; background:var(--pri); color:#fff;}
+.dlg .d-btns .plain{background:#eee; color:#444;}
+.dlg .d-btns .danger{background:#fff; color:var(--ng); border:2px solid var(--ng);}
+
+/* ===== 架空ストア ===== */
+.store{position:absolute; inset:0; z-index:50; background:#fff; display:flex; flex-direction:column; overflow:hidden;}
+.store-head{position:relative; height:calc(var(--safe-t) + 66px); padding-top:calc(var(--safe-t) + 22px); border-bottom:1px solid #e5e5e5; display:flex; align-items:center; justify-content:center; font-weight:700; font-size:15px; flex:none;}
+.store-close{position:absolute; top:calc(var(--safe-t) + 24px); display:flex; align-items:center; justify-content:center; min-width:40px; height:40px; padding:0 10px; color:var(--pri); font-weight:600; font-size:16px;}
+.store-close.x{font-size:22px; color:#777;}
+.store-close.left{left:8px;} .store-close.right{right:8px;}
+.store-close.easy{position:static; margin:0 auto; width:80%; min-height:64px; background:var(--pri); color:#fff; border-radius:14px; font-size:24px; font-weight:800;}
+.store-close.back-link{font-size:13px; color:var(--pri);}
+.store-hint{background:#fff3cd; color:#7a4b00; font-weight:800; text-align:center; padding:8px 10px; border-radius:10px; margin:10px 0 0; font-size:15px;}
+.store-body{flex:1; overflow:hidden; padding:14px;}
+.app-row{display:flex; gap:12px; align-items:center;}
+.app-icon{width:84px; height:84px; border-radius:20px; flex:none; display:flex; align-items:center; justify-content:center; font-size:48px; box-shadow:0 2px 8px rgba(0,0,0,.2);}
+.app-name{font-weight:800; font-size:20px;}
+.app-dev{font-size:13px; color:#777;}
+.app-get{margin-top:6px; display:inline-block; padding:8px 22px; border-radius:999px; background:var(--pri); color:#fff; font-weight:800; font-size:15px;}
+.app-meta{display:flex; gap:18px; margin:14px 0; font-size:12px; color:#777; border-top:1px solid #eee; border-bottom:1px solid #eee; padding:10px 0;}
+.app-meta b{display:block; font-size:16px; color:#333;}
+.shots{display:flex; gap:10px; overflow:hidden;}
+.shot{flex:none; width:44%; aspect-ratio:9/16; border-radius:12px; display:flex; align-items:center; justify-content:center; font-size:50px; color:#fff;}
+.store-links{margin-top:12px; display:flex; flex-direction:column; gap:8px;}
+.store-links button{text-align:left; padding:10px 0; border-bottom:1px solid #eee; color:var(--pri); font-weight:600; font-size:15px;}
+.install{position:absolute; inset:0; z-index:60; background:#fff; display:flex; flex-direction:column; align-items:center; justify-content:center; gap:14px;}
+.install .ring{width:70px; height:70px; border-radius:50%; border:6px solid #e0e0e0; border-top-color:var(--pri); animation:spin 1.1s linear infinite;}
+@keyframes spin{to{transform:rotate(360deg);}}
+.install .t{font-weight:800; font-size:18px;}
+.install .s{font-size:13px; color:#777;}
+.reco{position:absolute; inset:0; z-index:61; background:#fff; display:flex; flex-direction:column;}
+.reco-body{padding:14px; flex:1;}
+.reco-item{display:flex; align-items:center; gap:12px; padding:10px 0; border-bottom:1px solid #eee;}
+.reco-item .i{width:52px; height:52px; border-radius:13px; display:flex; align-items:center; justify-content:center; font-size:30px;}
+.reco-item .g{margin-left:auto; padding:6px 16px; border-radius:999px; background:#eee; color:var(--pri); font-weight:800; font-size:13px;}
+
+/* ===== 演出 ===== */
+.blackout{position:absolute; inset:0; z-index:70; background:#000; opacity:0; transition:opacity .25s; pointer-events:none; display:flex; align-items:center; justify-content:center; color:#fff; font-size:24px; font-weight:800;}
+.blackout.on{opacity:1; pointer-events:auto;}
+@keyframes blast{0%{transform:scale(1) rotate(0); opacity:1;} 100%{transform:scale(1.35) rotate(6deg) translateY(-40px); opacity:0;}}
+.ad.blast{animation:blast .45s ease-in forwards; pointer-events:none;}
+@keyframes shake{0%,100%{transform:translateX(0);} 25%{transform:translateX(-6px);} 75%{transform:translateX(6px);}}
+.ad.shake{animation:shake .25s;}
+.toast{position:absolute; left:50%; top:45%; transform:translate(-50%,-50%); z-index:80; background:rgba(31,157,74,.95); color:#fff; font-weight:900; font-size:clamp(28px,8vw,44px); padding:16px 30px; border-radius:20px; box-shadow:0 8px 30px rgba(0,0,0,.4); pointer-events:none; animation:toast 1.1s ease-out forwards;}
+.toast.bad{background:rgba(214,69,58,.95); font-size:clamp(20px,6vw,30px);}
+@keyframes toast{0%{opacity:0; transform:translate(-50%,-30%) scale(.8);} 15%{opacity:1; transform:translate(-50%,-50%) scale(1.05);} 80%{opacity:1;} 100%{opacity:0;}}
+.escape-tag{text-align:center; color:#7a4b00; font-weight:800; font-size:16px; margin:8px 0 0;}
+.no-anim .fg *, .no-anim .video-scene *, .no-anim .play-hand, .no-anim .orb{animation:none !important;}
+/* 「視差効果を減らす」設定：背景の動きだけ止め、正解・失敗の表示は残す */
+@media (prefers-reduced-motion:reduce){
+  .fg *, .video-scene *, .play-hand, .install .ring, .swap-btn, .real-wrap{animation:none !important; transition:none !important;}
+  .toast{animation:none !important; opacity:1;}
+  .ad.blast{animation:none !important; opacity:0;}
+}
+/* 結果画面：生徒向けの○×の並び・先生用の折りたたみ */
+.dots{display:flex; gap:6px; justify-content:center; flex-wrap:wrap; margin:8px 0;}
+.dots span{width:36px; height:36px; border-radius:50%; display:flex; align-items:center; justify-content:center; font-weight:800; color:#fff; font-size:18px;}
+.dots .o{background:var(--ok);} .dots .x{background:#b9bfc8;}
+.big-num{font-size:clamp(34px,10vw,52px); font-weight:900; text-align:center; line-height:1.1;}
+details.teacher{border-top:1px solid var(--line); margin-top:10px; padding-top:8px;}
+details.teacher summary{font-weight:700; color:var(--muted); cursor:pointer; min-height:44px; display:flex; align-items:center;}
+.howto{font-size:15px; line-height:1.7;}
+/* ずかん */
+.gcat{display:flex; align-items:center; gap:10px; margin:18px 0 8px; padding:10px 12px; border-radius:12px; color:#fff; font-weight:800; font-size:18px;}
+.gcat small{font-weight:600; font-size:13px; opacity:.95;}
+.gentry{background:#fff; border:1px solid var(--line); border-radius:14px; padding:12px 14px; margin-bottom:10px;}
+.gentry .g-head{display:flex; align-items:center; gap:10px; margin-bottom:6px;}
+.gentry .g-ico{font-size:30px; width:44px; text-align:center; flex:none;}
+.gentry .g-name{font-weight:800; font-size:17px;}
+.gentry .g-row{display:flex; gap:8px; font-size:15px; line-height:1.55; margin:4px 0;}
+.gentry .g-row b{flex:none; width:6.5em; color:var(--muted); font-size:13px; padding-top:2px;}
+.gentry .g-todo{background:#e8f6ec; border-radius:10px; padding:8px 10px; font-weight:700;}
+.gentry details{margin-top:6px;} .gentry summary{font-size:13px; color:var(--muted); min-height:36px; display:flex; align-items:center; cursor:pointer;}
+.gentry .g-try{margin-top:8px;}
+.g-rule{background:#fff8e1; border:1px solid #ffe08a; border-radius:12px; padding:10px 12px; font-size:15px; line-height:1.6; margin-bottom:10px;}
+.g-tabs{display:flex; gap:6px; flex-wrap:wrap; justify-content:center; margin-bottom:6px;}
+.g-tabs button{min-height:40px; padding:6px 12px; border-radius:999px; background:#e9edf2; font-weight:700; font-size:14px;}
+.g-tabs button.selected{background:var(--ink); color:#fff;}
+.rtag{display:inline-block; font-size:12px; font-weight:800; padding:3px 8px; border-radius:999px; margin-left:auto; white-space:nowrap;}
+</style>
+</head>
+<body>
+<div id="frame"><div id="frame-label">れんしゅう</div></div>
+
+<!-- ===== タイトル ===== -->
+<section id="title" class="screen active">
+  <h1>✕ボタンさがし</h1>
+  <p class="sub">こうこくの「ほんものの ✕」を みつけて、いっぱつで タップしよう</p>
+  <div class="card">
+    <h2 style="margin-top:0">だれが あそぶ？</h2>
+    <div id="player-list" class="player-list"></div>
+    <div id="player-new" class="hidden" style="margin-top:12px">
+      <p class="note">アイコンを 1つ えらんでね（なまえは なくてもOK）</p>
+      <div id="icon-grid" class="icon-grid"></div>
+      <input id="new-name" class="name-input" type="text" maxlength="12" placeholder="なまえ（なくてもOK・せんせいが いれます）" style="margin-top:10px" autocomplete="off" autocapitalize="off" autocorrect="off" enterkeyhint="done">
+      <div class="row" style="margin-top:10px">
+        <button id="btn-player-save" class="btn primary grow">とうろく</button>
+        <button id="btn-player-cancel" class="btn ghost">やめる</button>
+      </div>
+    </div>
+  </div>
+  <div class="card" id="mode-card">
+    <h2 style="margin-top:0">モード</h2>
+    <div id="mode-grid" class="mode-grid"></div>
+  </div>
+  <div class="card stack">
+    <button id="btn-start" class="btn primary big">▶ あそぶ</button>
+    <div class="row">
+      <button id="btn-zukan" class="btn grow">📖 ずかん</button>
+      <button id="btn-records" class="btn grow">📒 きろく</button>
+      <button id="btn-settings" class="btn grow teacher-btn">⚙ せってい（先生用）</button>
+      <button id="btn-test" class="btn grow teacher-btn">🧪 テスト</button>
+    </div>
+    <p class="note center teacher-note hidden">先生用の画面は、上の「れんしゅう」を 2秒 長押しすると開きます。</p>
+  </div>
+  <div class="card howto">
+    <h2 style="margin-top:0">あそびかた</h2>
+    ① ゲームの とちゅうで、こうこくが でてきます。<br>
+    ② すぐ おさないで、ぜんたいを よく みて、ほんものの ✕ を みつけます。<br>
+    ③ まちがえて おすと「アプリストア」に とびます。あわてず「もどる」を さがしましょう。
+  </div>
+</section>
+
+<!-- ===== 設定 ===== -->
+<section id="settings" class="screen">
+  <h1>せってい（先生用）</h1>
+  <p class="sub">モードごとに保存されます。いま選んでいるモード：<b id="settings-mode-name"></b></p>
+  <div class="card" id="settings-body"></div>
+  <div class="card stack">
+    <button id="btn-settings-back" class="btn primary big">もどる</button>
+    <button id="btn-settings-reset" class="btn ghost">このモードの設定を初期値に戻す</button>
+  </div>
+</section>
+
+<!-- ===== 記録 ===== -->
+<section id="records" class="screen">
+  <h1>きろく</h1>
+  <div class="card" id="records-body"></div>
+  <div class="card stack">
+    <button id="btn-json" class="btn">JSON を表示・コピー（書き出し）</button>
+    <textarea id="json-out" class="json hidden" readonly></textarea>
+    <button id="btn-json-copy" class="btn small hidden">クリップボードにコピー</button>
+    <button id="btn-import" class="btn">JSON を読み込む（別の iPad から持ってくる）</button>
+    <div id="import-box" class="hidden">
+      <textarea id="json-in" class="json" placeholder="書き出した JSON を ここに貼り付け"></textarea>
+      <button id="btn-import-run" class="btn small">読み込んで追加する</button>
+    </div>
+    <p class="note">Safari は 7日間使わないサイトの保存データを消すことがあります。ホーム画面に追加して使うか、学期の区切りで JSON を書き出して保管してください。</p>
+    <button id="btn-records-back" class="btn primary big">もどる</button>
+  </div>
+</section>
+
+<!-- ===== ずかん（罠の種類と対策） ===== -->
+<section id="zukan" class="screen">
+  <h1>わなの ずかん</h1>
+  <p class="sub">こうこくの「まぎらわしい ボタン」を しゅるいごとに。「ためす」で その れいが 1つ でます（きろくは のこりません）</p>
+  <div class="card" style="padding:10px">
+    <div class="g-rule">📌 <b>きほんの ルール</b><br>① すぐ おさない。まず ぜんたいを みる。<br>② ほんものの ✕は、こうこくの <b>わくの かど</b>に ついている。えの なかの ✕は にせもの。<br>③ 「とじる」「OK」「もどる」の <b>もじは しんじない</b>。<br>④ まちがえて ストアに とんでも、あわてず <b>ひだりうえ か みぎうえ</b>の「もどる」「かんりょう」「✕」を さがす。<br>⑤ こうこくには きまりが ある。でも <b>きまりが あっても あんぜんでは ない</b>。じぶんの めで みわける。</div>
+    <div id="g-rules"></div>
+    <div class="g-tabs" id="g-tabs"></div>
+  </div>
+  <div id="zukan-body" style="width:100%; max-width:640px; margin:0 auto"></div>
+  <div class="card stack">
+    <button id="btn-zukan-back" class="btn primary big">もどる</button>
+  </div>
+</section>
+
+<!-- ===== テスト ===== -->
+<section id="test" class="screen">
+  <h1>テストモード</h1>
+  <p class="sub">パターンと広告の種類を指定して 1問だけ出します（記録されません）</p>
+  <div class="card" id="test-body"></div>
+  <div class="card stack">
+    <button id="btn-test-run" class="btn primary big">この条件で出す</button>
+    <button id="btn-test-back" class="btn">もどる</button>
+  </div>
+</section>
+
+<!-- ===== ゲーム ===== -->
+<section id="game" class="screen">
+  <div class="stage" id="stage"></div>
+  <div class="hud">
+    <div class="hud-row">
+      <span id="hud-q">1 / 10</span>
+      <span class="badge" id="hud-level">Lv 1</span>
+      <span class="sp"></span>
+      <span id="hud-score">0 てん</span>
+      <button id="hud-quit" class="btn small ghost" style="min-height:32px">やめる</button>
+    </div>
+    <div class="tbar" id="tbar"><div id="tbar-fill"></div></div>
+  </div>
+  <div id="ad-root"></div>
+  <div id="store-root"></div>
+  <div id="fx-root"></div>
+  <div class="blackout" id="blackout">ストアに とびます…</div>
+</section>
+
+<!-- ===== 結果 ===== -->
+<section id="result" class="screen">
+  <h1>けっか</h1>
+  <p class="sub" id="result-sub"></p>
+  <div class="card" id="result-body"></div>
+  <div class="card">
+    <details class="teacher" id="result-teacher">
+      <summary>せんせい用 くわしく ▽</summary>
+      <div id="result-stats"></div>
+      <h2>押してしまったもの</h2>
+      <div id="result-traps"></div>
+      <h2>パターンべつ</h2>
+      <div id="result-patterns"></div>
+      <p class="note">赤い行は、まちがえた回数が多いパターンです。1問に複数パターンが同時に出るため、「押してしまったもの」の表の方が苦手を正確に示します。位置ランダム・透明リンク領域・多段脱出は罠そのものではないので参考程度に。</p>
+    </details>
+  </div>
+  <div class="card center">
+    <p style="font-size:20px; font-weight:800; margin:6px 0">📱 ほんもので ためしてみよう</p>
+    <p style="font-size:15px">つぎは、せんせいや かぞくと いっしょに、ほんものでも やってみよう。</p>
+    <details class="teacher">
+      <summary>先生・家族の方へ</summary>
+      <p class="note" style="text-align:left">このアプリでできても、本物のスマホでできるかは別です。本物で試す前に、iPad の「スクリーンタイム ＞ コンテンツとプライバシーの制限」でインストールと課金をオフにしてください。✕が見つからないときは「アプリごと閉じる」「大人を呼ぶ」も正解として教えてください（このゲームではその練習はできません）。</p>
+    </details>
+  </div>
+  <div class="card stack">
+    <button id="btn-again" class="btn primary big">もういちど</button>
+    <button id="btn-result-zukan" class="btn">📖 ずかんで たいさくを みる</button>
+    <button id="btn-result-title" class="btn">タイトルへ</button>
+  </div>
+</section>
+
+<script>
+'use strict';
+/* =====================================================================
+   ✕ボタンさがし れんしゅう  —  単一HTML / 外部通信なし
+   構成:
+     1. 共通ユーティリティ・定数（パターン一覧・広告種類・モード既定値）
+     2. 保存（localStorage）・音（Web Audio API）
+     3. 広告テンプレート関数（見た目だけを作る。画像差し替え可）
+     4. 出題スペック生成（パターンの組み合わせ）と広告レイヤーの組み立て
+     5. 架空ストア（脱出ステージ）
+     6. ラウンド進行・採点・結果
+     7. 画面（タイトル・設定・記録・テスト）
+   ===================================================================== */
+
+// ---------- 1. ユーティリティ ----------
+const $  = s => document.querySelector(s);
+const $$ = s => Array.from(document.querySelectorAll(s));
+function h(tag, attrs, ...children){
+  const e = document.createElement(tag);
+  if (attrs) for (const k in attrs){
+    const v = attrs[k];
+    if (v == null || v === false) continue;
+    if (k === 'class') e.className = v;
+    else if (k === 'style') e.style.cssText = v;
+    else if (k === 'text') e.textContent = v;
+    else if (k === 'html') e.innerHTML = v;
+    else if (k.startsWith('on')) e.addEventListener(k.slice(2), v);
+    else if (k.startsWith('data-')) e.setAttribute(k, v);
+    else e.setAttribute(k, v);
+  }
+  for (const c of children.flat()){
+    if (c == null || c === false) continue;
+    e.appendChild(typeof c === 'string' ? document.createTextNode(c) : c);
+  }
+  return e;
+}
+const rnd = (a,b) => a + Math.random()*(b-a);
+const ri  = (a,b) => Math.floor(rnd(a,b+1));
+const pick = arr => arr[ri(0,arr.length-1)];
+const shuffle = arr => { const a=arr.slice(); for(let i=a.length-1;i>0;i--){const j=ri(0,i);[a[i],a[j]]=[a[j],a[i]];} return a; };
+const clamp = (v,a,b) => Math.max(a,Math.min(b,v));
+const fmtSec = ms => (ms/1000).toFixed(1);
+const now = () => performance.now();
+const sleep = ms => new Promise(r=>setTimeout(r,ms));
+
+const ICONS = ['🐶','🐱','🐼','🦊','🐸','🐧','🦁','🐰','🚗','🚀','🚂','⛵'];
+
+// 意地悪パターン一覧（内部IDは結果画面・記録に使う）
+const PATTERNS = [
+  {id:'delay_x',        name:'遅延✕',                 desc:'カウントダウンのあとに✕が出る。数える間、押せる✕はない',      def:['easy','normal','hard']},
+  {id:'tiny_x',         name:'極小✕',                 desc:'隅に小さく薄い✕が出る',                                      def:['normal','hard']},
+  {id:'fake_x',         name:'偽✕',                   desc:'絵の中に✕っぽい飾りがある。押すとストアへ。本物は別の場所',   def:['easy','normal','hard']},
+  {id:'text_trap',      name:'文字ボタンの罠',        desc:'「閉じる」「Skip」などの文字ボタンのうち本物は1つだけ（やさしいでは本物は必ず「とじる」）', def:['normal','hard']},
+  {id:'ghost_link',     name:'透明リンク領域',        desc:'✕の周りの見えない領域は罠。中心を外すとストアへ（「広告の絵を押してもストア」がOFFのとき差が出る）', def:['hard'], hardOnly:true},
+  {id:'double_ad',      name:'二段構え',              desc:'✕を押すと2枚目の広告が出る',                                 def:['normal','hard']},
+  {id:'confirm_dialog', name:'「本当に閉じますか？」', desc:'閉じた直後に確認が出る。はい／いいえの並びと色がいつもと逆',  def:['normal','hard']},
+  {id:'random_pos',     name:'位置ランダム',          desc:'✕の位置が左上・右上・下など毎回変わる',                       def:['easy','normal','hard']},
+  {id:'swap_in',        name:'すり替え',              desc:'✕の位置に「入手」ボタンが滑り込んでくる',                     def:['hard'], hardOnly:true},
+  {id:'vanish_x',       name:'消える✕',               desc:'出ていた✕が数秒で消え、また出る',                             def:['normal','hard']},
+  {id:'trap_icon',      name:'罠アイコン',            desc:'▶ ⓘ 🔊 広告マークなど、押したくなるアイコンは罠',             def:['easy','normal','hard']},
+  {id:'gray_x',         name:'灰色の✕',               desc:'無効に見える灰色の✕が本物（逆に白い✕が偽物の回もある）',      def:['normal','hard']},
+  {id:'multi_escape',   name:'多段脱出',              desc:'ストアを閉じると「本当に戻りますか？」やおすすめ画面がもう1枚', def:['hard'], hardOnly:true},
+  {id:'countdown_x',    name:'✕入りカウントダウン',   desc:'円のカウントダウンの中に小さな✕。終わるまで押せない',          def:['normal','hard']},
+  {id:'early_x',        name:'早押し✕',               desc:'✕は最初から見えているが、カウントが終わる前に押すとストアへ',   def:['normal','hard']},
+  {id:'endless_cd',     name:'終わらないカウントダウン', desc:'数字がいつまでも終わらない。本物の✕は最初から別の場所に小さくある', def:['hard']},
+  {id:'multi_x',        name:'✕がいくつも',           desc:'同じ見た目の✕が絵の中にも。本物は広告の枠の角についている1つだけ', def:['easy','normal','hard']},
+  {id:'fake_back',      name:'偽の「＜ 戻る」',        desc:'アプリの戻るボタンに似た「＜」が広告の中にある。押すとストアへ',    def:['normal','hard']},
+  {id:'auto_redirect',  name:'勝手にストアへ',         desc:'何も押していないのに数秒でストアに飛ぶ。落ち着いて戻る練習',      def:['normal','hard']},
+  {id:'fake_alert',     name:'偽の警告',               desc:'「ウイルスが見つかりました」「更新が必要です」と脅す。全部ウソ',    def:['normal','hard']},
+];
+const PAT = Object.fromEntries(PATTERNS.map(p=>[p.id,p]));
+
+const AD_TYPES = [
+  {id:'interstitial', name:'全画面（静止）'},
+  {id:'video',        name:'動画風（スキップ待ち）'},
+  {id:'playable',     name:'プレイアブル風'},
+  {id:'banner_popup', name:'バナー＋ポップアップ'},
+  {id:'rewarded',     name:'報酬型'},
+  {id:'alert',        name:'警告ダイアログ風（偽の警告）'},
+  {id:'prize',        name:'当選・アンケート風'},
+  {id:'native',       name:'記事・ニュース風'},
+];
+
+const MODES = [
+  {id:'easy',   name:'やさしい', sub:'✕は大きめ・時間なし・速さは採点しない'},
+  {id:'normal', name:'ふつう',   sub:'本物の広告に近い設定'},
+  {id:'hard',   name:'本格',     sub:'全パターン・8秒・当たり判定せまい'},
+];
+
+// モードごとの既定設定（先生が設定画面で変更できる）
+function defaultSettings(mode){
+  const base = {
+    timeLimitOn: mode !== 'easy',
+    timeLimit: mode==='easy'?20 : mode==='normal'?15 : 8,   // 秒
+    xSize: mode==='easy'?56 : mode==='normal'?36 : 28,        // ✕の見た目の大きさ(px)
+    hitScale: mode==='hard'?0.7 : 1,                          // 当たり判定 = 見た目×この倍率
+    ghostWidth: mode==='hard'?24 : 0,                          // 透明リンク領域の幅(px)
+    delaySec: mode==='hard'?5 : 3,                             // 遅延✕の秒数
+    speedBonus: mode !== 'easy',                               // 一発正解のときだけ最大+20点
+    levelUpEvery: mode==='hard'?2 : 3,                         // 連続一発正解 N回でレベルアップ
+    maxLevel: 5,
+    startLevel: 1,
+    trapsPerLevel: mode==='easy'?0 : 1,                        // レベル1つにつき罠が増える数
+    xShrinkPerLevel: mode==='easy'?4 : 2,                      // レベル1つにつき✕が小さくなる(px)。下限24px
+    patternsMax: mode==='easy'?1 : mode==='normal'?2 : 3,      // 同時に組み合わせるパターン数の上限
+    patternsStep: 1,                                           // 何レベルごとに同時数が1増えるか
+    timeShrink: mode==='easy'?0 : 1,                           // レベル1上がるごとに制限時間が減る秒数
+    storeEasy: mode==='easy',                                  // ストアに大きな「もどる」
+    maxTraps: mode==='easy'?1 : mode==='normal'?4 : 6,         // 追加の罠ボタン上限（やさしい＝本物＋罠1＋大ボタンで3つ以内）
+    blackout: mode==='easy',                                   // 失敗時に暗転（「ストアに とびます…」）
+    blackoutSec: 0.5,
+    adBodyTrap: mode !== 'easy',                               // 広告の絵・文字・大ボタンを押してもストアへ飛ぶか
+    revealOnFail: true,                                        // 失敗・時間切れのあと本物の場所を見せる
+    animBg: true,                                              // 背景の架空ゲームを動かす
+    sound: true,
+    failSound: mode !== 'easy',                                // 失敗音（やさしいは既定OFF）
+    cdSound: true,                                             // カウントダウンの音
+    teacherLock: false,                                        // 先生用ボタンを隠し、「れんしゅう」長押しで開く
+    modeLock: false,                                           // 生徒がモードを変えられないようにする
+    questions: 10,
+    patterns: {},
+    adTypes: {},
+  };
+  for (const p of PATTERNS) base.patterns[p.id] = p.def.includes(mode);
+  for (const t of AD_TYPES) base.adTypes[t.id] = true;
+  return base;
+}
+
+// ---------- 2. 保存 ----------
+const LS_KEY = 'xbutton_hunt_v1';
+const DB = {
+  data: null,
+  load(){
+    try { this.data = JSON.parse(localStorage.getItem(LS_KEY)) || null; } catch(e){ this.data = null; }
+    if (!this.data) this.data = {players:[], settings:{}, records:{}, lastPlayer:null, lastMode:'easy'};
+    for (const m of ['easy','normal','hard']) {
+      this.data.settings[m] = Object.assign(defaultSettings(m), this.data.settings[m] || {});
+      // 新しいパターンが増えたときの補完
+      const d = defaultSettings(m);
+      this.data.settings[m].patterns = Object.assign(d.patterns, this.data.settings[m].patterns || {});
+      this.data.settings[m].adTypes  = Object.assign(d.adTypes,  this.data.settings[m].adTypes  || {});
+    }
+    return this.data;
+  },
+  save(){ try { localStorage.setItem(LS_KEY, JSON.stringify(this.data)); } catch(e){ console.warn('save failed', e); } },
+  settings(mode){ return this.data.settings[mode]; },
+  player(){ return this.data.players.find(p=>p.id===this.data.lastPlayer) || null; },
+  addRecord(playerId, rec){ (this.data.records[playerId] = this.data.records[playerId] || []).push(rec); this.save(); },
+};
+
+// ---------- 2. 音 ----------
+const Sound = {
+  ctx: null, enabled: true,
+  unlock(){
+    if (!this.ctx) { try { this.ctx = new (window.AudioContext||window.webkitAudioContext)(); } catch(e){ return; } }
+    if (this.ctx.state !== 'running') this.ctx.resume();   // iOS の interrupted からも復帰
+  },
+  tone(freq, dur, type='sine', vol=0.18, at=0){
+    if (!this.enabled || !this.ctx) return;
+    const t0 = this.ctx.currentTime + at;
+    const o = this.ctx.createOscillator(), g = this.ctx.createGain();
+    o.type = type; o.frequency.setValueAtTime(freq, t0);
+    g.gain.setValueAtTime(0.0001, t0);
+    g.gain.exponentialRampToValueAtTime(vol, t0+0.01);
+    g.gain.exponentialRampToValueAtTime(0.0001, t0+dur);
+    o.connect(g); g.connect(this.ctx.destination);
+    o.start(t0); o.stop(t0+dur+0.02);
+  },
+  correct(){ this.tone(660,.12,'triangle',.2); this.tone(880,.14,'triangle',.2,.1); this.tone(1320,.22,'triangle',.18,.2); },
+  fail(){ if (!this.failEnabled) return; this.tone(240,.16,'triangle',.14); this.tone(180,.2,'triangle',.12,.1); },   // 低く短く、ノコギリ波は使わない
+  tick(){ if (this.cdEnabled) this.tone(900,.05,'square',.06); },
+  failEnabled:true, cdEnabled:true,
+  escape(){ this.tone(520,.1,'triangle',.15); this.tone(780,.16,'triangle',.15,.1); },
+  press(){ this.tone(400,.04,'square',.04); },
+};
+document.addEventListener('pointerdown', ()=>Sound.unlock(), {passive:true});
+document.addEventListener('touchstart', ()=>Sound.unlock(), {passive:true});
+// iPad Safari のピンチ／ダブルタップ拡大を抑止
+document.addEventListener('gesturestart', e=>e.preventDefault());
+document.addEventListener('dblclick', e=>e.preventDefault());
+document.addEventListener('contextmenu', e=>e.preventDefault());
+// touch-action:manipulation が使えない古い iOS だけ、二重タップ拡大を手動で止める（新しい端末では連打の2回目が消えるので使わない）
+if (!(window.CSS && CSS.supports && CSS.supports('touch-action','manipulation'))){
+  let _lastTouchEnd = 0;
+  document.addEventListener('touchend', e=>{ const t=Date.now(); if (t-_lastTouchEnd<300 && e.cancelable) e.preventDefault(); _lastTouchEnd=t; }, {passive:false});
+}
+
+// ---------- 3. 広告テンプレート関数 ----------
+// すべて架空ブランド。絵は CSS グラデーションと絵文字。
+// ctx.imagePath を渡すと、絵の部分を <img> に差し替える（将来 img/ フォルダの PNG を使う想定）。
+const BRANDS = [
+  {name:'ジュエルクエスト',   hero:'💎', grad:['#7b2ff7','#f107a3'], copy:'今すぐ 無料で あそぼう！', dev:'Sparkle Works'},
+  {name:'にゃんこキッチン',   hero:'🐱', grad:['#ff9a3c','#ff3d7f'], copy:'かわいい お店を つくろう', dev:'Pawpaw Games'},
+  {name:'ドラゴンレイド',     hero:'🐉', grad:['#0f3460','#e94560'], copy:'伝説の 冒険が はじまる', dev:'Ember Studio'},
+  {name:'スピードキング',     hero:'🏎️', grad:['#00c6ff','#0072ff'], copy:'世界中の ライバルと 勝負！', dev:'Turbo Labs'},
+  {name:'ふしぎのもり',       hero:'🦉', grad:['#11998e','#38ef7d'], copy:'なぞを といて すすもう', dev:'Mossy Pixel'},
+  {name:'キャンディタウン',   hero:'🍭', grad:['#f857a6','#ff5858'], copy:'3つ そろえて 消そう！', dev:'Sweet Bit'},
+  {name:'スターシューター',   hero:'🚀', grad:['#141e30','#243b55'], copy:'宇宙の 果てまで 飛べ', dev:'Nova Play'},
+  {name:'ワードパズル王',     hero:'🧩', grad:['#f7971e','#ffd200'], copy:'ことばを つないで 高得点', dev:'Lexi Lab'},
+  {name:'まほうのケーキ屋',   hero:'🎂', grad:['#ff9a9e','#fad0c4'], copy:'デコって うって ひろげよう', dev:'Oven Tales'},
+  {name:'ゾンビロード',       hero:'🧟', grad:['#232526','#414345'], copy:'生きのこれ。48時間', dev:'Night Byte'},
+  {name:'おさかなパーク',     hero:'🐠', grad:['#43cea2','#185a9d'], copy:'すいぞくかんを つくろう', dev:'Reef Works'},
+  {name:'サッカースター',     hero:'⚽', grad:['#1d976c','#93f9b9'], copy:'きみが エースだ！', dev:'Pitch Play'},
+  {name:'ネコとダンジョン',   hero:'🐈‍⬛', grad:['#654ea3','#eaafc8'], copy:'にゃんこと 冒険に でかけよう', dev:'Tail Quest'},
+  {name:'ゴールドラッシュ',   hero:'⛏️', grad:['#c79081','#dfa579'], copy:'ほって ほって おおがねもち', dev:'Nugget Inc.'},
+];
+function pickBrand(){ return pick(BRANDS); }
+
+// 絵の部分（背景）。画像パスがあれば <img> に差し替える
+function adArt(ctx){
+  if (ctx.imagePath) return h('img', {class:'ad-img', src:ctx.imagePath, alt:''});
+  const [a,b] = ctx.brand.grad;
+  return h('div', {class:'ad-img', style:`background:linear-gradient(160deg,${a},${b}); position:absolute; inset:0;`});
+}
+function appIcon(brand, size){
+  const [a,b] = brand.grad;
+  return h('div', {class:'appicon', style:`background:linear-gradient(135deg,${a},${b}); display:flex; align-items:center; justify-content:center; font-size:${Math.round(size*0.55)}px; width:${size}px; height:${size}px; border-radius:${Math.round(size*0.24)}px;`}, brand.hero);
+}
+function adFoot(ctx){
+  return h('div', {class:'ad-foot'},
+    appIcon(ctx.brand, 44),
+    h('div', null, h('div',{class:'t',text:ctx.brand.name}), h('div',{class:'s'}, h('span',{class:'stars',text:'★★★★★'}), ' 4.8 ・ 無料')),
+    h('button', {class:'get', 'data-trap':'cta', text:'入手'}),
+  );
+}
+// 「広告」の小さなマーク（罠アイコンパターンでは押すとストア）
+function adMark(){ return h('div', {class:'ad-mark', 'data-trap':'admark', text:'広告 ▷'}); }
+
+// 各テンプレートは {root, body, note} を返す。
+//   root : 広告全体の要素（.ad）。この中のクリックは、data-role が無ければすべて「罠」扱い。
+//   body : ✕ボタンや罠ボタンを重ねる基準要素（position:relative）。
+//   note : テンプレート固有の情報（動画のスキップ待ち秒数など）
+const AD_TEMPLATES = {
+  interstitial(ctx){
+    const v = ctx.variant ?? ri(0,2);
+    let inner;
+    if (v === 1){   // キャラ並び＋イベントのリボン
+      const others = shuffle(BRANDS.filter(b=>b!==ctx.brand)).slice(0,2).map(b=>b.hero);
+      inner = h('div', {style:'position:relative'},
+        h('div', {style:'display:inline-block; background:#ff3d7f; color:#fff; font-weight:900; padding:4px 14px; border-radius:999px; font-size:14px; margin-bottom:8px', text:'🎉 新イベント 開催中'}),
+        h('div', {class:'ad-brand', text:ctx.brand.name}),
+        h('div', {style:'font-size:clamp(50px,16vw,80px); line-height:1.1; margin:8px 0', text: others[0] + ctx.brand.hero + others[1]}),
+        h('div', {class:'ad-copy', text:ctx.brand.copy}),
+        h('button', {class:'ad-cta', 'data-trap':'cta', text:'いますぐ 参加'}),
+      );
+    } else if (v === 2){   // 特典・限定
+      inner = h('div', {style:'position:relative'},
+        h('div', {class:'ad-hero', text:ctx.brand.hero}),
+        h('div', {class:'ad-brand', text:ctx.brand.name}),
+        h('div', {class:'reward-box', text:'🎁 今だけ 限定アイテム ＋ 💎 ×50'}),
+        h('div', {class:'ad-copy', text:'あと 09:59 で 終了'}),
+        h('button', {class:'ad-cta', 'data-trap':'cta', text:'無料で 受け取る'}),
+      );
+    } else {
+      inner = h('div', {style:'position:relative'},
+        h('div', {class:'ad-brand', text:ctx.brand.name}),
+        h('div', {class:'ad-hero', text:ctx.brand.hero}),
+        h('div', {class:'ad-copy', text:ctx.brand.copy}),
+        h('button', {class:'ad-cta', 'data-trap':'cta', text:'今すぐ ダウンロード'}),
+      );
+    }
+    const body = h('div', {class:'ad-body'}, adArt(ctx), inner, adMark());
+    if (v === 1) body.style.setProperty('--deco', '1');
+    const root = h('div', {class:'ad'}, body, adFoot(ctx));
+    return {root, body};
+  },
+
+  video(ctx){
+    const [a,b] = ctx.brand.grad;
+    const scene = h('div', {class:'video-scene', style:`--vlen:${ctx.videoLen||15}s`},
+      ctx.imagePath ? adArt(ctx) : null,
+      h('div', {class:'orb', style:`left:10%; top:15%; background:${a};`}),
+      h('div', {class:'orb', style:`left:55%; top:40%; background:${b}; animation-delay:-2s;`}),
+      h('div', {class:'char', text:ctx.brand.hero}),
+      h('div', {class:'bar'}, h('div')),
+    );
+    const body = h('div', {class:'ad-body'},
+      scene,
+      h('div', {style:'position:relative; margin-top:auto; margin-bottom:24px;'},
+        h('div', {class:'ad-brand', text:ctx.brand.name}),
+        h('div', {class:'ad-copy', text:ctx.brand.copy}),
+        h('button', {class:'ad-cta', 'data-trap':'cta', text:'プレイする'}),
+      ),
+      adMark(),
+    );
+    const root = h('div', {class:'ad'}, body, adFoot(ctx));
+    return {root, body, note:{skipWait: ctx.skipWait ?? 5}};
+  },
+
+  playable(ctx){
+    const board = h('div', {class:'play-board'});
+    const emo = ['🍎','🍇','🍋','🍓','🫐'];
+    for (let i=0;i<20;i++) board.appendChild(h('div', {text: pick(emo)}));
+    const body = h('div', {class:'ad-body'},
+      adArt(ctx),
+      h('div', {style:'position:relative; width:100%'},
+        h('div', {class:'ad-brand', text:ctx.brand.name}),
+        h('div', {class:'ad-copy', text:'おためしプレイ！ 3つ そろえてみよう'}),
+        board,
+        h('div', {class:'play-hand', text:'👆', style:'left:50%; top:52%;'}),
+        h('button', {class:'ad-cta', 'data-trap':'cta', text:'タップして 遊ぶ'}),
+      ),
+      adMark(),
+    );
+    const root = h('div', {class:'ad'}, body, adFoot(ctx));
+    return {root, body};
+  },
+
+  banner_popup(ctx){
+    const [a,b] = ctx.brand.grad;
+    const b2 = pickBrand();
+    const banner = h('div', {class:'banner'},
+      h('div', {class:'b-ico', text:b2.hero}),
+      h('div', null, h('div',{class:'b-t', text:b2.name}), h('div',{class:'b-s', text:'今なら 限定アイテム プレゼント'})),
+      h('button', {class:'b-cta', 'data-trap':'cta', text:'ひらく'}),
+      ctx.mode === 'easy' ? null : h('span', {class:'close-x fake-deco', 'data-role':'trap', 'data-trap':'banner-x', style:'top:4px; right:10px; width:18px; height:18px; font-size:10px; border-width:1px;', text:'✕'}),
+    );
+    const popup = h('div', {class:'popup'},
+      h('div', {class:'p-art', style:`background:linear-gradient(135deg,${a},${b}); position:relative;`},
+        ctx.imagePath ? adArt(ctx) : null, h('span',{style:'position:relative', text:ctx.brand.hero})),
+      h('div', {class:'p-body'},
+        h('div', {class:'p-t', text:ctx.brand.name}),
+        h('div', {class:'p-s', text:ctx.brand.copy}),
+        h('button', {class:'p-cta', 'data-trap':'cta', text:'無料で はじめる'}),
+      ),
+      adMark(),
+    );
+    const root = h('div', {class:'ad compact', style:'background:transparent; box-shadow:none; width:100%; height:100%; border-radius:0; overflow:visible;'}, popup, banner);
+    return {root, body: popup, note:{layerClass:'banner-mode'}};
+  },
+
+  // 偽の警告ダイアログ風（本物のシステム警告にそっくりだが、全部ウソ）
+  alert(ctx){
+    const dialog = h('div', {class:'alert-box'},
+      h('div', {class:'al-title', text:'⚠️ 警告'}),
+      h('div', {class:'al-text', text:'お使いの iPad で ウイルスが 3件 見つかりました。今すぐ 対処しないと データが 消えます。'}),
+      h('div', {class:'al-bar'}, h('div')),
+      h('button', {class:'al-btn primary', 'data-role':'trap', 'data-trap':'alertbtn', text:'今すぐ スキャン'}),
+      h('button', {class:'al-btn', 'data-role':'trap', 'data-trap':'alertbtn', text:'OK'}),
+      adMark(),
+    );
+    const root = h('div', {class:'ad compact', style:'background:rgba(0,0,0,.6); box-shadow:none; width:100%; height:100%; border-radius:0; overflow:visible; align-items:center; justify-content:center;'}, dialog);
+    return {root, body: dialog, note:{layerClass:'banner-mode'}};
+  },
+
+  // 当選・アンケート風
+  prize(ctx){
+    const body = h('div', {class:'ad-body', style:'background:linear-gradient(160deg,#ffd200,#f7971e)'},
+      h('div', {style:'position:relative'},
+        h('div', {style:'font-size:64px; line-height:1', text:'🎉'}),
+        h('div', {class:'ad-brand', text:'おめでとうございます！'}),
+        h('div', {class:'ad-copy', text:'あなたは 1,000,000人目の 訪問者に 選ばれました'}),
+        h('div', {class:'reward-box', text:'🎁 最新スマホ が 当たる'}),
+        h('div', {class:'ad-copy', text:'受け取り期限 あと 00:59'}),
+        h('button', {class:'ad-cta', 'data-trap':'cta', text:'プレゼントを 受け取る'}),
+      ),
+      adMark(),
+    );
+    const root = h('div', {class:'ad'}, body, h('div', {class:'ad-foot'}, h('div', {class:'s', text:'※ アンケートに答えると 受け取れます'})));
+    return {root, body};
+  },
+
+  // 記事・ニュース風（ネイティブ広告）
+  native(ctx){
+    const [a,b] = ctx.brand.grad;
+    const body = h('div', {class:'ad-body native-body'},
+      h('div', {class:'nv-head'}, h('span', {class:'nv-pr', text:'PR'}), ' おすすめの 記事'),
+      h('div', {class:'nv-thumb', style:`background:linear-gradient(135deg,${a},${b})`, text:ctx.brand.hero}),
+      h('div', {class:'nv-title', text:`【話題】${ctx.brand.name} が 大人気の 理由とは？`}),
+      h('div', {class:'nv-text', text:'いま SNS で 話題の このゲーム。はじめた人の 9割が「もう やめられない」と…'}),
+      h('button', {class:'nv-more', 'data-trap':'cta', text:'続きを読む ›'}),
+      h('div', {class:'nv-head', style:'margin-top:10px'}, '関連記事'),
+      h('div', {class:'nv-rel', text:'▶ 3日で レベル50に なる 方法'}),
+      h('div', {class:'nv-rel', text:'▶ 無料で 💎 を 集める 裏ワザ'}),
+      adMark(),
+    );
+    const root = h('div', {class:'ad'}, body, adFoot(ctx));
+    return {root, body};
+  },
+
+  rewarded(ctx){
+    const body = h('div', {class:'ad-body'},
+      adArt(ctx),
+      h('div', {style:'position:relative'},
+        h('div', {class:'ad-copy', text:'このゲームの ごほうび'}),
+        h('div', {class:'reward-box', text:'🪙 コイン ×100'}),
+        h('div', {class:'ad-hero', text:ctx.brand.hero}),
+        h('div', {class:'ad-brand', text:ctx.brand.name}),
+        h('div', {class:'ad-copy', text:ctx.brand.copy}),
+      ),
+      adMark(),
+    );
+    const root = h('div', {class:'ad'}, body, adFoot(ctx));
+    return {root, body, note:{rewardButton:true}};
+  },
+};
+
+// ---------- 4. 出題スペック（パターンの組み合わせ） ----------
+const POSITIONS = ['tl','tr','bl','br','bc','tc'];
+const TEXT_LABELS = ['閉じる','Close','Skip','次へ','いいえ','あとで'];
+const TRAP_NAMES = {fakeX:'絵の中の偽✕', text:'文字ボタン', icon:'罠アイコン（▶ ⓘ 🔊 など）', x:'色ちがいの✕', ghost:'✕のまわりの透明領域', swap:'すり替えの「入手」', reward:'報酬ボタン', 'banner-x':'バナーの小さな✕', cta:'大きなボタン（入手・プレイなど）', admark:'「広告」マーク', body:'広告の絵や文字', early:'カウント前の早押し✕', sameX:'絵の中の✕（本物そっくり）', back:'偽の「＜ 戻る」', auto:'勝手にストアへ（自動遷移）', alertbtn:'偽の警告の「OK」「今すぐ」'};
+const ICON_TRAPS = ['▶','ⓘ','🔊','▷'];
+// 同時に使えない組み合わせ
+const EXCLUSIVE = {
+  delay_x:['countdown_x','early_x','endless_cd'], countdown_x:['delay_x','text_trap','early_x','endless_cd'],
+  early_x:['delay_x','countdown_x','endless_cd','text_trap','vanish_x'], endless_cd:['delay_x','countdown_x','early_x','text_trap','tiny_x','random_pos','vanish_x'],
+  text_trap:['tiny_x','gray_x','countdown_x','early_x','endless_cd','multi_x'], tiny_x:['text_trap','endless_cd'], gray_x:['text_trap','multi_x'],
+  multi_x:['gray_x','text_trap'], fake_alert:['text_trap'],
+};
+function compatible(list, p){ return !list.some(q => (EXCLUSIVE[q]||[]).includes(p) || (EXCLUSIVE[p]||[]).includes(q)); }
+function enabledPatterns(settings){ return PATTERNS.filter(p=>settings.patterns[p.id]).map(p=>p.id); }
+function patternCountForLevel(settings, level){
+  return clamp(1 + Math.floor((level-1)/Math.max(1,settings.patternsStep)), 1, settings.patternsMax);
+}
+
+function buildSpec(o){
+  const {mode, settings, level=1} = o;
+  const adPool = AD_TYPES.filter(t=>settings.adTypes[t.id] && t.id !== 'alert').map(t=>t.id);   // 警告風は「偽の警告」パターンのときだけ
+  let adType = o.adType || pick(adPool.length ? adPool : ['interstitial']);
+  let pats = [];
+  // 山札方式：o.first で指定されたパターンを先頭に置く（1ラウンド内で偏らないように）
+  const source = o.patterns ? o.patterns.slice() : (o.first ? [o.first, ...shuffle(enabledPatterns(settings).filter(p=>p!==o.first))] : shuffle(enabledPatterns(settings)));
+  const n = o.patterns ? 99 : patternCountForLevel(settings, level);
+  for (const p of source){ if (pats.length >= n) break; if (compatible(pats, p)) pats.push(p); }
+  const has = id => pats.includes(id);
+  if (has('fake_alert')) adType = 'alert';
+
+  const posPool = (adType === 'banner_popup' || adType === 'alert') ? ['tl','tr','bl','br'] : POSITIONS;   // ポップアップは中央下が CTA と重なるので四隅のみ
+  const spec = {
+    adType, patterns:pats, brand:pickBrand(), mode, imagePath:o.imagePath||null, posPool,
+    xSize: Math.max(24, settings.xSize - settings.xShrinkPerLevel*(level-1)), hitScale:settings.hitScale,
+    adBodyTrap: settings.adBodyTrap !== false,
+    ghostWidth: has('ghost_link') ? (settings.ghostWidth || 16) : 0,   // 設定が0でもパターンONなら最低16px
+    closeKind: has('text_trap') ? 'text' : 'x',
+    xPos: has('random_pos') ? pick(posPool) : 'tr',
+    xStyle:'normal',
+    delaySec: has('delay_x') ? settings.delaySec : 0,
+    countdownX: has('countdown_x'),
+    vanish: has('vanish_x'), swap: has('swap_in'),
+    doubleAd: has('double_ad') && !o.second, confirm: has('confirm_dialog') && !o.second,
+    multiEscape: has('multi_escape'),
+    traps:[], textReal:null, rewardReal:false, skipWait:0,
+    earlyX: has('early_x'), endless: has('endless_cd'),
+    autoSec: has('auto_redirect') ? (mode==='hard' ? 4 : 6) : 0,
+  };
+  if (adType === 'video') spec.skipWait = mode==='easy' ? 3 : 5;          // 動画は常にスキップ待ち
+  if (has('countdown_x') || has('early_x')) spec.delaySec = Math.max(spec.delaySec, settings.delaySec);
+  if (has('endless_cd')){ spec.delaySec = 0; spec.skipWait = 0; spec.xStyle = 'tiny'; spec.xPos = pick(posPool.filter(p=>p!=='tr')); }
+  if (has('multi_x')){ spec.traps.push({kind:'sameX'}); if (mode !== 'easy') spec.traps.push({kind:'sameX'}); }
+  if (has('fake_back')) spec.traps.push({kind:'back'});
+  if (has('gray_x')) { const grayReal = Math.random() < 0.6; spec.xStyle = grayReal ? 'gray' : 'white'; spec.traps.push({kind:'x', style: grayReal ? 'white' : 'gray'}); }
+  else if (has('tiny_x')) spec.xStyle = 'tiny';
+  if (has('text_trap')) {
+    if (mode === 'easy') { spec.textReal = 'とじる'; spec.traps.push({kind:'text', label:'次へ'}, {kind:'text', label:'Skip'}); }   // やさしいでは言葉を裏切らない
+    else { const L = shuffle(TEXT_LABELS); spec.textReal = L[0]; spec.traps.push({kind:'text', label:L[1]}, {kind:'text', label:L[2]}); }
+  }
+  if (has('fake_x')) { spec.traps.push({kind:'fakeX'}); if (mode==='hard') spec.traps.push({kind:'fakeX'}); }
+  if (has('trap_icon')) { const I = shuffle(ICON_TRAPS); spec.traps.push({kind:'icon', label:I[0]}); if (mode!=='easy') spec.traps.push({kind:'icon', label:I[1]}); }
+  if (adType === 'rewarded') spec.rewardReal = mode !== 'easy' && Math.random() < 0.5;   // やさしいでは「ごほうびボタンは押さない」で一貫させる
+  spec.traps = shuffle(spec.traps).slice(0, settings.maxTraps + settings.trapsPerLevel*(level-1));
+  // 罠の位置：本物と重ならない場所に割り当て
+  const free = shuffle(posPool.filter(p => p !== spec.xPos));
+  let fi = 0;
+  for (const t of spec.traps){
+    if (t.kind === 'fakeX' || t.kind === 'sameX') { t.pos = null; continue; }
+    if (t.kind === 'back' && free.includes('tl')) { t.pos = 'tl'; free.splice(free.indexOf('tl'),1); continue; }   // 偽の戻るは左上が定位置
+    t.pos = free[(fi++) % free.length];
+  }
+  return spec;
+}
+
+// ---------- 4. 広告レイヤーの組み立て ----------
+function posStyle(pos, w, h, inset){
+  const cx = `left:calc(50% - ${w/2}px);`;
+  switch(pos){
+    case 'tl': return `top:${inset}px; left:${inset}px;`;
+    case 'tr': return `top:${inset}px; right:${inset}px;`;
+    case 'bl': return `bottom:${inset+22}px; left:${inset}px;`;   // 左下は「広告」マークと重ならないよう少し上げる
+    case 'br': return `bottom:${inset}px; right:${inset}px;`;
+    case 'tc': return `top:${inset}px; ${cx}`;
+    default:   return `bottom:${inset}px; ${cx}`;
+  }
+}
+function xSizeFor(spec){ return spec.xStyle === 'tiny' ? Math.max(18, Math.round(spec.xSize*0.55)) : spec.xSize; }
+function makeX(size, style, role, extraStyle){
+  return h('button', {class:'close-x ' + (style||''), 'data-role':role, style:`width:${size}px; height:${size}px; font-size:${Math.round(size*0.5)}px; ${extraStyle||''}`, text:'✕'});
+}
+function makeTrap(t, spec){
+  const s = xSizeFor(spec);
+  let el;
+  if (t.kind === 'x')         el = makeX(spec.xSize, t.style, 'trap', posStyle(t.pos, spec.xSize, spec.xSize, 8));
+  else if (t.kind === 'text') el = h('button', {class:'txtbtn ' + (Math.random()<.5?'dark':''), 'data-role':'trap', style:posStyle(t.pos, 84, 36, 8) + 'width:84px; height:36px; padding:0;', text:t.label});
+  else if (t.kind === 'icon') el = h('button', {class:'trap-icon', 'data-role':'trap', style:posStyle(t.pos, 36, 36, 10), text:t.label});
+  else if (t.kind === 'back') el = h('button', {class:'txtbtn back', 'data-role':'trap', style:posStyle(t.pos, 70, 32, 8) + 'padding:4px 8px;', text:'＜ 戻る'});
+  else if (t.kind === 'sameX') el = makeX(s, spec.xStyle, 'trap', `top:${ri(20,62)}%; left:${ri(12,74)}%;`);   // 本物そっくりの✕を絵の中に
+  else { const sz = Math.max(26, Math.round(s*0.9)); el = makeX(sz, 'fake-deco', 'trap', `top:${ri(22,60)}%; left:${ri(12,78)}%;`); }   // fakeX: 絵の中の飾りの✕
+  el.dataset.trap = t.kind;
+  return el;
+}
+
+// 本物の閉じるボタン（ラッパー付き）。ラッパーごと動かせる（すり替え・位置変更）
+function makeReal(spec, pos){
+  const size = spec.closeKind === 'text' ? null : xSizeFor(spec);
+  const w = size || 84, hgt = size || 36;
+  const wrap = h('div', {class:'real-wrap', style:`position:absolute; z-index:5; width:${w}px; height:${hgt}px; ${posStyle(pos, w, hgt, 8)}`});
+  if (spec.ghostWidth > 0){
+    const g = spec.ghostWidth;
+    wrap.appendChild(h('div', {class:'ghost-link', 'data-role':'trap', 'data-trap':'ghost', style:`left:${-g}px; top:${-g}px; width:${w+2*g}px; height:${hgt+2*g}px;`}));
+  }
+  if (spec.closeKind === 'text'){
+    wrap.appendChild(h('button', {class:'txtbtn', 'data-role':'real', style:'left:0; top:0; width:100%; height:100%; padding:0;', text:spec.textReal}));
+  } else {
+    const inner = spec.hitScale < 1;
+    const x = makeX(size, spec.xStyle, inner ? 'trap' : 'real', 'left:0; top:0;');
+    if (inner){
+      const hs = Math.max(16, Math.round(size * spec.hitScale));   // 当たり判定は最低16px（運ゲーにしない）
+      x.appendChild(h('span', {class:'hit', 'data-role':'real', style:`width:${hs}px; height:${hs}px; left:${(size-hs)/2 - 2}px; top:${(size-hs)/2 - 2}px;`}));
+    }
+    wrap.appendChild(x);
+  }
+  wrap.dataset.pos = pos;
+  return wrap;
+}
+
+/* 広告を layerEl に載せる。cb = {onReal, onTrap, onNoop, onAvailable}
+   戻り値 inst = {root, body, realWrap, availableAt, destroy(), lock} */
+function mountAd(spec, layerEl, cb){
+  const tpl = AD_TEMPLATES[spec.adType]({brand:spec.brand, imagePath:spec.imagePath, skipWait:spec.skipWait, mode:spec.mode});
+  const {root, body} = tpl;
+  const note = tpl.note || {};
+  layerEl.className = 'ad-layer' + (note.layerClass ? ' ' + note.layerClass : '');
+  layerEl.appendChild(root);
+  const inst = {root, body, spec, timers:[], realWrap:null, availableAt:null, destroyed:false, lock:false};
+  const later = (fn, ms) => { const id = setTimeout(()=>{ if (!inst.destroyed) fn(); }, ms); inst.timers.push(id); return id; };
+  const every = (fn, ms) => { const id = setInterval(()=>{ if (!inst.destroyed) fn(); }, ms); inst.timers.push(id); return id; };
+  inst.destroy = () => { inst.destroyed = true; inst.timers.forEach(t=>{ clearTimeout(t); clearInterval(t); }); root.remove(); layerEl.remove(); };
+
+  for (const t of spec.traps) body.appendChild(makeTrap(t, spec));
+  // 報酬ボタン：待ち時間中は押しても罠（早押しはストア行き）。本物になるのは✕が出るタイミングと同時
+  let rewardBtn = null;
+  if (spec.adType === 'rewarded'){
+    rewardBtn = h('button', {class:'reward-btn', 'data-role':'trap', 'data-trap':'reward', text:'🎁 報酬を受け取る'});
+    body.appendChild(rewardBtn);
+  }
+
+  let cdEl = null;
+  function placeReal(){
+    if (inst.realWrap) return;
+    if (cdEl){ cdEl.remove(); cdEl = null; }
+    inst.realWrap = makeReal(spec, spec.xPos);
+    body.appendChild(inst.realWrap);
+    if (rewardBtn && spec.rewardReal) rewardBtn.dataset.role = 'real';
+    inst.availableAt = now();
+    cb.onAvailable && cb.onAvailable();
+    if (spec.vanish){
+      later(()=>{ const cyc = ()=>{ inst.realWrap.classList.add('vanish'); later(()=>inst.realWrap.classList.remove('vanish'), 1500); }; cyc(); every(cyc, 3500); }, 2000);
+    }
+    if (spec.swap){
+      later(()=>{
+        const pos = inst.realWrap.dataset.pos;
+        const fromRight = pos.includes('r') || pos === 'bc' || pos === 'tc';
+        const btn = h('button', {class:'swap-btn', 'data-role':'trap', 'data-trap':'swap', style: posStyle(pos, 80, 36, 6) + `transform:translateX(${fromRight?140:-140}px);`, text:'入手'});
+        body.appendChild(btn);
+        // 「入手」が滑り込み、本物の✕は同じ方向に押しのけられる（見ていれば追える）
+        const push = (inst.realWrap.offsetWidth || 36) + 60;
+        requestAnimationFrame(()=>requestAnimationFrame(()=>{ btn.style.transform = 'translateX(0)'; inst.realWrap.style.transform = `translateX(${fromRight?-push:push}px)`; }));
+        later(()=>{ btn.style.transform = `translateX(${fromRight?140:-140}px)`; inst.realWrap.style.transform = ''; later(()=>btn.remove(), 400); }, 2600);
+      }, 1500);
+    }
+  }
+
+  // 遅延／カウントダウン
+  const wait = Math.max(spec.delaySec, spec.skipWait);
+  inst.forceReal = () => { if (earlyEl){ earlyEl.remove(); earlyEl = null; } placeReal(); };   // 失敗時に「本物はここ」を見せるため、待ち時間を打ち切る
+  // 早押し✕：最初から✕は見えているが、カウントが終わるまでは罠
+  let earlyEl = null;
+  if (spec.earlyX && wait > 0){
+    earlyEl = makeX(xSizeFor(spec), spec.xStyle, 'trap', posStyle(spec.xPos, xSizeFor(spec), xSizeFor(spec), 8));
+    earlyEl.dataset.trap = 'early'; body.appendChild(earlyEl);
+  }
+  // 終わらないカウントダウン：右上の円は永遠に回る。本物は最初から別の場所
+  if (spec.endless){
+    const ce = h('div', {class:'cd-circle', 'data-role':'cd', style:posStyle('tr',44,44,6)}, h('div',{class:'inner'}, h('span',{class:'n', text:'5'}), h('span',{class:'x',text:'✕'})));
+    body.appendChild(ce); const t0 = now();
+    every(()=>{ const el = (now()-t0)/1000 % 5; ce.style.setProperty('--cd-deg', `${el/5*360}deg`); ce.querySelector('.n').textContent = Math.ceil(5-el); }, 100);
+  }
+  // 勝手にストアへ：何も押していなくても数秒で飛ぶ（1回だけ）
+  if (spec.autoSec > 0) later(()=>{ if (!inst.lock && cb.onAuto) cb.onAuto(); }, spec.autoSec*1000);
+  if (wait > 0){
+    const label = spec.adType === 'video' ? 'スキップまで ' : 'あと ';
+    const cdPos = spec.earlyX ? (spec.xPos === 'tc' ? 'bc' : 'tc') : spec.xPos;
+    if (spec.countdownX){
+      cdEl = h('div', {class:'cd-circle', 'data-role':'cd', style:posStyle(cdPos,44,44,6)}, h('div',{class:'inner'}, h('span',{class:'n', text:String(wait)}), h('span',{class:'x',text:'✕'})));
+    } else {
+      cdEl = h('div', {class:'cd-text', 'data-role':'cd', style:posStyle(cdPos,110,30,8), text: label + wait});
+    }
+    body.appendChild(cdEl);
+    const t0 = now(); let lastSec = wait;
+    every(()=>{
+      if (!cdEl) return;
+      const remain = wait - (now()-t0)/1000;
+      const sec = Math.max(0, Math.ceil(remain));
+      if (spec.countdownX){ cdEl.style.setProperty('--cd-deg', `${clamp((1-remain/wait)*360,0,360)}deg`); cdEl.querySelector('.n').textContent = sec; }
+      else cdEl.textContent = label + sec;
+      if (sec !== lastSec){ lastSec = sec; if (sec>0) Sound.tick(); }
+    }, 100);
+    later(()=>{ if (earlyEl){ earlyEl.remove(); earlyEl = null; } placeReal(); }, wait*1000);
+  } else placeReal();
+
+  layerEl.onclick = e => {
+    if (inst.destroyed || inst.lock) return;
+    const t = e.target.closest('[data-role]');
+    let role = t ? t.dataset.role : (root.contains(e.target) ? (spec.adBodyTrap ? 'trap' : 'noop') : 'noop');
+    if (role === 'real') cb.onReal(t);
+    else if (role === 'noop') cb.onNoop(t);
+    else if (role === 'cd') { if (spec.mode !== 'easy') cb.onNoop(t); }   // やさしいではカウントダウンを触っても数えない
+    else cb.onTrap(t || e.target.closest('[data-trap]') || root);
+  };
+  return inst;
+}
+
+// 「本当に閉じますか？」ダイアログ。並びと色がいつもと逆（大きい青が「いいえ＝続ける」）
+function showConfirmDialog(container, onYes, onNo){
+  const yes = h('button', {class:'plain', text:'はい'});
+  const no  = h('button', {class:'big',   text:'いいえ・つづける'});
+  const btns = Math.random()<.5 ? [no, yes] : [yes, no];
+  const back = h('div', {class:'dlg-back'},
+    h('div', {class:'dlg'}, h('div',{class:'d-t', text:'本当に閉じますか？'}), h('div',{class:'d-s', text:'閉じると 特典を 受け取れません'}), h('div',{class:'d-btns'}, btns)));
+  yes.onclick = e => { e.stopPropagation(); back.remove(); onYes(); };
+  no.onclick  = e => { e.stopPropagation(); back.remove(); onNo(); };
+  back.onclick = e => e.stopPropagation();
+  container.appendChild(back);
+  return back;
+}
+
+// ---------- 5. 架空ストア（第2ステージ「脱出」） ----------
+const STORE_CLOSES = [
+  {label:'✕', cls:'x right'}, {label:'完了', cls:'right'}, {label:'＜ 戻る', cls:'left'}, {label:'✕', cls:'x left'}, {label:'◀ ゲームにもどる', cls:'left back-link'},
+];
+const STORE_CLOSES_NORMAL = STORE_CLOSES.slice(0,2);   // ふつうは右上の✕／完了だけ（やさしい→本格の段差を小さく）
+function gradBox(cls, brand, txt, extra){
+  const [a,b] = brand.grad;
+  return h('div', {class:cls, style:`background:linear-gradient(150deg,${a},${b}); ${extra||''}`, text:txt});
+}
+/* opts = {settings, spec, root, onEscaped({ms,misses}), onMiss()} */
+function openStore(opts){
+  const {settings, spec, root} = opts;
+  const brand = spec.brand;
+  const st = {start: now(), misses:0, extraShown:false, done:false};
+  const closeDef = pick(spec.mode === 'normal' ? STORE_CLOSES_NORMAL : STORE_CLOSES);
+  const closeBtn = settings.storeEasy
+    ? h('button', {class:'store-close easy', 'data-role':'close', text:'⬅ もどる'})
+    : h('button', {class:'store-close ' + closeDef.cls, 'data-role':'close', text:closeDef.label});
+  const store = h('div', {class:'store'},
+    h('div', {class:'store-head'}, 'アプリストア', settings.storeEasy ? null : closeBtn),
+    settings.storeEasy ? h('div', {style:'padding:16px 0 0'}, closeBtn, h('div', {class:'escape-tag', text:'ストアに きちゃった。「⬅ もどる」を おそう'}), h('div', {class:'store-hint hidden', id:'store-hint', text:'ほんものなら アプリが はいっちゃう！ ⬅ もどる を おそう'})) : null,
+    h('div', {class:'store-body'},
+      h('div', {class:'app-row'},
+        appIcon(brand, 84),
+        h('div', null,
+          h('div', {class:'app-name', text:brand.name}),
+          h('div', {class:'app-dev', text:brand.dev}),
+          h('button', {class:'app-get', 'data-role':'deep', text:'入手'}),
+        ),
+      ),
+      h('div', {class:'app-meta'},
+        h('div', null, h('b', {text:'4.8 ★'}), '12.3万件の評価'),
+        h('div', null, h('b', {text:'12+'}), '年齢'),
+        h('div', null, h('b', {text:'#3'}), 'ゲーム'),
+      ),
+      h('div', {class:'shots'},
+        gradBox('shot', brand, brand.hero), gradBox('shot', pickBrand(), '🏆'), gradBox('shot', pickBrand(), '⭐'),
+      ),
+      h('div', {class:'store-links'},
+        h('button', {'data-role':'deep', text:'開く'}),
+        h('button', {'data-role':'deep', text:'レビューを書く'}),
+        h('button', {'data-role':'deep', text:'デベロッパのその他のアプリ ›'}),
+      ),
+    ),
+  );
+  root.appendChild(store);
+  let overlay = null;
+
+  function miss(el){
+    st.misses++;
+    Sound.press();
+    if (el){ el.classList.add('shake'); setTimeout(()=>el.classList.remove('shake'), 300); }
+    opts.onMiss && opts.onMiss();
+  }
+  function openInstall(){
+    const cd = pick([{label:'キャンセル', cls:'right'}, {label:'✕', cls:'x right'}, {label:'✕', cls:'x left'}]);
+    overlay = h('div', {class:'install'},
+      h('button', {class:'store-close ' + cd.cls, 'data-role':'close-install', text:cd.label}),
+      h('div', {class:'ring'}),
+      h('div', {class:'t', text:'インストール中…'}),
+      h('div', {class:'s', text:'アカウントを確認しています'}),
+      h('button', {class:'app-get', 'data-role':'miss', style:'opacity:.5', text:'開く'}),
+    );
+    store.appendChild(overlay);
+  }
+  function openExtra(){
+    // 多段脱出：「本当に戻りますか？」か「おすすめアプリ」
+    if (Math.random() < .5){
+      const stay = h('button', {class:'big', 'data-role':'miss', text:'ストアに残る'});
+      const back = h('button', {class:'plain', 'data-role':'close-extra', text:'戻る'});
+      overlay = h('div', {class:'dlg-back', style:'z-index:62'},
+        h('div', {class:'dlg'}, h('div',{class:'d-t', text:'本当に戻りますか？'}), h('div',{class:'d-s', text:'今なら 初回特典が もらえます'}), h('div',{class:'d-btns'}, Math.random()<.5 ? [stay, back] : [back, stay])));
+    } else {
+      const cd = pick(STORE_CLOSES);
+      overlay = h('div', {class:'reco'},
+        h('div', {class:'store-head'}, 'おすすめアプリ', h('button', {class:'store-close ' + cd.cls, 'data-role':'close-extra', text:cd.label})),
+        h('div', {class:'reco-body'}, shuffle(BRANDS).slice(0,4).map(b =>
+          h('div', {class:'reco-item'}, appIcon(b, 52), h('div', null, h('div',{style:'font-weight:800', text:b.name}), h('div',{class:'app-dev', text:b.dev})), h('button', {class:'g', 'data-role':'miss', text:'入手'}))
+        )),
+      );
+    }
+    store.appendChild(overlay);
+  }
+  function finish(){
+    if (st.done) return; st.done = true;
+    store.remove();
+    opts.onEscaped({ms: now() - st.start, misses: st.misses});
+  }
+  store.addEventListener('click', e => {
+    if (st.done) return;
+    const t = e.target.closest('[data-role]'); if (!t) return;
+    const role = t.dataset.role;
+    if (role === 'close'){
+      if (spec.multiEscape && !settings.storeEasy && !st.extraShown){ st.extraShown = true; Sound.press(); openExtra(); }
+      else finish();
+    } else if (role === 'deep'){
+      if (settings.storeEasy){ miss(t); const hint = store.querySelector('#store-hint'); if (hint) hint.classList.remove('hidden'); } else { miss(t); openInstall(); }
+    } else if (role === 'close-install'){
+      Sound.press(); overlay && overlay.remove(); overlay = null;
+    } else if (role === 'close-extra'){
+      finish();
+    } else if (role === 'miss'){
+      miss(t);
+    }
+  });
+  return {finish, state: st};
+}
+
+// ---------- 6. ラウンド進行・採点 ----------
+function showScreen(id){ $$('.screen').forEach(s=>s.classList.toggle('active', s.id===id)); }
+function toast(text, bad){
+  const t = h('div', {class:'toast' + (bad?' bad':''), text});
+  $('#fx-root').appendChild(t); setTimeout(()=>t.remove(), 1200);
+}
+// 架空ゲーム画面（広告が割り込む前の背景）
+function renderFakeGame(stage){
+  stage.innerHTML = '';
+  if (Math.random() < .5){
+    const board = h('div', {class:'board'});
+    const cols = ['#ff5f6d','#ffc371','#47e0a8','#4facfe','#c471ed','#f9f871'];
+    for (let i=0;i<36;i++) board.appendChild(h('div', {class:'gem', style:`background:${pick(cols)}`}));
+    stage.appendChild(h('div', {class:'fg fg-puzzle'}, h('div',{class:'fg-title', text:'ジェムパズル ステージ 12'}), board,
+      h('div',{class:'fg-score', text:'SCORE 1,240'}), h('div',{class:'fg-hint', text:'ゲームちゅう…'})));
+  } else {
+    stage.appendChild(h('div', {class:'fg fg-runner'},
+      h('div',{class:'cloud', style:'animation-delay:-3s'}), h('div',{class:'cloud', style:'top:12%; animation-delay:-7s'}),
+      h('div',{class:'ground'}), h('div',{class:'hero', text:'🦖'}), h('div',{class:'coin', text:'🪙'}),
+      h('div',{class:'fg-score', text:'DIST 320m'}), h('div',{class:'fg-hint', text:'ゲームちゅう…'})));
+  }
+}
+
+const Game = {
+  mode:'easy', settings:null, level:1, streak:0, score:0, qIndex:0, questions:[], test:false, active:false,
+  q:null, inst:null, store:null, timer:{limit:0, remain:0, running:false, id:null, last:0}, pendingTimers:[],
+
+  start(mode, opt={}){
+    this.mode = mode; this.settings = opt.settingsOverride || DB.settings(mode); this.test = !!opt.test; this.testSpec = opt.spec || null; this.returnTo = opt.returnTo || 'test';
+    Sound.enabled = !!this.settings.sound; Sound.failEnabled = this.settings.failSound !== false; Sound.cdEnabled = this.settings.cdSound !== false;
+    this.level = clamp(this.settings.startLevel || 1, 1, this.settings.maxLevel); this.streak = 0; this.score = 0; this.qIndex = 0; this.questions = []; this.active = true;
+    this.deck = [];   // 山札：全パターンを引き切るまで再シャッフルしない
+    $('#game').classList.toggle('debug', !!opt.debug);
+    $('#game').classList.toggle('no-anim', this.settings.animBg === false);
+    showScreen('game');
+    this.nextQuestion();
+  },
+  later(fn, ms){ const id = setTimeout(()=>{ if (this.active) fn(); }, ms); this.pendingTimers.push(id); return id; },
+  clearAll(){
+    this.pendingTimers.forEach(clearTimeout); this.pendingTimers = [];
+    if (this.inst) { this.inst.destroy(); this.inst = null; }
+    $('#store-root').innerHTML = ''; $('#ad-root').innerHTML = ''; $('#fx-root').innerHTML = '';
+    $('#blackout').classList.remove('on');
+    this.stopTimer();
+  },
+  quit(){ this.active = false; this.clearAll(); showScreen(this.test ? this.returnTo : 'title'); },
+
+  updateHud(){
+    const total = this.test ? 1 : this.settings.questions;
+    $('#hud-q').textContent = `${Math.min(this.qIndex+1,total)} / ${total}`;
+    $('#hud-level').textContent = `Lv ${this.level}`;
+    $('#hud-score').textContent = `${this.score} てん`;
+  },
+
+  nextQuestion(){
+    this.clearAll();
+    const total = this.test ? 1 : this.settings.questions;
+    if (this.qIndex >= total) return this.endRound();
+    this.updateHud();
+    const stage = $('#stage'); renderFakeGame(stage);
+    if (!this.deck.length) this.deck = shuffle(enabledPatterns(this.settings));
+    const first = this.deck.shift();
+    const spec = this.testSpec || buildSpec({mode:this.mode, settings:this.settings, level:this.level, first});
+    this.q = {spec, level:this.level, startAt:null, availableAt:null, findMs:null, misses:0, storeTrips:0, autoTrips:0, escapes:[], escapeMisses:0, trapKinds:[], secondShown:false, confirmed:false, result:null, score:0};
+    this.later(()=>this.showAd(spec), this.test ? 800 : ri(1500, 3000));
+  },
+
+  // ---- 制限時間 ----
+  startTimer(spec){
+    const s = this.settings;
+    if (!s.timeLimitOn) { $('#tbar').style.visibility = 'hidden'; return; }
+    $('#tbar').style.visibility = 'visible';
+    const base = Math.max(4, s.timeLimit - s.timeShrink * (this.level-1));
+    this.timer.limit = (base + Math.max(spec.delaySec, spec.skipWait)) * 1000;
+    this.timer.remain = this.timer.limit;
+    this.resumeTimer();
+  },
+  resumeTimer(){
+    if (!this.settings.timeLimitOn || this.timer.running) return;
+    this.timer.running = true; this.timer.last = now();
+    this.timer.id = setInterval(()=>{
+      const t = now(); this.timer.remain -= (t - this.timer.last); this.timer.last = t;
+      const r = clamp(this.timer.remain / this.timer.limit, 0, 1);
+      const f = $('#tbar-fill'); f.style.width = (r*100) + '%'; f.classList.toggle('low', r < .3);
+      if (this.timer.remain <= 0) { this.stopTimer(); this.onTimeout(); }
+    }, 100);
+  },
+  stopTimer(){ this.timer.running = false; if (this.timer.id) { clearInterval(this.timer.id); this.timer.id = null; } },
+
+  // ---- 広告 ----
+  showAd(spec, second){
+    const q = this.q;
+    const layer = h('div', {class:'ad-layer'});
+    $('#ad-root').appendChild(layer);
+    this.inst = mountAd(spec, layer, {
+      onAvailable: ()=>{ if (!q.availableAt) q.availableAt = now(); },
+      onReal: (el)=>this.onReal(el),
+      onTrap: (el)=>this.onTrap(el),
+      onAuto: ()=>this.onTrap(null, true),
+      onNoop: (el)=>this.onNoop(el),
+    });
+    if (!second) { q.startAt = now(); this.startTimer(spec); }
+    $('#tbar-fill').style.width = '100%';
+  },
+  onNoop(){
+    const q = this.q; q.misses++; Sound.press();
+    if (this.inst){ this.inst.root.classList.add('shake'); setTimeout(()=>this.inst && this.inst.root.classList.remove('shake'), 300); }
+  },
+  // 本物の場所を示す（失敗・時間切れのあと）。ms 後に cb
+  revealReal(ms, cb){
+    const inst = this.inst;
+    if (!inst || this.settings.revealOnFail === false){ cb && cb(); return; }
+    inst.lock = true;
+    if (!inst.realWrap && inst.forceReal) inst.forceReal();
+    if (inst.realWrap){ inst.realWrap.classList.remove('vanish'); inst.realWrap.classList.add('reveal'); }
+    this.later(()=>{ if (inst.realWrap) inst.realWrap.classList.remove('reveal'); cb && cb(); }, ms);
+  },
+  onTrap(el, auto){
+    const q = this.q; if (!this.inst) return;
+    if (auto){ q.autoTrips++; q.trapKinds.push('auto'); toast('かってに ストアへ！', true); }   // 自分のせいではないので一発正解は消えない
+    else { q.storeTrips++; q.trapKinds.push((el && el.dataset && el.dataset.trap) || 'body'); }
+    this.inst.lock = true; this.stopTimer(); Sound.fail();
+    const open = ()=> {
+      this.store = openStore({settings:this.settings, spec:q.spec, root:$('#store-root'),
+        onEscaped: ({ms, misses})=>{
+          q.escapes.push(ms); q.escapeMisses += misses; this.store = null;
+          Sound.escape(); toast(misses===0 ? 'もどれた！' : 'もどれた', false);
+          // ふつう以上は、戻ってきた直後に「本物はここ」を見せる（やさしいは飛ぶ前に見せている）
+          const after = ()=>{ if (this.inst) this.inst.lock = false; this.timer.remain = Math.max(this.timer.remain, 4000); this.resumeTimer(); };
+          if (this.settings.blackout) after(); else this.revealReal(1000, after);
+        }});
+    };
+    const goStore = ()=>{
+      if (this.settings.blackout){
+        const b = $('#blackout'); b.classList.add('on');
+        this.later(()=>{ open(); b.classList.remove('on'); }, Math.round((this.settings.blackoutSec || 0.5)*1000));
+      } else open();
+    };
+    if (this.settings.blackout) this.revealReal(1000, goStore); else goStore();
+  },
+  onReal(){
+    const q = this.q; if (!this.inst) return;
+    if (q.spec.confirm && !q.confirmed){
+      this.inst.lock = true;
+      showConfirmDialog(this.inst.root, ()=>{ q.confirmed = true; this.inst.lock = false; this.proceedClose(); },
+                                        ()=>{ this.inst.lock = false; this.onNoop(); });
+      return;
+    }
+    this.proceedClose();
+  },
+  proceedClose(){
+    const q = this.q;
+    if (q.spec.doubleAd && !q.secondShown){
+      q.secondShown = true; Sound.press();
+      const old = this.inst; old.lock = true; old.root.classList.add('blast');
+      this.later(()=>{ old.destroy(); if (old === this.inst) this.inst = null;
+        const s2 = buildSpec({mode:this.mode, settings:this.settings, level:this.level, second:true, adType:'interstitial', patterns:[pick(['random_pos','fake_x','trap_icon'])]});
+        this.showAd(s2, true);
+        this.timer.remain += 4000;   // 2枚目のぶんの猶予
+      }, 450);
+      return;
+    }
+    this.succeed();
+  },
+  succeed(){
+    const q = this.q; this.stopTimer();
+    q.findMs = Math.max(0, now() - (q.availableAt || q.startAt) - q.escapes.reduce((a,b)=>a+b,0));   // 発見時間：ストアにいた時間は除く
+    q.result = 'ok';
+    Sound.correct();
+    if (this.inst){ this.inst.lock = true; this.inst.root.classList.add('blast'); }
+    const oneShot = q.misses === 0 && q.storeTrips === 0;
+    toast((oneShot ? 'いっぱつ！' : 'できた！') + (this.settings.speedBonus && oneShot ? ` ${fmtSec(q.findMs)}びょう` : ''));   // 秒数は速さボーナスONのときだけ
+    this.later(()=>this.finishQuestion(), 1150);
+  },
+  onTimeout(){
+    const q = this.q; q.result = 'timeout'; Sound.fail();
+    if (this.inst) this.inst.lock = true;
+    toast('じかんに なったよ。つぎへ', true);
+    this.later(()=>this.revealReal(1200, ()=>this.finishQuestion()), 600);
+  },
+
+  // ---- 採点 ----
+  // 得点：「迷ったら押さない」が損にならない順序にする
+  //   一発正解 100 ＞ 無駄押しあり 60 ＞ 時間切れ(ストアに飛んでいない) 40 ≧ ストア行き・一発脱出 35 ＞ 脱出も失敗 15
+  //   速さボーナスは一発正解のときだけ、最大 +20（基本点の2割まで）
+  scoreQuestion(q){
+    if (q.result === 'timeout') return q.storeTrips === 0 ? 40 : (q.escapeMisses === 0 ? 30 : 10);
+    const oneShot = q.misses === 0 && q.storeTrips === 0;
+    let pts = oneShot ? 100 : q.storeTrips === 0 ? 60 : (q.escapeMisses === 0 ? 35 : 15);
+    if (oneShot && this.settings.speedBonus){
+      const sec = q.findMs/1000;
+      pts += sec <= 4 ? 20 : sec <= 7 ? 10 : 0;
+    }
+    return pts;
+  },
+  finishQuestion(){
+    const q = this.q; if (!q) return;
+    q.oneShot = q.result === 'ok' && q.misses === 0 && q.storeTrips === 0;
+    q.score = this.scoreQuestion(q); this.score += q.score;
+    let leveled = false;
+    if (q.oneShot){ this.streak++; if (this.streak >= this.settings.levelUpEvery && this.level < this.settings.maxLevel){ this.level++; this.streak = 0; leveled = true; toast(`レベル ${this.level}！`); } }
+    else this.streak = 0;
+    this.questions.push({patterns:q.spec.patterns, adType:q.spec.adType, level:q.level, result:q.result, oneShot:q.oneShot, findMs:q.findMs, misses:q.misses, storeTrips:q.storeTrips, escapes:q.escapes, escapeMisses:q.escapeMisses, autoTrips:q.autoTrips, trapKinds:q.trapKinds, score:q.score});
+    this.qIndex++;
+    if (this.test){ this.later(()=>{ this.active=false; this.clearAll(); showScreen(this.returnTo); if (this.returnTo === 'test') renderTestResult(this.questions[0]); else toastTitle(q.oneShot ? 'いっぱつ！ できた' : (q.result==='ok' ? 'できた（つぎは いっぱつで）' : 'つぎは ずかんを みてから')); }, q.oneShot ? 900 : 100); return; }
+    this.later(()=>this.nextQuestion(), leveled ? 1300 : 500);
+  },
+
+  endRound(){
+    this.active = false; this.clearAll();
+    const rec = summarize(this.questions, this.mode, this.level, this.score);
+    const player = DB.player();
+    if (player) DB.addRecord(player.id, rec);
+    renderResult(rec);
+    showScreen('result');
+  },
+};
+
+function summarize(qs, mode, level, score){
+  const n = qs.length, ok = qs.filter(q=>q.result==='ok');
+  const oneShot = qs.filter(q=>q.oneShot).length;
+  const finds = ok.map(q=>q.findMs);
+  const escapes = qs.flatMap(q=>q.escapes);
+  const avg = a => a.length ? a.reduce((x,y)=>x+y,0)/a.length : null;
+  const trapKinds = {};
+  for (const q of qs) for (const k of (q.trapKinds||[])) trapKinds[k] = (trapKinds[k]||0) + 1;
+  const patterns = {};
+  for (const q of qs) for (const p of q.patterns){
+    const s = patterns[p] = patterns[p] || {n:0, oneShot:0, misses:0, storeTrips:0};
+    s.n++; if (q.oneShot) s.oneShot++; s.misses += q.misses + q.storeTrips; s.storeTrips += q.storeTrips;
+  }
+  return {date:new Date().toISOString(), mode, level, score, questions:n, oneShot, oneShotRate: n ? oneShot/n : 0,
+    avgFindMs: avg(finds), avgEscapeMs: avg(escapes), storeTrips: qs.reduce((a,q)=>a+q.storeTrips,0), timeouts: qs.filter(q=>q.result==='timeout').length, patterns, trapKinds, detail: qs};
+}
+
+function renderResult(rec){
+  const modeName = MODES.find(m=>m.id===rec.mode).name;
+  const p = DB.player();
+  $('#result-sub').textContent = `${p ? p.icon + ' ' + (p.name||'') : ''} ・ ${modeName} ・ Lv ${rec.level} まで`;
+  // 生徒向け：一発で見つけた数と○×の並び、とくてん
+  const body = $('#result-body'); body.innerHTML = '';
+  body.appendChild(h('div', {class:'center', style:'font-weight:800; font-size:18px', text:'✕を いっぱつで みつけた'}));
+  body.appendChild(h('div', {class:'big-num', text:`${rec.oneShot} / ${rec.questions}`}));
+  body.appendChild(h('div', {class:'dots'}, rec.detail.map(q => h('span', {class: q.oneShot ? 'o' : 'x', text: q.oneShot ? '○' : (q.result==='timeout' ? '－' : '×')}))));
+  body.appendChild(h('div', {class:'center', style:'font-size:20px; font-weight:800; margin-top:6px', text:`とくてん ${rec.score}`}));
+  // 先生向け：統計・押してしまったもの・パターン別
+  const stat = (v,k) => h('div',{class:'stat'}, h('div',{class:'v', text:v}), h('div',{class:'k', text:k}));
+  const st = $('#result-stats'); st.innerHTML = '';
+  st.appendChild(h('div', {class:'stat-grid', style:'margin-top:8px'},
+    stat(`${Math.round(rec.oneShotRate*100)}%`, `一発正解率（${rec.oneShot}/${rec.questions}）`),
+    stat(rec.avgFindMs==null ? '—' : fmtSec(rec.avgFindMs)+'秒', '平均 発見時間（ストア滞在は除く）'),
+    stat(rec.avgEscapeMs==null ? '—' : fmtSec(rec.avgEscapeMs)+'秒', `平均 脱出タイム（${rec.storeTrips}回）`),
+    stat(`${rec.timeouts}回`, '時間切れ'),
+  ));
+  const tk = $('#result-traps'); tk.innerHTML = '';
+  const kinds = Object.entries(rec.trapKinds||{}).sort((a,b)=>b[1]-a[1]);
+  if (!kinds.length) tk.appendChild(h('p', {class:'note', text:'ストアに飛ばされた回はありません'}));
+  else { const t = h('table', {class:'pt'}, h('tr', null, h('th',{text:'押してしまったもの'}), h('th',{text:'回数'})));
+    for (const [k,n] of kinds) t.appendChild(h('tr', {class: n>=2 ? 'weak':''}, h('td',{text:TRAP_NAMES[k]||k}), h('td',{class:'n', text:n})));
+    tk.appendChild(t); }
+  const tbl = h('table', {class:'pt'}, h('tr', null, h('th',{text:'パターン'}), h('th',{text:'出た'}), h('th',{text:'一発'}), h('th',{text:'まちがい'})));
+  const ids = Object.keys(rec.patterns).sort((a,b)=>rec.patterns[b].misses - rec.patterns[a].misses);
+  for (const id of ids){
+    const s = rec.patterns[id]; const weak = s.misses >= 2 || (s.n >= 2 && s.oneShot/s.n < .5);
+    tbl.appendChild(h('tr', {class: weak ? 'weak' : ''}, h('td',{text:PAT[id]?PAT[id].name:id}), h('td',{class:'n', text:s.n}), h('td',{class:'n', text:s.oneShot}), h('td',{class:'n', text:s.misses})));
+  }
+  $('#result-patterns').innerHTML = ''; $('#result-patterns').appendChild(ids.length ? tbl : h('p',{class:'note', text:'（パターンなし）'}));
+  $('#result-teacher').open = false;
+}
+
+// ---------- ずかん：まぎらわしいボタンの種類と対策 ----------
+// cat: 系統 / look: どんなもの / spot: みわけかた / todo: どうする（生徒向け） / teacher: 先生向けの補足 / try: 例を出す条件
+const GUIDE_CATS = [
+  {id:'wait',   ico:'⏳', name:'まつ系',          sub:'✕が すぐに でない',            color:'#e8a11b'},
+  {id:'find',   ico:'🔍', name:'みつけにくい系',   sub:'✕が ちいさい・うすい・うごく',   color:'#2b6fe0'},
+  {id:'fool',   ico:'🎭', name:'だます系',         sub:'ほんものに にせた ボタン',       color:'#d6453a'},
+  {id:'shift',  ico:'🎯', name:'ずらす系',         sub:'おしたつもりが ずれる',           color:'#7b2ff7'},
+  {id:'again',  ico:'🔁', name:'しつこい系',       sub:'とじても また でる',             color:'#1f9d4a'},
+  {id:'store',  ico:'🏪', name:'ストアから もどる', sub:'とばされたときの だっしゅつ',     color:'#6b7480'},
+  {id:'help',   ico:'🆘', name:'こまったとき',     sub:'✕が どうしても みつからない',     color:'#1d2430'},
+];
+const RULE_TAGS = {
+  ok: {t:'きまりどおり',    c:'#e8f6ec', ink:'#1f6b3a', why:'きまりの はんい内。でも ぎりぎりまで またせる'},
+  gap:{t:'きまりの すきま', c:'#fff3cd', ink:'#7a4b00', why:'「ボタンは ある」と いいはれる はんいで、みつけにくく・おしにくく している'},
+  bad:{t:'きまりやぶり',    c:'#fde2e0', ink:'#8a1f17', why:'きまりに はんしている。でも とりしまりが おいつかず のこっている'},
+  os: {t:'OSの ぶひん',     c:'#e4edfc', ink:'#1f3f8a', why:'こうこくでは なく iPad じたいの がめん。ここは しんよう できる'},
+};
+const RULES_TEXT = {
+  student: [
+    '📱 Apple と Google の きまり：「とじるボタンは わかりやすく、おおきく」「だまして おさせない」「15びょう いないに とじられるように」。',
+    '🏢 ぎょうかいの きまり：「みぎうえに 50×50 の とじる ばしょを つくる」。でも こうこくが「じぶんの ✕を つかう」と いえば、ちいさい ✕でも いい。ここが すきま。',
+    '📡 こうこくネットワークの きまり：「とじるボタンは 5びょうまで おくらせて いい」。だから「あと 5」は きまりどおり。',
+    '⚖️ だから こうこくの わなは 3しゅるい：きまりどおり ／ きまりの すきま ／ きまりやぶり。',
+    '🛡 きまりが あっても、あんぜんでは ない。じぶんの めで みわける。',
+  ],
+  teacher: 'Apple の App Store 審査ガイドライン 2.5.18 は「割り込む広告は広告であることを明示し、だましてタップさせず、簡単に見つかる十分な大きさの閉じる／スキップボタンを備えること」と定めています。Google Play のデベロッパーポリシーは 2022年9月から「全画面広告は15秒以内に閉じられること」「予期しないタイミングで出さないこと」を必須にし、システム警告に似せた広告も禁じています。業界の技術規格 MRAID 3.0 は「50×50dp の閉じる領域、推奨は右上」としつつ、広告側が自前の閉じるマークを使うことを認めています。広告ネットワーク（例：AdMob）の規約は「誤タップを誘う配置の禁止」と同時に「閉じるボタンは最大5秒遅らせてよい」と明記しています。違反が残る理由は、審査がアプリ本体に対して行われ、広告の中身は配信ネットワークが後から差し替えるため、取り締まりが通報後になるからです。ストア画面の「完了」「＜ 戻る」は広告ではなく OS の部品なので、そこだけは信用してよいと教えられます。',
+};
+const GUIDE = [
+  // ---- まつ系 ----
+  {cat:'wait', id:'delay_x', rule:'ok', ico:'⏱', name:'あとから でる ✕',
+   look:'「あと 3」と かぞえてから ✕が でる。', spot:'すうじが みえる あいだは、✕は どこにも ない。',
+   todo:'すうじが 0に なるまで、なにも おさない。',
+   teacher:'カウント中に触った場所はすべてリンクです。「待つ」練習そのものなので、やさしいモードではカウント中のタップを無駄押しに数えません。', try:{patterns:['delay_x']}},
+  {cat:'wait', id:'countdown_x', rule:'ok', ico:'⭕', name:'まるの なかの ✕',
+   look:'まるい カウントダウンの なかに ちいさな ✕。', spot:'まるが ぜんぶ うまるまで おせない。',
+   todo:'まるが いっぱいに なってから、まんなかを おす。',
+   teacher:'円が満ちるまでは押しても反応しません（ふつう以上では無駄押しに数えます）。', try:{patterns:['countdown_x']}},
+  {cat:'wait', id:'early_x', rule:'gap', ico:'🫸', name:'はやおし ✕',
+   look:'✕は さいしょから みえている。でも すうじが おわる まえに おすと ストアへ。', spot:'✕の ちかくに すうじが ある。',
+   todo:'すうじが きえてから おす。',
+   teacher:'本物の広告で最も多い「見えているのに押せない」型。反射で押す癖を直す練習になります。', try:{patterns:['early_x']}},
+  {cat:'wait', id:'endless_cd', rule:'bad', ico:'♾', name:'おわらない カウントダウン',
+   look:'すうじが 5→1→5→1 と、いつまでも おわらない。', spot:'2かい まわっても おわらない。',
+   todo:'まつのを やめて、ほかの かどを さがす。ちいさい ✕が べつの ばしょに ある。',
+   teacher:'「待てば出る」を逆手に取る手口です。本格モードのみ既定ON。', try:{patterns:['endless_cd'], mode:'hard'}},
+  {cat:'wait', id:'video', rule:'ok', ico:'🎬', name:'どうが こうこく',
+   look:'どうがが ながれて「スキップまで 5」。', spot:'したに あかい バーが すすむ。',
+   todo:'「スキップ」か ✕が でてから おす。「プレイする」は おさない。',
+   teacher:'スキップ待ちの秒数は制限時間に自動で足されます。', try:{adType:'video'}},
+  // ---- みつけにくい系 ----
+  {cat:'find', id:'tiny_x', rule:'gap', ico:'🔬', name:'ちいさい・うすい ✕',
+   look:'かどに とても ちいさく、うすい いろで でる。', spot:'4つの かどを じゅんばんに みる。',
+   todo:'みつけたら、✕の どまんなかを おす。',
+   teacher:'当たり判定は最低16pxを確保しています。運動に困難がある生徒は設定「✕の大きさ」を大きめに。', try:{patterns:['tiny_x']}},
+  {cat:'find', id:'gray_x', rule:'gap', ico:'⚪', name:'はいいろの ✕',
+   look:'おせなさそうな はいいろの ✕が ほんもの。しろい ✕が にせものの ときも。', spot:'いろで きめない。「わくの かどに ついているか」で きめる。',
+   todo:'はいいろでも、かどに あれば おしてみる。',
+   teacher:'「無効に見える＝押せない」という思い込みを利用した手口です。', try:{patterns:['gray_x']}},
+  {cat:'find', id:'vanish_x', rule:'gap', ico:'👻', name:'きえる ✕',
+   look:'でていた ✕が きえて、また でる。', spot:'2びょう みえて、1びょう きえる。',
+   todo:'きえても ばしょを おぼえておく。でた ときに おちついて おす。',
+   teacher:'消えている間に同じ場所を押すと広告本体のリンクになります。', try:{patterns:['vanish_x']}},
+  {cat:'find', id:'random_pos', rule:'gap', ico:'🧭', name:'ばしょが かわる ✕',
+   look:'みぎうえ とは かぎらない。ひだりうえ・した にも でる。', spot:'まいかい ちがう。',
+   todo:'みぎうえ だけ みない。4つの かどを みる。',
+   teacher:'「右上を反射で押す」癖を崩すための基本パターンです。', try:{patterns:['random_pos']}},
+  // ---- だます系 ----
+  {cat:'fool', id:'fake_x', rule:'bad', ico:'🎨', name:'えの なかの ✕',
+   look:'こうこくの えの なかに ✕の かざりが ある。', spot:'えの まんなかに ある ✕は かざり。',
+   todo:'えの なかの ✕は おさない。わくの かどを さがす。',
+   teacher:'本物の✕は広告の枠（角）に付いています。絵柄の一部として描かれた✕はすべてリンクです。', try:{patterns:['fake_x']}},
+  {cat:'fool', id:'multi_x', rule:'bad', ico:'✖✖', name:'✕が いくつも',
+   look:'おなじ みための ✕が えの なかにも ある。', spot:'ほんものは わくの かどに ある 1つだけ。',
+   todo:'かどの ✕ だけ おす。',
+   teacher:'色や形では区別できません。「位置」で見分ける練習です。', try:{patterns:['multi_x']}},
+  {cat:'fool', id:'text_trap', rule:'gap', ico:'🔤', name:'もじの ボタン',
+   look:'「閉じる」「Close」「Skip」「いいえ」の もじボタンが いくつも。ほんものは 1つ。', spot:'もじは しんじられない。',
+   todo:'まよったら、もじより ✕マーク。かどに あるものを えらぶ。',
+   teacher:'やさしいモードでは本物が必ず「とじる」、罠は「次へ」「Skip」です。ふつう以上ではラベルがランダムになり、「いいえ」が本物のこともあります。', try:{patterns:['text_trap']}},
+  {cat:'fool', id:'trap_icon', rule:'bad', ico:'🔊', name:'おしたくなる マーク',
+   look:'▶ ⓘ 🔊 ▷ などの マーク。', spot:'✕ ではない。',
+   todo:'✕ いがいの マークは おさない。',
+   teacher:'「広告 ▷」の小さな表示も含め、すべてリンクです。', try:{patterns:['trap_icon']}},
+  {cat:'fool', id:'fake_back', rule:'bad', ico:'◀', name:'にせの「＜ もどる」',
+   look:'アプリの「もどる」に にた「＜ 戻る」が こうこくの なかに ある。', spot:'ほんものの もどるは、こうこくの なかには ない。',
+   todo:'こうこくの なかの「＜」は おさない。',
+   teacher:'ストア画面の左上「＜ 戻る」は本物ですが、広告の中の「＜」は偽物、という違いを教えてください。', try:{patterns:['fake_back']}},
+  {cat:'fool', id:'fake_alert', rule:'bad', ico:'⚠️', name:'にせの けいこく',
+   look:'「ウイルスが みつかりました」「こうしんが ひつよう」と おどす。', spot:'こうこくの なかに でる けいこくは ぜんぶ ウソ。',
+   todo:'「今すぐ」「OK」は おさない。ちいさい ✕を さがす。しんぱいなら おとなに みせる。',
+   teacher:'消費者トラブルにつながりやすい手口です。「本物のiPadの警告は広告の中には出ない」と伝えてください。', try:{patterns:['fake_alert']}},
+  {cat:'fool', id:'prize', rule:'bad', ico:'🎉', name:'「おめでとうございます」',
+   look:'「あたりました」「えらばれました」と プレゼントを みせる。', spot:'しらない ところから プレゼントは こない。',
+   todo:'「受け取る」は おさない。✕を さがす。',
+   teacher:'当選詐欺型。アンケートや個人情報の入力に誘導します。', try:{adType:'prize'}},
+  {cat:'fool', id:'native', rule:'ok', ico:'📰', name:'きじに みえる こうこく',
+   look:'ニュースや きじの ように みえる。', spot:'「PR」「広告」の しるしが ある。',
+   todo:'「続きを読む」は おさない。',
+   teacher:'ネイティブ広告。記事風でも角の✕とPR表記で見分けます。', try:{adType:'native'}},
+  {cat:'fool', id:'rewarded', rule:'gap', ico:'🎁', name:'ごほうび ボタン',
+   look:'「報酬を受け取る」ボタン。ほんものの ときと わなの ときが ある。', spot:'みためでは わからない。',
+   todo:'まず ✕を さがす。ごほうびボタンは そのあと。',
+   teacher:'やさしいモードでは常に罠にしています（「ごほうびは押さない」で一貫）。ふつう以上では50%で本物です。', try:{adType:'rewarded'}},
+  // ---- ずらす系 ----
+  {cat:'shift', id:'ghost_link', rule:'gap', ico:'🫥', name:'✕の まわりの みえない リンク',
+   look:'✕の まわりの なにもない ところも リンクに なっている。', spot:'みためでは わからない。',
+   todo:'✕の どまんなかを おす。',
+   teacher:'透明領域の幅は設定で変えられます。テストモードの「色で見せる」で確認できます。', try:{patterns:['ghost_link'], mode:'hard'}},
+  {cat:'shift', id:'hit', rule:'gap', ico:'🎯', name:'あたりはんていの ずれ',
+   look:'✕の ふちを おすと ストアに とぶ。', spot:'みためより おせる ばしょが せまい。',
+   todo:'ふちでは なく、どまんなか。',
+   teacher:'本格モードでは当たり判定を見た目の70%にしています（設定で変更可）。', try:{patterns:['random_pos'], mode:'hard'}},
+  {cat:'shift', id:'swap_in', rule:'gap', ico:'🔀', name:'すりかえ',
+   look:'おそうとした ばしょに「入手」が すべりこんでくる。✕は おしのけられる。', spot:'なにかが うごいた。',
+   todo:'うごいた ちょくごは おさない。ひとつ いきを して、✕の いまの ばしょを みなおす。',
+   teacher:'速さを競うと最も引っかかる手口です。本格モードのみ既定ON。', try:{patterns:['swap_in'], mode:'hard'}},
+  // ---- しつこい系 ----
+  {cat:'again', id:'double_ad', rule:'gap', ico:'🔂', name:'2まいめの こうこく',
+   look:'✕を おしたら、べつの こうこくが でる。', spot:'えが かわった。',
+   todo:'2まいめも おなじように、おちついて ✕を さがす。',
+   teacher:'2枚目のぶん、制限時間を4秒足しています。', try:{patterns:['double_ad']}},
+  {cat:'again', id:'confirm_dialog', rule:'gap', ico:'❓', name:'「本当に閉じますか？」',
+   look:'とじた あとに かくにんが でる。おおきい あおい ボタンが「いいえ・つづける」。', spot:'いろと ならびが いつもと ぎゃく。',
+   todo:'いろで えらばない。もじを よんで「はい」を おす。',
+   teacher:'ダークパターンの典型です。「大きい青＝OK」の習慣を突きます。', try:{patterns:['confirm_dialog']}},
+  {cat:'again', id:'multi_escape', rule:'bad', ico:'🪆', name:'ストアの あとの もう1まい',
+   look:'ストアを とじても「本当に戻りますか？」や「おすすめアプリ」が でる。', spot:'まだ ゲームに もどっていない。',
+   todo:'もう1かい「戻る」を さがす。',
+   teacher:'本格モードのみ既定ON。脱出の段数が増えます。', try:{patterns:['multi_escape'], mode:'hard'}},
+  {cat:'again', id:'auto_redirect', rule:'bad', ico:'🚀', name:'かってに ストアへ',
+   look:'なにも おしていないのに、すうびょうで ストアに とぶ。', spot:'じぶんは おしていない。',
+   todo:'じぶんの せいでは ない。あわてず「もどる」を さがす。',
+   teacher:'自動遷移。このパターンでのストア行きは無駄押しに数えず、一発正解も消えません。脱出だけを評価します。', try:{patterns:['auto_redirect']}},
+  {cat:'again', id:'banner_popup', rule:'gap', ico:'🪧', name:'バナー ＋ ポップアップ',
+   look:'したの ほそい バナーと、まんなかの ポップアップ。', spot:'バナーの ちいさな ✕は にせもの が おおい。',
+   todo:'ポップアップの かどの ✕を さがす。',
+   teacher:'バナーの飾り✕はやさしいモードでは出しません。', try:{adType:'banner_popup'}},
+  {cat:'again', id:'playable', rule:'ok', ico:'🕹', name:'おためし ゲーム',
+   look:'「タップして遊ぶ」の ちいさな ゲーム。', spot:'ゆびの マークが てまねき している。',
+   todo:'あそばない。さわると ストアに とぶ。✕を さがす。',
+   teacher:'プレイアブル広告。盤面のどこを触ってもリンクです。', try:{adType:'playable'}},
+  // ---- ストアから もどる ----
+  {cat:'store', id:'store_close', rule:'os', ico:'🏪', name:'ストアの「もどる」',
+   look:'ひだりうえに「＜ 戻る」「◀ ゲームにもどる」、みぎうえに「完了」「✕」。', spot:'うえの はしを みる。',
+   todo:'「入手」「開く」「レビューを書く」は おさない。うえの はしの ちいさい もじを さがす。',
+   teacher:'ストア画面の「完了」「＜ 戻る」は広告ではなく iPad（OS）の部品なので、ここは信用してよい数少ない場所です。やさしいモードでは大きな「⬅ もどる」を出し、脱出は1段だけです。実機では画面左上のステータスバーに「◀ ゲーム名」が出ることもあります。'},
+  {cat:'store', id:'install', rule:'os', ico:'⏬', name:'「インストール中…」の がめん',
+   look:'「入手」を おすと、ぐるぐる まわる がめんに なる。', spot:'まだ ストアの なか。',
+   todo:'「キャンセル」か ✕で ストアに もどり、それから「もどる」を おす。',
+   teacher:'ふつう以上で、ストアの「入手」「開く」などを押すと1段深くなります。'},
+  {cat:'store', id:'reco', rule:'bad', ico:'📋', name:'「おすすめアプリ」「本当に戻りますか？」',
+   look:'ストアを とじた あとに、もう1まい でる。', spot:'おおきい ボタンは「ストアに残る」。',
+   todo:'ちいさい ほうの「戻る」を おす。',
+   teacher:'本格モードの多段脱出です。'},
+  // ---- こまったとき ----
+  {cat:'help', id:'giveup', ico:'🏠', name:'✕が どうしても みつからない',
+   look:'さがしても ない。じかんが すぎる。', spot:'—',
+   todo:'アプリごと とじて（ホームに もどって）OK。おとなを よぶのも せいかい。',
+   teacher:'このゲームでは練習できませんが、本物では「アプリを終了する」「人に聞く」が最も安全な正解です。結果画面の注意書きと合わせて教えてください。'},
+];
+
+// ---------- 7. 画面：タイトル・設定・記録・テスト ----------
+const UI = {
+  newIcon: null,
+  renderTitle(){
+    const d = DB.data, list = $('#player-list'); list.innerHTML = '';
+    for (const p of d.players){
+      const c = h('button', {class:'pchip' + (p.id===d.lastPlayer?' selected':''), onclick:()=>{ d.lastPlayer = p.id; DB.save(); this.renderTitle(); }},
+        h('span',{class:'ico', text:p.icon}), p.name ? h('span',{text:p.name}) : null);
+      list.appendChild(c);
+    }
+    list.appendChild(h('button', {class:'pchip', onclick:()=>{ $('#player-new').classList.remove('hidden'); this.renderIconGrid(); }}, '＋ あたらしく'));
+    const grid = $('#mode-grid'); grid.innerHTML = '';
+    for (const m of MODES) grid.appendChild(h('button', {class:'btn mode-btn' + (m.id===d.lastMode?' selected':''), onclick:()=>{ d.lastMode = m.id; DB.save(); this.renderTitle(); }}, m.name, h('small',{text:m.sub})));
+    // 先生用のロック（設定はモードごとなので、いま選んでいるモードの設定を見る）
+    const st = DB.settings(d.lastMode);
+    $$('.teacher-btn').forEach(b => b.classList.toggle('hidden', !!st.teacherLock));
+    $('.teacher-note').classList.toggle('hidden', !st.teacherLock);
+    $('#mode-card').classList.toggle('hidden', !!st.modeLock);
+    $('#btn-start').textContent = st.modeLock ? `▶ あそぶ（${MODES.find(m=>m.id===d.lastMode).name}）` : '▶ あそぶ';
+  },
+  renderIconGrid(){
+    const g = $('#icon-grid'); g.innerHTML = '';
+    for (const ic of ICONS) g.appendChild(h('button', {class: ic===this.newIcon?'selected':'', text:ic, onclick:()=>{ this.newIcon = ic; this.renderIconGrid(); }}));
+  },
+  savePlayer(){
+    if (!this.newIcon) { toastTitle('アイコンを えらんでね'); return; }
+    let name = $('#new-name').value.trim().slice(0,12);
+    if (!name){ const same = DB.data.players.filter(x=>x.icon===this.newIcon).length; if (same) name = String(same+1); }   // 同じアイコンが2人目なら番号を付ける
+    const p = {id: Date.now().toString(36), icon:this.newIcon, name};
+    DB.data.players.push(p); DB.data.lastPlayer = p.id; DB.save();
+    this.newIcon = null; $('#new-name').value = ''; $('#player-new').classList.add('hidden');
+    this.renderTitle();
+  },
+
+  // ---- 設定 ----
+  renderSettings(){
+    const mode = DB.data.lastMode, s = DB.settings(mode);
+    $('#settings-mode-name').textContent = MODES.find(m=>m.id===mode).name;
+    const body = $('#settings-body'); body.innerHTML = '';
+    const save = ()=>{ DB.save(); };
+    const row = (label, ctl, note) => h('div', {class:'setting'}, h('div', null, h('label',{text:label}), note ? h('div',{class:'note', text:note}) : null), h('div',{class:'ctl'}, ctl));
+    const toggle = (key, onchange) => { const b = h('button', {class:'toggle' + (s[key]?' on':''), 'aria-label':key}); b.onclick = ()=>{ s[key] = !s[key]; b.classList.toggle('on', s[key]); save(); onchange && onchange(); }; return b; };
+    const num = (key, min, max, step, unit='') => {
+      const v = h('span', {text: s[key] + unit});
+      const set = d => { s[key] = clamp(s[key] + d, min, max); v.textContent = s[key] + unit; save(); };
+      return h('div', {class:'num'}, h('button',{text:'−', onclick:()=>set(-step)}), v, h('button',{text:'＋', onclick:()=>set(step)}));
+    };
+    const seg = (key, opts) => { const w = h('div',{class:'seg'}); const rr = ()=>{ w.innerHTML=''; for (const o of opts) w.appendChild(h('button',{class: s[key]===o.v?'selected':'', text:o.t, onclick:()=>{ s[key]=o.v; save(); rr(); }})); }; rr(); return w; };
+
+    body.appendChild(h('h2',{style:'margin-top:0', text:'⏱ 時間・大きさ'}));
+    body.appendChild(row('制限時間を つける', toggle('timeLimitOn'), 'やさしいは「なし」が既定'));
+    body.appendChild(row('制限時間（秒）', num('timeLimit', 4, 60, 1), '遅延✕・動画のスキップ待ちの秒数は自動で足されます'));
+    body.appendChild(row('✕の大きさ', num('xSize', 18, 80, 4, 'px')));
+    body.appendChild(row('当たり判定', seg('hitScale', [{v:1,t:'見た目どおり'},{v:.85,t:'85%'},{v:.7,t:'70%'},{v:.55,t:'55%'}]), '見た目より小さくすると、✕の縁を押してもストアに飛びます'));
+    body.appendChild(row('透明リンク領域の幅', num('ghostWidth', 0, 60, 4, 'px'), 'パターン「透明リンク領域」がONのときだけ使われます'));
+    body.appendChild(row('遅延✕・カウントダウンの秒数', num('delaySec', 1, 10, 1, '秒')));
+    body.appendChild(row('速さボーナス', toggle('speedBonus'), '一発正解のときだけ最大+20点。速さより一発を重視するならOFF。ONのときだけ正解表示に秒数が出ます'));
+    body.appendChild(row('広告の絵や文字・大きなボタンを押してもストアへ飛ぶ', toggle('adBodyTrap'), 'OFFにすると、印のついた罠ボタンだけがストア行きになります（やさしい向け）'));
+    body.appendChild(row('罠ボタンの数の上限', num('maxTraps', 0, 8, 1, 'こ'), '本物の✕以外に置く「押したくなるもの」の数'));
+    body.appendChild(row('1ラウンドの問題数', num('questions', 5, 20, 5, 'もん')));
+
+    body.appendChild(h('h2',{text:'📈 レベルの上がり方'}));
+    body.appendChild(row('連続一発正解 何回でレベルアップ', num('levelUpEvery', 1, 10, 1, 'かい')));
+    body.appendChild(row('はじめのレベル', num('startLevel', 1, 9, 1)));
+    body.appendChild(row('最大レベル', num('maxLevel', 1, 9, 1)));
+    body.appendChild(row('レベル1つにつき罠が増える数', num('trapsPerLevel', 0, 3, 1, 'こ')));
+    body.appendChild(row('レベル1つにつき✕が小さくなる大きさ', num('xShrinkPerLevel', 0, 8, 2, 'px'), '下限は24px'));
+    body.appendChild(row('同時に使うパターン数の上限', num('patternsMax', 1, 4, 1, 'こ')));
+    body.appendChild(row('何レベルごとに同時数が増えるか', num('patternsStep', 1, 4, 1, 'Lv')));
+    body.appendChild(row('レベル1つにつき制限時間が減る秒数', num('timeShrink', 0, 3, 1, '秒')));
+
+    body.appendChild(h('h2',{text:'🛟 失敗したとき'}));
+    body.appendChild(row('失敗・時間切れのあと「本物はここ」を見せる', toggle('revealOnFail'), '本物の広告にはない足場かけ。慣れてきたらOFFに'));
+    body.appendChild(row('ストアに飛ぶ前に暗転（「ストアに とびます…」）', toggle('blackout'), '心の準備のため'));
+    body.appendChild(row('暗転の長さ', seg('blackoutSec', [{v:.5,t:'0.5秒'},{v:1,t:'1秒'},{v:2,t:'2秒'}])));
+    body.appendChild(row('ストアに大きな「もどる」を出す（脱出は1段）', toggle('storeEasy')));
+    body.appendChild(row('背景の架空ゲームを動かす', toggle('animBg'), '気が散りやすい生徒はOFF'));
+    body.appendChild(h('h2',{text:'🔊 音'}));
+    body.appendChild(row('効果音（全体）', toggle('sound', ()=>{ Sound.enabled = s.sound; })));
+    body.appendChild(row('失敗の音', toggle('failSound'), '音に敏感な生徒はOFF'));
+    body.appendChild(row('カウントダウンの音', toggle('cdSound')));
+    body.appendChild(h('h2',{text:'🔒 生徒が触らないように'}));
+    body.appendChild(row('先生用ボタンを隠す', toggle('teacherLock'), 'ONにすると、タイトルの「れんしゅう」を2秒長押しで設定を開きます'));
+    body.appendChild(row('モードを固定する', toggle('modeLock'), 'いま選んでいるモードで固定され、生徒は変えられません'));
+
+    body.appendChild(h('h2',{text:'📺 広告の種類'}));
+    for (const t of AD_TYPES){
+      const b = h('button', {class:'toggle' + (s.adTypes[t.id]?' on':'')}); b.onclick = ()=>{ s.adTypes[t.id] = !s.adTypes[t.id]; b.classList.toggle('on', s.adTypes[t.id]); save(); };
+      body.appendChild(row(t.name, b));
+    }
+    body.appendChild(h('h2',{text:'🪤 使う意地悪パターン'}));
+    const pl = h('div',{class:'pat-list'});
+    for (const p of PATTERNS){
+      const b = h('button', {class:'toggle' + (s.patterns[p.id]?' on':'')}); b.onclick = ()=>{ s.patterns[p.id] = !s.patterns[p.id]; b.classList.toggle('on', s.patterns[p.id]); save(); };
+      pl.appendChild(h('div',{class:'pat-item'}, h('div', null, h('span',{class:'pname', text:p.name}), p.hardOnly ? h('span',{class:'tag', text:'本格向け'}) : null, h('div',{class:'pdesc', text:p.desc})), b));
+    }
+    body.appendChild(pl);
+  },
+
+  // ---- 記録 ----
+  recPlayer: null,
+  renderRecords(){
+    const d = DB.data, body = $('#records-body'); body.innerHTML = '';
+    if (!d.players.length){ body.appendChild(h('p',{class:'note', text:'まだ プレイヤーが いません'})); return; }
+    if (!this.recPlayer || !d.players.some(p=>p.id===this.recPlayer)) this.recPlayer = d.lastPlayer || d.players[0].id;
+    const chips = h('div',{class:'player-list', style:'margin-bottom:10px'});
+    for (const p of d.players) chips.appendChild(h('button',{class:'pchip'+(p.id===this.recPlayer?' selected':''), onclick:()=>{ this.recPlayer=p.id; this.renderRecords(); }}, h('span',{class:'ico',text:p.icon}), p.name?h('span',{text:p.name}):null));
+    body.appendChild(chips);
+    const recs = (d.records[this.recPlayer] || []).slice().reverse();
+    if (!recs.length) body.appendChild(h('p',{class:'note', text:'まだ きろくが ありません'}));
+    for (const r of recs){
+      const dt = new Date(r.date); const ds = `${dt.getMonth()+1}/${dt.getDate()} ${String(dt.getHours()).padStart(2,'0')}:${String(dt.getMinutes()).padStart(2,'0')}`;
+      const worst = Object.entries(r.trapKinds||{}).sort((a,b)=>b[1]-a[1]).slice(0,2).map(([k])=>TRAP_NAMES[k]||k);
+      body.appendChild(h('div',{class:'rec-item'},
+        h('div', null, h('b',{text:ds}), ` ・ ${MODES.find(m=>m.id===r.mode).name} ・ Lv${r.level} ・ ${r.score}点`),
+        h('div', null, `一発正解 ${Math.round(r.oneShotRate*100)}%（${r.oneShot}/${r.questions}） ・ 発見 ${r.avgFindMs==null?'—':fmtSec(r.avgFindMs)+'秒'} ・ 脱出 ${r.avgEscapeMs==null?'—':fmtSec(r.avgEscapeMs)+'秒'}`),
+        worst.length ? h('div',{class:'note', text:'つぎに れんしゅう：' + worst.join('、')}) : null,
+      ));
+    }
+    body.appendChild(h('div',{class:'row', style:'margin-top:12px'},
+      h('button',{class:'btn small ghost', text:'このプレイヤーを けす', onclick:()=>{
+        const p = d.players.find(x=>x.id===this.recPlayer);
+        if (p && confirm(`${p.icon} ${p.name||''} と その記録を すべて 消しますか？`)){
+          d.players = d.players.filter(x=>x.id!==this.recPlayer); delete d.records[this.recPlayer];
+          if (d.lastPlayer===this.recPlayer) d.lastPlayer = d.players[0] ? d.players[0].id : null;
+          this.recPlayer = null; DB.save(); this.renderRecords();
+        }
+      }})));
+  },
+  importJson(text){
+    let obj; try { obj = JSON.parse(text); } catch(e){ toastTitle('JSON が読めません'); return; }
+    const d = DB.data; let added = 0;
+    if (obj.player && obj.player.id){
+      if (!d.players.some(x=>x.id===obj.player.id)) d.players.push(obj.player);
+      const recs = Array.isArray(obj.records) ? obj.records : [];
+      const have = new Set((d.records[obj.player.id]||[]).map(r=>r.date));
+      for (const r of recs) if (!have.has(r.date)){ (d.records[obj.player.id] = d.records[obj.player.id]||[]).push(r); added++; }
+      this.recPlayer = obj.player.id;
+    }
+    if (obj.settings && confirm('設定も上書きしますか？（いいえ＝記録だけ追加）')){
+      for (const m of ['easy','normal','hard']) if (obj.settings[m]) d.settings[m] = Object.assign(defaultSettings(m), obj.settings[m]);
+    }
+    DB.save(); DB.load(); this.renderRecords();
+    toastTitle(`記録を ${added}件 追加しました`);
+  },
+  exportJson(){
+    const d = DB.data, p = d.players.find(x=>x.id===this.recPlayer);
+    const out = {exportedAt:new Date().toISOString(), player:p||null, records:(p && d.records[p.id])||[], settings:d.settings};
+    const ta = $('#json-out'); ta.value = JSON.stringify(out, null, 1); ta.classList.remove('hidden'); $('#btn-json-copy').classList.remove('hidden');
+  },
+
+  // ---- ずかん ----
+  gtab: 'all',
+  renderZukan(){
+    const tabs = $('#g-tabs'); tabs.innerHTML = '';
+    const mk = (id, label) => h('button', {class: this.gtab===id?'selected':'', text:label, onclick:()=>{ this.gtab = id; this.renderZukan(); }});
+    tabs.appendChild(mk('all', 'ぜんぶ'));
+    for (const c of GUIDE_CATS) tabs.appendChild(mk(c.id, c.ico + ' ' + c.name));
+    // こうこくの きまり（折りたたみ）
+    const rules = $('#g-rules'); rules.innerHTML = '';
+    rules.appendChild(h('details', {class:'teacher', open: this.gtab==='rules' ? true : null},
+      h('summary', {text:'⚖️ こうこくの きまり と、わなの 3しゅるい ▽'}),
+      h('div', {class:'howto'}, RULES_TEXT.student.map(t=>h('div', {style:'margin:4px 0', text:t}))),
+      h('div', {class:'row', style:'margin:8px 0'}, Object.entries(RULE_TAGS).map(([k,v])=>h('span', {class:'rtag', style:`background:${v.c}; color:${v.ink}`, text:v.t}))),
+      h('div', {class:'note'}, Object.values(RULE_TAGS).map(v=>h('div', {text:`${v.t}：${v.why}`}))),
+      h('details', null, h('summary', {text:'せんせい向け：どの きまりか'}), h('div', {class:'note', text:RULES_TEXT.teacher})),
+    ));
+    const body = $('#zukan-body'); body.innerHTML = '';
+    for (const c of GUIDE_CATS){
+      if (this.gtab !== 'all' && this.gtab !== c.id) continue;
+      body.appendChild(h('div', {class:'gcat', style:`background:${c.color}`}, h('span', {text:c.ico}), h('span', null, c.name, ' ', h('small', {text:'— ' + c.sub}))));
+      for (const g of GUIDE.filter(x=>x.cat===c.id)){
+        const card = h('div', {class:'gentry', id:'g-' + g.id},
+          h('div', {class:'g-head'}, h('div', {class:'g-ico', text:g.ico}), h('div', {class:'g-name', text:g.name}),
+            g.rule ? h('span', {class:'rtag', style:`background:${RULE_TAGS[g.rule].c}; color:${RULE_TAGS[g.rule].ink}`, text:RULE_TAGS[g.rule].t, title:RULE_TAGS[g.rule].why}) : null),
+          h('div', {class:'g-row'}, h('b', {text:'どんなもの'}), h('span', {text:g.look})),
+          h('div', {class:'g-row'}, h('b', {text:'みわけかた'}), h('span', {text:g.spot})),
+          h('div', {class:'g-row g-todo'}, h('b', {text:'どうする'}), h('span', {text:g.todo})),
+          h('details', null, h('summary', {text:'せんせい向け'}), h('div', {class:'note', text:g.teacher})),
+          g.try ? h('button', {class:'btn small primary g-try', text:'▶ ためす', onclick:()=>this.tryGuide(g)}) : null,
+        );
+        body.appendChild(card);
+      }
+    }
+  },
+  tryGuide(g){
+    const mode = g.try.mode || DB.data.lastMode;
+    const settings = Object.assign({}, DB.settings(mode));
+    settings.patterns = Object.assign({}, settings.patterns);
+    if (g.try.patterns) for (const id of g.try.patterns) settings.patterns[id] = true;
+    const spec = buildSpec({mode, settings, level:1, adType:g.try.adType, patterns:g.try.patterns || []});
+    Game.start(mode, {test:true, spec, returnTo:'zukan', settingsOverride:settings});
+  },
+
+  // ---- テスト ----
+  testSel: {adType:'interstitial', mode:'normal', patterns:new Set(), debug:false},
+  renderTest(){
+    const t = this.testSel, body = $('#test-body'); body.innerHTML = '';
+    const seg = (key, opts) => { const w = h('div',{class:'seg', style:'flex-wrap:wrap'}); const rr=()=>{ w.innerHTML=''; for (const o of opts) w.appendChild(h('button',{class:t[key]===o.v?'selected':'', text:o.t, onclick:()=>{ t[key]=o.v; rr(); }})); }; rr(); return w; };
+    body.appendChild(h('div',{class:'setting'}, h('label',{text:'設定を使うモード'}), seg('mode', MODES.map(m=>({v:m.id,t:m.name})))));
+    body.appendChild(h('div',{class:'setting'}, h('label',{text:'広告の種類'}), seg('adType', AD_TYPES.map(a=>({v:a.id,t:a.name})))));
+    const pl = h('div',{class:'pat-list', style:'margin-top:8px'});
+    for (const p of PATTERNS){
+      const b = h('button',{class:'toggle'+(t.patterns.has(p.id)?' on':'')}); b.onclick=()=>{ t.patterns.has(p.id)?t.patterns.delete(p.id):t.patterns.add(p.id); b.classList.toggle('on', t.patterns.has(p.id)); };
+      pl.appendChild(h('div',{class:'pat-item'}, h('div',null,h('span',{class:'pname',text:p.name}), h('div',{class:'pdesc',text:p.desc})), b));
+    }
+    body.appendChild(h('p',{class:'note', text:'同時に使えない組み合わせ（遅延✕とカウントダウン、文字ボタンと極小/灰色など）は、先に選んだ方が優先されます。'}));
+    body.appendChild(pl);
+    const dbg = h('button',{class:'toggle'+(t.debug?' on':'')}); dbg.onclick=()=>{ t.debug=!t.debug; dbg.classList.toggle('on', t.debug); };
+    body.appendChild(h('div',{class:'setting'}, h('label',{text:'当たり判定と透明領域を色で見せる'}), dbg));
+    body.appendChild(h('div',{id:'test-result'}));
+  },
+  runTest(){
+    const t = this.testSel, settings = DB.settings(t.mode);
+    const spec = buildSpec({mode:t.mode, settings, level:1, adType:t.adType, patterns:PATTERNS.map(p=>p.id).filter(id=>t.patterns.has(id))});
+    Game.start(t.mode, {test:true, spec, debug:t.debug});
+  },
+};
+function renderTestResult(q){
+  const el = $('#test-result'); if (!el || !q) return;
+  el.innerHTML = '';
+  el.appendChild(h('div',{class:'card', style:'margin-top:10px; background:#f7f8fa'},
+    h('b',{text:'テスト結果：'}), ` ${q.result==='ok'?'正解':'じかんぎれ'} ・ 一発${q.oneShot?'○':'×'} ・ 発見 ${q.findMs==null?'—':fmtSec(q.findMs)+'秒'} ・ 無駄押し ${q.misses} ・ ストア ${q.storeTrips}回 ・ 脱出 ${q.escapes.map(fmtSec).join('/')||'—'}秒 ・ ${q.score}点`,
+    h('div',{class:'note', text:'パターン：' + (q.patterns.map(id=>PAT[id].name).join('、')||'なし')})));
+}
+function toastTitle(msg){ const t = h('div',{class:'toast bad', style:'position:fixed', text:msg}); document.body.appendChild(t); setTimeout(()=>t.remove(),1200); }
+
+// ---------- 起動 ----------
+function init(){
+  DB.load();
+  UI.renderTitle();
+  $('#btn-player-save').onclick = ()=>UI.savePlayer();
+  $('#btn-player-cancel').onclick = ()=>{ $('#player-new').classList.add('hidden'); UI.newIcon=null; };
+  $('#btn-start').onclick = ()=>{
+    if (!DB.player()){ toastTitle('プレイヤーを えらんでね'); $('#player-new').classList.remove('hidden'); UI.renderIconGrid(); return; }
+    Game.start(DB.data.lastMode);
+  };
+  $('#btn-settings').onclick = ()=>{ UI.renderSettings(); showScreen('settings'); };
+  $('#btn-settings-back').onclick = ()=>{ UI.renderTitle(); showScreen('title'); };
+  $('#btn-settings-reset').onclick = ()=>{ if (confirm('このモードの設定を初期値に戻しますか？')){ DB.data.settings[DB.data.lastMode] = defaultSettings(DB.data.lastMode); DB.save(); UI.renderSettings(); } };
+  $('#btn-records').onclick = ()=>{ $('#json-out').classList.add('hidden'); $('#btn-json-copy').classList.add('hidden'); UI.renderRecords(); showScreen('records'); };
+  $('#btn-records-back').onclick = ()=>{ UI.renderTitle(); showScreen('title'); };
+  $('#btn-json').onclick = ()=>UI.exportJson();
+  $('#btn-import').onclick = ()=>$('#import-box').classList.toggle('hidden');
+  $('#btn-import-run').onclick = ()=>{ UI.importJson($('#json-in').value); $('#json-in').value=''; $('#import-box').classList.add('hidden'); };
+  // 名前入力：Enter で登録、キーボードを閉じたあとのレイアウトずれを戻す
+  const nm = $('#new-name');
+  nm.addEventListener('keydown', e=>{ if (e.key==='Enter'){ e.preventDefault(); UI.savePlayer(); } });
+  nm.addEventListener('blur', ()=>window.scrollTo(0,0));
+  // 「れんしゅう」ラベルを2秒長押し → 先生用の設定（先生用ボタンを隠しているとき用）
+  let pressTimer = null;
+  const lbl = $('#frame-label');
+  lbl.addEventListener('pointerdown', ()=>{ clearTimeout(pressTimer); pressTimer = setTimeout(()=>{ if ($('#title').classList.contains('active')){ UI.renderSettings(); showScreen('settings'); } }, 2000); });
+  for (const ev of ['pointerup','pointercancel','pointerleave']) lbl.addEventListener(ev, ()=>clearTimeout(pressTimer));
+  // ホームに戻る・通知を開くなどで画面が隠れたら時間を止める。戻ったら音も再開
+  document.addEventListener('visibilitychange', ()=>{
+    if (document.hidden){ Game.stopTimer(); return; }
+    Sound.unlock();
+    if (Game.active && Game.inst && !Game.inst.lock && !Game.store) Game.resumeTimer();
+  });
+  $('#btn-json-copy').onclick = async ()=>{ const ta=$('#json-out'); try{ await navigator.clipboard.writeText(ta.value); toastTitle('コピーしました'); }catch(e){ ta.focus(); ta.select(); toastTitle('長押しでコピーしてください'); } };
+  $('#btn-test').onclick = ()=>{ UI.renderTest(); showScreen('test'); };
+  $('#btn-zukan').onclick = ()=>{ UI.renderZukan(); showScreen('zukan'); };
+  $('#btn-zukan-back').onclick = ()=>{ UI.renderTitle(); showScreen('title'); };
+  $('#btn-result-zukan').onclick = ()=>{ UI.gtab = 'all'; UI.renderZukan(); showScreen('zukan'); };
+  $('#btn-test-back').onclick = ()=>showScreen('title');
+  $('#btn-test-run').onclick = ()=>UI.runTest();
+  $('#hud-quit').onclick = ()=>{ if (Game.test || confirm('やめますか？ このラウンドの記録は残りません')) Game.quit(); };
+  $('#btn-again').onclick = ()=>Game.start(DB.data.lastMode);
+  $('#btn-result-title').onclick = ()=>{ UI.renderTitle(); showScreen('title'); };
+  // 広告の外側（架空ゲーム画面）をタップ → 無駄押し
+  $('#stage').addEventListener('click', ()=>{ if (Game.active && Game.inst && !Game.inst.lock && Game.q && Game.q.startAt) Game.onNoop(); });
+}
+document.addEventListener('DOMContentLoaded', init);
+</script>
+</body>
+</html>
