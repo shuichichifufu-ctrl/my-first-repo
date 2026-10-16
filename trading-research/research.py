@@ -153,15 +153,16 @@ def fx_study(X: pd.DataFrame, rates: pd.DataFrame) -> tuple[pd.DataFrame, dict]:
         turnover = (sig.diff().abs() > 0).sum().sum() / len(pairs) / (len(sig) / 252)
         return vol_target(pnl.sum(axis=1)), turnover
 
-    def one_pair(sig: pd.DataFrame, c: str) -> pd.Series:
+    def one_pair(sig: pd.DataFrame, c: str, markup: float = SWAP_MARKUP) -> pd.Series:
         pos = (sig[c] * TARGET_VOL / pv[c]).clip(-3, 3).shift(1).fillna(0)
-        return pos * (ret[c] + carry_d[c]) - pos.abs() * SWAP_MARKUP / 100 / 252 \
+        return pos * (ret[c] + carry_d[c]) - pos.abs() * markup / 100 / 252 \
             - pos.diff().abs().fillna(0) * spread[c]
 
     tsm = np.sign(lvl.diff(252))
     carry = np.sign(diff)
     carry1 = carry.where(diff.abs() >= 1.0, 0.0)
     both = carry.where(carry == tsm, 0.0)
+    both1 = carry1.where(carry1 == tsm, 0.0)
 
     # 通貨ごとの順位で、金利の高い3通貨を買い・低い3通貨を売り（G8キャリー）
     rank = rates.rank(axis=1)
@@ -190,6 +191,7 @@ def fx_study(X: pd.DataFrame, rates: pd.DataFrame) -> tuple[pd.DataFrame, dict]:
         "FX: キャリー（高金利側を持つ・28ペア）": run_pairs(carry),
         "FX: キャリー（金利差1%以上のみ）": run_pairs(carry1),
         "FX: キャリー×12か月トレンド一致": run_pairs(both),
+        "FX: キャリー（1%以上）×トレンド一致": run_pairs(both1),
         "FX: G8キャリー（上位3買い・下位3売り）": (xs, xs_turn),
         "FX: G8キャリー＋荒れ相場で休む": (xs_calm, xs_turn),
         "FX: G8キャリー＋トレンド一致": (xs2, xs_turn),
@@ -200,7 +202,15 @@ def fx_study(X: pd.DataFrame, rates: pd.DataFrame) -> tuple[pd.DataFrame, dict]:
     for k, sig in {"12か月トレンド": tsm, "キャリー": carry, "キャリー×トレンド": both}.items():
         r, _ = run_pairs(sig, markup=1.5, spread_mult=2.0)
         sens[k] = stats(r)["sharpe"]
-    extra = {"費用が重い場合のシャープ": sens,
+    # EAで使う想定の8ペアだけで組んだ場合（MT4では1チャート1ペアで動かすため）
+    ea_pairs = ["AUDJPY", "NZDJPY", "GBPJPY", "EURJPY", "CADJPY", "USDJPY", "AUDUSD", "NZDUSD"]
+    ea = {}
+    for k, sig in {"キャリー1%以上": carry1, "キャリー1%以上×トレンド": both1}.items():
+        for mk in [0.0, 0.5, 1.0, 2.0]:
+            r = vol_target(pd.concat([one_pair(sig, c, mk) for c in ea_pairs], axis=1).mean(axis=1))
+            ea[f"{k} / スワップのマージン年{mk}%"] = {p: stats(r.loc[a:b])["sharpe"] for p, (a, b) in
+                                               zip(["00-06", "07-12", "13-19", "20-26"], PERIODS)} | stats(r)
+    extra = {"EA想定8ペア": ea, "費用が重い場合のシャープ": sens,
              "通貨ペア別 シャープ（キャリー / キャリー×トレンド）": {
                  c: (stats(one_pair(carry, c))["sharpe"], stats(one_pair(both, c))["sharpe"])
                  for c in ["AUDJPY", "NZDJPY", "USDJPY", "EURJPY", "GBPJPY", "CADJPY", "AUDUSD", "NZDUSD",
@@ -268,8 +278,13 @@ def nikkei_study(N: pd.DataFrame, rates: pd.DataFrame) -> tuple[pd.DataFrame, di
     res["日経: 日中だけ買い（寄りで買い引けで売り）"] = ((intra - 2 * NK_SPREAD).loc[first_ok:].fillna(0), 252.0)
 
     rows = [summarize(k, *v, periods=NK_PERIODS) for k, v in res.items()]
+    gap = {}
+    for rt in [0.0, 1.75e-4, 5e-4]:  # 往復の費用: なし / 7円程度(4万円台) / 研究の既定
+        g = (on - rt - long_cost).loc[first_ok:]
+        gap[f"往復{rt * 100:.4f}%"] = {f"{a}-{b}": stats(g.loc[a:b])["ann%"] for a, b in NK_PERIODS}
     extra = {"データ期間": f"{N.index[0]:%Y-%m-%d}〜{N.index[-1]:%Y-%m-%d}",
              "始値が使える最初の日": str(first_ok)[:10] if first_ok is not None else None,
+             "夜間だけ買い 費用別の年率%": gap,
              "夜間/日中 費用ゼロの年率%": {"夜間": round(on.mean() * 252 * 100, 1),
                                      "日中": round(intra.mean() * 252 * 100, 1)},
              "年別リターン%": pd.DataFrame({k: v[0].groupby(v[0].index.year).sum() * 100
@@ -293,6 +308,8 @@ def main() -> None:
     fx_tab, fx_extra = fx_study(X, rates)
     print("\n=== FX（シャープレシオ。期間別と全期間） ===")
     print(fx_tab.set_index("strategy").to_string())
+    print("\n=== EA想定8ペア（シャープ。マージン別） ===")
+    print(pd.DataFrame(fx_extra.pop("EA想定8ペア")).T.to_string())
     print("\n", json.dumps({k: v for k, v in fx_extra.items() if k != "年別リターン%"}, ensure_ascii=False))
     import os
     os.makedirs(a.out, exist_ok=True)
