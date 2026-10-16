@@ -1,0 +1,33 @@
+name: trading-research
+# FX（スワップ込み）と日経225の売買ルール比較。実データを取りに行くため GitHub Actions で動かす。
+on:
+  push:
+    branches: ["claude/project-thread-mllk4y"]
+    paths:
+      - ".github/workflows/trading-research.yml"
+      - "trading-research/*.py"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  research:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    defaults:
+      run:
+        working-directory: trading-research
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - run: pip install -r requirements.txt
+      - run: python research.py --out out
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: trading-research
+          path: trading-research/out
+          retention-days: 14
