@@ -3,7 +3,7 @@
 (function () {
   'use strict';
   var PLAYERS = [{ color: '#e53935' }, { color: '#1e88e5' }];
-  var CAM_LABEL = ['め', 'うしろ', 'そら'];
+  var CAM_LABEL = ['め', 'おいかけ', 'そら']; // 移動の「うしろ」とかぶらない名前
   var DEFAULT_ERR = 'つながらなかったよ。ばんごうを たしかめてね';
   var doc = document;
 
@@ -30,14 +30,17 @@
     link: '<svg viewBox="0 0 24 24"><circle cx="5.500" cy="12" r="4"/><circle cx="18.500" cy="12" r="4"/><rect x="8" y="10.500" width="8" height="3"/></svg>',
     pic: '<svg viewBox="0 0 24 24"><rect x="2" y="4" width="20" height="16" rx="3" fill="#ffd23f"/><circle cx="8" cy="10" r="2.400" fill="#ff5d8f"/><path d="M3 19l6-6 4 4 3-3 5 5z" fill="#3b8df0"/></svg>'
   };
-  var CAM_ICON = [
-    // め（目）
-    '<svg viewBox="0 0 48 48"><path d="M3 24C10 12 38 12 45 24 38 36 10 36 3 24z" fill="#fff" stroke="#1f5fd9" stroke-width="3"/><circle cx="24" cy="24" r="8.500" fill="#1f5fd9"/><circle cx="21" cy="21" r="2.800" fill="#fff"/></svg>',
-    // うしろ（戦車を後ろから見る）
-    '<svg viewBox="0 0 48 48"><rect x="12" y="26" width="24" height="9" rx="3" fill="#e53935"/><rect x="16" y="19" width="16" height="9" rx="3" fill="#ff7a6e"/><rect x="29" y="13" width="14" height="4" rx="2" fill="#555" transform="rotate(-20 29 15)"/><rect x="9" y="33" width="30" height="7" rx="3.500" fill="#444"/><path d="M4 8h10l-3-4M14 8l-3 4" stroke="#1f5fd9" stroke-width="2.600" fill="none" stroke-linecap="round"/></svg>',
-    // そら（真上から）
-    '<svg viewBox="0 0 48 48"><rect x="4" y="6" width="40" height="36" rx="4" fill="#fff" stroke="#1f5fd9" stroke-width="3"/><path d="M4 18h24v10h14M18 6v12M30 28v14" stroke="#9db8e8" stroke-width="3" fill="none"/><rect x="9" y="30" width="9" height="9" rx="2" fill="#e53935"/><path d="M34 11l3 5 3-5-3 1z" fill="#ffb703"/><circle cx="37" cy="14" r="3.500" fill="#ffb703"/></svg>'
-  ];
+  // カメラの絵。戦車の色は自分の色（ゲストは青）
+  var LIGHT = { '#e53935': '#ff7a6e', '#1e88e5': '#7ab8f5' };
+  function camIcon(m, color) {
+    var c = color || PLAYERS[0].color, l = LIGHT[c] || '#ffffff';
+    if (m === 0) // め（目）：自分の目で見る
+      return '<svg viewBox="0 0 48 48"><path d="M3 24C10 12 38 12 45 24 38 36 10 36 3 24z" fill="#fff" stroke="#1f5fd9" stroke-width="3"/><circle cx="24" cy="24" r="8.500" fill="#1f5fd9"/><circle cx="21" cy="21" r="2.800" fill="#fff"/></svg>';
+    if (m === 1) // おいかけ：戦車を後ろから追いかけて見る
+      return '<svg viewBox="0 0 48 48"><rect x="12" y="26" width="24" height="9" rx="3" fill="' + c + '"/><rect x="16" y="19" width="16" height="9" rx="3" fill="' + l + '"/><rect x="29" y="13" width="14" height="4" rx="2" fill="#555" transform="rotate(-20 29 15)"/><rect x="9" y="33" width="30" height="7" rx="3.500" fill="#444"/><path d="M4 8h10l-3-4M14 8l-3 4" stroke="#1f5fd9" stroke-width="2.600" fill="none" stroke-linecap="round"/></svg>';
+    // そら：真上から地図ぜんぶを見る
+    return '<svg viewBox="0 0 48 48"><rect x="4" y="6" width="40" height="36" rx="4" fill="#fff" stroke="#1f5fd9" stroke-width="3"/><path d="M4 18h24v10h14M18 6v12M30 28v14" stroke="#222" stroke-width="3.500" fill="none"/><rect x="9" y="30" width="9" height="9" rx="2" fill="' + c + '"/><path d="M34 11l3 5 3-5-3 1z" fill="#ff4fb0"/><circle cx="37" cy="14" r="3.500" fill="#ff4fb0"/></svg>';
+  }
   var SAD = '<svg viewBox="0 0 64 64"><circle cx="32" cy="32" r="28" fill="#ffd23f" stroke="#fff" stroke-width="4"/><circle cx="22" cy="26" r="3.500" fill="#12327a"/><circle cx="42" cy="26" r="3.500" fill="#12327a"/><path d="M20 46q12-12 24 0" stroke="#12327a" stroke-width="4" fill="none" stroke-linecap="round"/></svg>';
   var HAPPY = '<svg viewBox="0 0 64 64"><circle cx="32" cy="32" r="28" fill="#8ee0a5" stroke="#fff" stroke-width="4"/><circle cx="22" cy="26" r="3.500" fill="#12327a"/><circle cx="42" cy="26" r="3.500" fill="#12327a"/><path d="M20 38q12 12 24 0" stroke="#12327a" stroke-width="4" fill="none" stroke-linecap="round"/></svg>';
 
@@ -364,8 +367,8 @@
     var other = 1 - myIndex;
     if (d.t === 'st') call('World', 'applyRemoteState', other, d.s);
     else if (d.t === 'boom') {
-      guard = true; try { call('World', 'applyRemoteBoom', d.cells); } finally { guard = false; }
-      showBoom();
+      // 発射のときに1回だけ届く。弾が山なりに飛んでから壊れる（「ドゴォーン！」は着弾のとき World の boom で出す）
+      guard = true; try { call('World', 'applyRemoteBoom', d.cells, d.from); } finally { guard = false; }
     } else if (d.t === 'found') {
       guard = true; try { call('World', 'remoteFound', d.idx); } finally { guard = false; }
       go('ending', d.idx);
@@ -391,6 +394,7 @@
     els.ptTitle.textContent = m.title || '';
     els.ptYomi.textContent = m.reading || '';
     camMode = 1; updateCam();
+    doc.body.classList.add('camtop'); // 開始演出は真上から
     go('play');
     call('World', 'setCamera', camMode);
     call('World', 'start');
@@ -401,8 +405,11 @@
     if (running) { running = false; call('World', 'stop'); }
   }
   function updateCam() {
-    els.camIco.innerHTML = CAM_ICON[camMode];
+    var col = PLAYERS[myIndex] ? PLAYERS[myIndex].color : PLAYERS[0].color, nx = (camMode + 1) % 3;
+    els.camIco.innerHTML = camIcon(camMode, col);
+    els.camNext.innerHTML = camIcon(nx, col);
     els.camLabel.textContent = CAM_LABEL[camMode];
+    els.cam.setAttribute('aria-label', CAM_LABEL[camMode] + '。おすと ' + CAM_LABEL[nx]);
   }
   function cycleCam() {
     var m = call('World', 'cycleCamera');
@@ -416,9 +423,7 @@
     boomTimer = setTimeout(function () { b.classList.remove('on'); }, 800);
   }
   function showNotice(t) {
-    els.notice.textContent = t; els.notice.classList.add('on');
-    clearTimeout(noticeTimer);
-    noticeTimer = setTimeout(hideNotice, 7000);
+    els.notice.textContent = t; els.notice.classList.add('on'); // プレイが終わるまで出しつづける（小さく）
   }
   function hideNotice() { clearTimeout(noticeTimer); els.notice.classList.remove('on'); }
 
@@ -427,10 +432,12 @@
     if (netOn) call('Net', 'send', { t: 'found', idx: idx });
     go('ending', idx);
   }
-  function onBoom(cells) {
-    showBoom();
-    if (guard || !netOn || state !== 'play') return;
-    call('Net', 'send', { t: 'boom', cells: cells });
+  function onBoom(cells, remote) {
+    showBoom(); // 着弾（自分の弾も、相手の弾も）。通信へは送らない
+  }
+  function onFire(info) {
+    if (guard || !netOn || state !== 'play' || !info) return;
+    call('Net', 'send', { t: 'boom', cells: info.cells, from: info.from }); // 発射時の1回だけ
   }
   function onState(s) {
     if (guard || !netOn || state !== 'play') return;
@@ -524,7 +531,7 @@
     ['stage', 'nav', 'home', 'modal', 'setting', 'sethead', 'cards', 'preview', 'keypad', 'codein', 'codeshow', 'msgface', 'msgtext',
       'cam', 'notice', 'boom', 'confetti'].forEach(function (id) { els[id] = $(id); });
     els.ptTitle = $('pt-title'); els.ptYomi = $('pt-yomi');
-    els.camIco = $('cam-ico'); els.camLabel = $('cam-label');
+    els.camIco = $('cam-ico'); els.camNext = $('cam-next'); els.camLabel = $('cam-label');
     els.endDisc = $('end-disc'); els.endWho = $('end-who'); els.endTitle = $('end-title'); els.endYomi = $('end-yomi'); els.endPic = $('end-pic');
 
     doc.addEventListener('contextmenu', function (e) { e.preventDefault(); });
@@ -561,6 +568,8 @@
     call('World', 'init', $('worldbox'));
     call('World', 'on', 'found', onFound);
     call('World', 'on', 'boom', onBoom);
+    call('World', 'on', 'fire', onFire);
+    call('World', 'on', 'cam', function (top) { doc.body.classList.toggle('camtop', !!top); });
     call('World', 'on', 'state', onState);
     call('Net', 'on', 'open', onNetOpen);
     call('Net', 'on', 'data', onNetData);

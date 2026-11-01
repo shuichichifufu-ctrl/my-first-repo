@@ -91,7 +91,7 @@ body[data-state=quit] #quit .center{padding-bottom:14cqmin}
 .nbtn i{display:block;width:8cqmin;height:8cqmin;flex:none}
 .nbtn i svg{width:100%;height:100%;fill:currentColor}
 .nbtn.primary{background:linear-gradient(#ffe86b,#ffb703);color:#3d2800}
-.nbtn.secondary{background:linear-gradient(#8fd0ff,#3b8df0);color:#fff;text-shadow:0 .3cqmin 0 rgba(0,40,120,.5);animation-delay:.25s}
+.nbtn.secondary{background:linear-gradient(#8fd0ff,#3b8df0);color:#fff;text-shadow:0 .3cqmin 0 rgba(0,40,120,.5);animation:none} /* 跳ねるのは次に押す1つ（primary）だけ */
 @keyframes hop{0%,100%{transform:translateY(0)}35%{transform:translateY(-2cqmin)}60%{transform:translateY(0)}}
 .nbtn.down,.ctl.down,.card.down,.bigcard.down,.key.down,.backbtn.down,#home.down,#cam.down{animation:none;transform:translateY(.7cqmin) scale(.95);filter:brightness(.92)}
 
@@ -150,7 +150,9 @@ body:not([data-state=boot]) #home{display:flex}
 .card.on{background:linear-gradient(#fff9c4,#ffe45e);border-color:#ff9f1c;box-shadow:0 1.1cqmin 0 rgba(255,140,0,.5)}
 .card.file{background:linear-gradient(#fff,#e3f3ff)}
 .card.file svg{width:11cqmin;height:11cqmin}
-.card.file .kan{font-size:5.4cqmin}
+.card{text-align:center}
+.card.file{padding:0 1cqmin}
+.card.file .kan{font-size:4.2cqmin;white-space:nowrap;text-align:center;width:100%;letter-spacing:0}
 .card input[type=file]{position:absolute;inset:0;width:100%;height:100%;opacity:0;cursor:pointer;font-size:0}
 .preview{flex:1;border-radius:4cqmin;background:rgba(255,255,255,.88);border:.8cqmin dashed #8fb4e8;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:1.2cqmin;padding:2cqmin;min-width:0;overflow:hidden}
 .preview img{max-width:100%;max-height:38cqmin;object-fit:contain;border-radius:1.6cqmin;border:.6cqmin solid #fff;box-shadow:0 .8cqmin 0 rgba(20,40,100,.25);background:#fff}
@@ -173,10 +175,11 @@ body:not([data-state=boot]) #home{display:flex}
 /* ---------- Play ---------- */
 #play{pointer-events:none}
 #play>*{pointer-events:auto}
-#maptag{position:absolute;top:2cqmin;left:50%;transform:translateX(-50%);display:flex;align-items:baseline;gap:2cqmin;background:rgba(255,255,255,.88);border-radius:6cqmin;padding:.8cqmin 5cqmin;border:.5cqmin solid #fff;box-shadow:0 .6cqmin 0 rgba(20,40,100,.25);white-space:nowrap;pointer-events:none}
-#maptag b{font-size:6.4cqmin;color:#12327a;font-weight:900}#maptag small{font-size:3cqmin;color:#4a6aa8}
-#notice{position:absolute;top:15cqmin;left:50%;transform:translateX(-50%);display:none;font-size:5.4cqmin;background:#fff5d6;color:#7a3b00;border:.7cqmin solid #ffb703;border-radius:6cqmin;padding:1.4cqmin 6cqmin;white-space:nowrap;pointer-events:none}
-#notice.on{display:block;animation:pop .35s ease-out}
+#maptag{position:absolute;top:2cqmin;left:max(2cqmin,env(safe-area-inset-left));display:flex;align-items:baseline;gap:1.4cqmin;background:rgba(255,255,255,.88);border-radius:4cqmin;padding:.5cqmin 3cqmin;border:.4cqmin solid #fff;box-shadow:0 .5cqmin 0 rgba(20,40,100,.25);white-space:nowrap;pointer-events:none;transition:opacity .4s}
+#maptag b{font-size:4.4cqmin;color:#12327a;font-weight:900}#maptag small{font-size:2.4cqmin;color:#4a6aa8}
+body.camtop #maptag{opacity:0} /* 真上のときは地図の上はしと戦車をかくさない */
+#notice{position:absolute;top:10.5cqmin;left:max(2cqmin,env(safe-area-inset-left));display:none;font-size:3.6cqmin;background:#fff5d6;color:#7a3b00;border:.5cqmin solid #ffb703;border-radius:4cqmin;padding:.7cqmin 3cqmin;white-space:nowrap;pointer-events:none}
+#notice.on{display:block;animation:pop2 .35s ease-out}
 .ctl{display:flex;flex-direction:column;align-items:center;justify-content:center;gap:.2cqmin;color:#12327a}
 #dpad{position:absolute;left:max(3cqmin,env(safe-area-inset-left));bottom:3cqmin;display:grid;grid-template-columns:repeat(3,15cqmin);grid-template-rows:repeat(3,15cqmin);gap:1cqmin;pointer-events:none}
 #dpad .ctl{pointer-events:auto;border-radius:3.4cqmin;background:rgba(255,255,255,.86);border:.6cqmin solid #fff;box-shadow:0 .9cqmin 0 rgba(20,40,100,.35)}
@@ -189,14 +192,18 @@ body:not([data-state=boot]) #home{display:flex}
 #fire svg{width:16cqmin;height:16cqmin}
 #fire span{font-size:5.6cqmin;line-height:1;text-shadow:0 .3cqmin 0 rgba(100,20,0,.6)}
 #fire.down{background:radial-gradient(circle at 35% 30%,#ffc09a,#ff6b3d 70%)}
-#cam{position:absolute;right:max(3cqmin,env(safe-area-inset-right));top:23cqmin;width:17cqmin;height:19cqmin;border-radius:4cqmin;background:rgba(255,255,255,.9);border:.6cqmin solid #fff;box-shadow:0 .9cqmin 0 rgba(20,40,100,.35);display:flex;flex-direction:column;align-items:center;justify-content:center;gap:.6cqmin;color:#12327a}
-#cam i{display:block;width:10.6cqmin;height:10.6cqmin}
+#cam{position:absolute;right:max(3cqmin,env(safe-area-inset-right));top:23cqmin;width:30cqmin;height:20cqmin;border-radius:4cqmin;background:rgba(255,255,255,.92);border:.6cqmin solid #fff;box-shadow:0 .9cqmin 0 rgba(20,40,100,.35);display:flex;flex-direction:column;align-items:center;justify-content:center;gap:.4cqmin;color:#12327a}
+#cam .camrow{display:flex;align-items:center;justify-content:center;gap:1cqmin}
+#cam i{display:block;width:10.6cqmin;height:10.6cqmin;flex:none}
 #cam i svg{width:100%;height:100%}
-#cam span{font-size:4.2cqmin;line-height:1;font-weight:900}
+#cam i.next{width:8cqmin;height:8cqmin;opacity:.8;border:.45cqmin dashed #8fb4e8;border-radius:2cqmin;padding:.3cqmin}
+#cam .arr{display:block;width:0;height:0;border-top:2cqmin solid transparent;border-bottom:2cqmin solid transparent;border-left:3cqmin solid #ff9f1c;flex:none}
+#cam span#cam-label{font-size:4.2cqmin;line-height:1;font-weight:900}
 #boom{position:absolute;left:50%;top:30%;z-index:60;pointer-events:none;display:none;font-size:20cqmin;font-weight:900;color:#ffd23f;white-space:nowrap;--e:.5cqmin;
   text-shadow:calc(var(--e)*-1) 0 #7a1c00,var(--e) 0 #7a1c00,0 calc(var(--e)*-1) #7a1c00,0 var(--e) #7a1c00,calc(var(--e)*2) calc(var(--e)*2) #7a1c00,calc(var(--e)*-2) calc(var(--e)*-2) #7a1c00,calc(var(--e)*-2) calc(var(--e)*2) #7a1c00,calc(var(--e)*2) calc(var(--e)*-2) #7a1c00,0 1.6cqmin 0 #7a1c00,0 0 3cqmin #ff6a00}
 #boom.on{display:block;animation:boom .75s ease-out forwards}
 @keyframes boom{0%{transform:translate(-50%,-50%) scale(.3) rotate(-14deg);opacity:0}18%{transform:translate(-50%,-50%) scale(1.25) rotate(-6deg);opacity:1}70%{transform:translate(-50%,-50%) scale(1) rotate(-6deg);opacity:1}100%{transform:translate(-50%,-60%) scale(1.05) rotate(-6deg);opacity:0}}
+@keyframes pop2{0%{transform:scale(.6);transform-origin:left top}100%{transform:scale(1);transform-origin:left top}}
 @keyframes pop{0%{transform:translateX(-50%) scale(.6)}100%{transform:translateX(-50%) scale(1)}}
 
 /* ---------- Ending ---------- */

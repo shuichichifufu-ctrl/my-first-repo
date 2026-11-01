@@ -76,8 +76,16 @@ async function solo(browser) {
   const b64 = await makePng(page);
   await page.setInputFiles('.card.file input', { name: 'nurie.png', mimeType: 'image/png', buffer: Buffer.from(b64, 'base64') });
   await sleep(1200); await page.screenshot({ path: SH + '04preview.png' });
-  await nav(page, 'しゅっぱつ！'); await sleep(1500);
-  ok('ひとり: プレイへ', await state(page) === 'play'); await page.screenshot({ path: SH + '05play.png' });
+  await nav(page, 'しゅっぱつ！'); await sleep(300);
+  ok('ひとり: プレイへ', await state(page) === 'play');
+  // 開始演出：まず真上（2秒）→ 斜め後ろへ寄る。途中の画面と、寄り終わった画面を撮る
+  const introT = async () => page.evaluate(() => World._debug().intro);
+  ok('ひとり: 開始演出が始まっている', (await introT()) >= 0, await introT());
+  await page.screenshot({ path: SH + '05a_intro_start.png' });
+  await waitFor(async () => (await introT()) >= 2.7 || (await introT()) < 0, 40000); await page.screenshot({ path: SH + '05b_intro_mid.png' });
+  const gotChase = await waitFor(async () => (await introT()) < 0, 40000); await sleep(600);
+  ok('ひとり: 開始演出が終わり斜め後ろの視点', gotChase && await page.evaluate(() => World._debug().cam === 1), await page.evaluate(() => World._debug().blend));
+  await page.screenshot({ path: SH + '05play.png' });
   const map = await page.evaluate(() => { const m = MapGen.fromCanvas(window.__testCanvas); return { w: m.w, h: m.h, heights: Array.from(m.heights), treasure: m.treasure, start: m.starts[0] }; });
   const m0 = await me(page);
   ok('ひとり: スタート位置が地図データと一致', m0 && m0.cx === map.start.x && m0.cz === map.start.z, { me: m0, start: map.start });
@@ -89,7 +97,7 @@ async function solo(browser) {
   await page.evaluate(() => World.setCamera(1)); await sleep(800);
   await page.evaluate(() => World.press('fire', true)); await sleep(150); await page.evaluate(() => World.press('fire', false));
   await sleep(450); await page.screenshot({ path: SH + '06fire.png' });
-  await sleep(500); await page.screenshot({ path: SH + '07boom.png' });
+  await waitFor(async () => (await page.evaluate((x) => World._debug(x, 12).h, stage.x)) === 0, 20000); await sleep(150); await page.screenshot({ path: SH + '07boom.png' });
   const hh = await page.evaluate((x) => [World._debug(x, 12).h, World._debug(x, 13).h, World._debug(x, 14).h], stage.x);
   ok('ひとり: 2マス先と3マス先だけ高さ0に', hh[0] === 0 && hh[1] === 0, hh);
   map.heights[12 * map.w + stage.x] = 0; map.heights[13 * map.w + stage.x] = 0;
@@ -145,15 +153,25 @@ async function online(browser) {
   ok('つうしん: 相手の位置が届く', last && Math.abs(last.x - am2.x) < 0.05 && Math.abs(last.z - am2.z) < 0.05, { last, host: am2 });
   ok('つうしん: 相手の戦車の表示が追いつく（遅い検査環境では参考）', after && Math.abs(after.x - am2.x) < 0.3, { before, after });
   // ホストが撃つ → ゲストの地形も同じく壊れる
-  await A.page.evaluate(() => World.press('fire', true)); await sleep(100); await A.page.evaluate(() => World.press('fire', false)); await sleep(2000);
   const m = await me(A.page); const tx = m.cx + DX[m.dir] * 2, tz = m.cz + DZ[m.dir] * 2;
+  const hb0 = await B.page.evaluate(([x, z]) => World._debug(x, z).h, [tx, tz]);
+  await A.page.evaluate(() => World.press('fire', true)); await sleep(100); await A.page.evaluate(() => World.press('fire', false));
+  // 相手(B)の画面にも弾が飛ぶ：発射のあと、壊れる前に弾が見えるはず（遅い環境では参考）
+  const sawBall = await waitFor(async () => (await B.page.evaluate(() => World._debug().projectiles)) > 0, 6000);
+  await B.page.screenshot({ path: SH + '26guest_ball.png' });
+  await waitFor(async () => (await A.page.evaluate(([x, z]) => World._debug(x, z).h, [tx, tz])) === 0 && (await B.page.evaluate(([x, z]) => World._debug(x, z).h, [tx, tz])) === 0, 25000);
+  ok('つうしん: 相手の弾が自分の画面で飛ぶ', sawBall, { sawBall, hb0 });
   const ha = await A.page.evaluate(([x, z]) => World._debug(x, z).h, [tx, tz]); const hb = await B.page.evaluate(([x, z]) => World._debug(x, z).h, [tx, tz]);
   ok('つうしん: 破壊が両方で一致', ha === 0 && hb === 0, { ha, hb, tx, tz });
   await A.page.screenshot({ path: SH + '23host_play.png' }); await B.page.screenshot({ path: SH + '24guest_play.png' });
   // ゲストを閉じる → ホストに表示
   await B.context.close(); await sleep(2500); await A.page.screenshot({ path: SH + '25host_after_leave.png' });
+  await sleep(8000); // 7秒たっても消えない
   let seen = false; for (let i = 0; i < 20 && !seen; i++) { seen = await A.page.evaluate(() => document.getElementById('notice').classList.contains('on') && /いなくなった/.test(document.getElementById('notice').textContent)); if (!seen) await sleep(500); }
   ok('つうしん: 相手が抜けた表示（12秒以内）', seen && (await state(A.page)) === 'play');
+  const still = await A.page.evaluate(() => document.getElementById('notice').classList.contains('on'));
+  await A.page.screenshot({ path: SH + '25b_host_leave_8s_later.png' });
+  ok('つうしん: 抜けた表示は8秒すぎても出つづける', still);
   ok('つうしん: コンソールエラー0', A.errors.length === 0 && B.errors.length === 0, [...A.errors, ...B.errors].slice(0, 5));
 }
 

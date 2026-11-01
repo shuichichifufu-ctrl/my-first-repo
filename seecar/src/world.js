@@ -4,12 +4,17 @@
   'use strict';
 
   var STEP_H = 0.5;
+  // 見た目の高さ：高さ0と1は「紙に塗った色」（平ら）、2〜10が積み木。壁（10）は 5.0 の高さ。
+  var VSTEP = 5 / 9;
+  function vis(h) { return h <= 1 ? 0 : (h - 1) * VSTEP; }
   var DX = [0, 1, 0, -1];
   var DZ = [-1, 0, 1, 0];
   var MOVE_DUR = 0.22, TURN_DUR = 0.2, BUMP_DUR = 0.28;
   var FIRE_CD = 0.8, BALL_DUR = 0.6;
   var CAM_BLEND = 0.9;
+  var INTRO_HOLD = 2.0, INTRO_MOVE = 1.8; // 開始演出：真上から2秒見せて、斜め後ろへ寄せる
   var DEBRIS_MAX = 900, PUFF_MAX = 48;
+  var GEM_R = 0.55, GEM_Y = 1.15; // 宝石の大きさと高さ（遠くからでも目立つように大きく）
 
   // ---------- 小さな道具 ----------
   function sfx(name) { try { if (window.Sfx && window.Sfx.play) window.Sfx.play(name); } catch (e) { /* 音が無くても続ける */ } }
@@ -268,14 +273,14 @@
     level: null, // 地図ごとに作った物
     myIndex: 0, players: [], net: false,
     me: null, remotes: {}, held: {}, tapQ: {},
-    camMode: 1, camBlendT: 1, camFrom: null, chaseLift: 0,
+    camMode: 1, camBlendT: 1, camFrom: null, chaseLift: 0, intro: null, topFlag: null,
     shake: 0, stateAcc: 0, found: false, treasure: null,
     projectiles: [], fx: null
   };
-  var handlers = { found: [], boom: [], state: [] };
-  function emit(ev, a) {
+  var handlers = { found: [], boom: [], state: [], fire: [], cam: [] };
+  function emit(ev, a, b) {
     var list = handlers[ev]; if (!list) return;
-    list.slice().forEach(function (fn) { try { fn(a); } catch (e) { console.warn('World handler error', e); } });
+    list.slice().forEach(function (fn) { try { fn(a, b); } catch (e) { console.warn('World handler error', e); } });
   }
 
   // ---------- 初期化 ----------
@@ -305,15 +310,15 @@
     S.camera.position.set(0, 10, 10);
 
     // 明かり：やわらかい環境光＋左上からの日ざし
-    sc.add(new THREE.HemisphereLight(0xf4f8ff, 0xd9c7a8, 0.68));
-    var sun = new THREE.DirectionalLight(0xfff4e0, 0.52);
+    sc.add(new THREE.HemisphereLight(0xffffff, 0xf0f0f2, 0.72)); // 色をつけない（壁は黒く、紙は白く見せる）
+    var sun = new THREE.DirectionalLight(0xffffff, 0.5);
     sun.position.set(-0.55, 1, -0.4);
     sc.add(sun);
     // 爆発の光（いつも置いておき、明るさだけ変える）
     S.boomLight = new THREE.PointLight(0xffb040, 0, 9, 2);
     sc.add(S.boomLight);
     // 宝の光
-    S.gemLight = new THREE.PointLight(0xff5fc0, 0, 3.2, 2);
+    S.gemLight = new THREE.PointLight(0xff5fc0, 0, 7, 2);
     sc.add(S.gemLight);
 
     S.camFrom = { p: new THREE.Vector3(), q: new THREE.Quaternion() };
@@ -500,7 +505,7 @@
   function idx(x, z) { return z * S.w + x; }
   function inMap(x, z) { return x >= 0 && z >= 0 && x < S.w && z < S.h; }
   function hAt(x, z) { return inMap(x, z) ? S.heights[idx(x, z)] : 0; }
-  function groundTopAt(wx, wz) { var x = Math.floor(wx), z = Math.floor(wz); return inMap(x, z) ? S.heights[idx(x, z)] * STEP_H : 0; }
+  function groundTopAt(wx, wz) { var x = Math.floor(wx), z = Math.floor(wz); return inMap(x, z) ? vis(S.heights[idx(x, z)]) : 0; }
   function cellColor(i, out) { return out.setRGB(S.colors[i * 3] / 255, S.colors[i * 3 + 1] / 255, S.colors[i * 3 + 2] / 255); }
 
   function clearLevel() {
@@ -541,7 +546,7 @@
       tank: tk, cx: st.x, cz: st.z, dir: st.dir || 0,
       move: null, turn: null, bump: null, bumpCd: 0, fireCd: 0, fireAnim: 0
     };
-    tk.x = st.x; tk.z = st.z; tk.y = hAt(st.x, st.z) * STEP_H; tk.heading = dirToHeading(S.me.dir);
+    tk.x = st.x; tk.z = st.z; tk.y = vis(hAt(st.x, st.z)); tk.heading = dirToHeading(S.me.dir);
     // 相手の戦車（通信のときは最初からスタート位置に置く）
     if (S.net) {
       for (var p = 0; p < S.players.length; p++) {
@@ -554,21 +559,23 @@
     S.camBlendT = 1; S.chaseLift = 0;
     var far = overheadHeight() * 1.6 + 60;
     S.camera.far = far; S.camera.updateProjectionMatrix();
-    var pose = poseFor(S.camMode);
+    // 開始演出：まず真上から地図全体と宝を見せる（updateCamera が、のち斜め後ろへ寄せる）
+    S.camMode = 1; S.intro = { t: 0 }; S.topFlag = null; // 開始演出のあと斜め後ろ（1）へ
+    var pose = poseFor(2);
     S.camera.position.copy(pose.p); S.camera.quaternion.copy(pose.q);
     if (!S.running) render();
   }
 
   function buildTerrain(L, add) {
     var w = S.w, h = S.h, n = 0, i;
-    for (i = 0; i < w * h; i++) if (S.heights[i] > 0) n++;
+    for (i = 0; i < w * h; i++) if (S.heights[i] > 1) n++; // 高さ0・1は紙の色（床に塗る）
     var geo = new THREE.BoxGeometry(1, 1, 1);
     geo.translate(0, 0.5, 0);
     // 側面を少し暗く（上の面=明るい、側面=やや暗い、底=暗い）
     var pos = geo.attributes.position, nor = geo.attributes.normal, cols = new Float32Array(pos.count * 3);
     for (i = 0; i < pos.count; i++) {
       var ny = nor.getY(i), nx = nor.getX(i), v;
-      if (ny > 0.5) v = 1; else if (ny < -0.5) v = 0.5; else v = nx !== 0 ? 0.74 : 0.82;
+      if (ny > 0.5) v = 1; else if (ny < -0.5) v = 0.5; else v = nx !== 0 ? 0.86 : 0.93;
       cols[i * 3] = cols[i * 3 + 1] = cols[i * 3 + 2] = v;
     }
     geo.setAttribute('color', new THREE.BufferAttribute(cols, 3));
@@ -579,12 +586,13 @@
     var m = new THREE.Matrix4(), c = new THREE.Color(), k = 0;
     for (var z = 0; z < h; z++) for (var x = 0; x < w; x++) {
       i = z * w + x; var hh = S.heights[i];
-      if (hh <= 0) continue;
-      m.makeScale(1, hh * STEP_H, 1); m.setPosition(x + 0.5, 0, z + 0.5);
+      if (hh <= 1) continue;
+      m.makeScale(1, vis(hh), 1); m.setPosition(x + 0.5, 0, z + 0.5);
       mesh.setMatrixAt(k, m);
       cellColor(i, c);
-      // 真っ黒だと形が見えないので少しだけ持ち上げる（黒い壁は黒いまま）
-      c.r = 0.07 + c.r * 0.93; c.g = 0.07 + c.g * 0.93; c.b = 0.08 + c.b * 0.92;
+      // 高い段（濃い色）ほど黒に近づける。壁（10）はほぼ真っ黒（上の面だけ少し明るく見える）
+      var wl = clamp((hh - 5) / 4, 0, 1);
+      c.r += (0.12 - c.r) * wl; c.g += (0.12 - c.g) * wl; c.b += (0.125 - c.b) * wl;
       mesh.setColorAt(k, c);
       cellToInst[i] = k++;
     }
@@ -630,12 +638,12 @@
     for (var z = 0; z < h; z++) for (var x = 0; x < w; x++) {
       var i = z * w + x, hh = S.heights[i], r, g, b;
       if (S.destroyed[i]) { r = 236; g = 230; b = 218; }
-      else if (hh > 1) { r = 70; g = 66; b = 62; } // 積み木の下：にじんで足元の影になる
+      else if (hh > 1) { r = 40; g = 40; b = 42; } // 積み木の下：にじんで足元の影になる
       else { r = S.colors[i * 3]; g = S.colors[i * 3 + 1]; b = S.colors[i * 3 + 2]; }
       // 柔らかい影：左上（北西）の高い物が、右下へ影を落とす
       var sh = 1;
       for (var k = 1; k <= 4; k++) {
-        var hx = hAt(x - k, z - k) * STEP_H - hh * STEP_H;
+        var hx = vis(hAt(x - k, z - k)) - vis(hh);
         if (hx > k * 0.75) { sh = Math.min(sh, 0.7 + k * 0.04); break; }
       }
       // まわりが高いとほんのり暗く（すみっこの影）
@@ -661,32 +669,32 @@
   function buildTreasure(L, add) {
     var t = S.map.treasure; if (!t) return;
     var g = new THREE.Group();
-    g.position.set(t.x + 0.5, hAt(t.x, t.z) * STEP_H, t.z + 0.5);
-    var gemGeo = new THREE.OctahedronGeometry(0.28, 0);
-    var gemMat = new THREE.MeshStandardMaterial({ color: 0xff4fb0, emissive: 0xb01070, emissiveIntensity: 0.65, roughness: 0.12, metalness: 0.25, flatShading: true });
-    var gem = new THREE.Mesh(gemGeo, gemMat); gem.scale.set(1, 1.35, 1); gem.position.y = 0.6;
+    g.position.set(t.x + 0.5, vis(hAt(t.x, t.z)), t.z + 0.5);
+    var gemGeo = new THREE.OctahedronGeometry(GEM_R, 0);
+    var gemMat = new THREE.MeshStandardMaterial({ color: 0xff4fb0, emissive: 0xb01070, emissiveIntensity: 0.95, roughness: 0.12, metalness: 0.25, flatShading: true });
+    var gem = new THREE.Mesh(gemGeo, gemMat); gem.scale.set(1, 1.35, 1); gem.position.y = GEM_Y;
     g.add(gem);
-    var glowMat = new THREE.SpriteMaterial({ map: T.soft, color: 0xff6cc4, transparent: true, depthWrite: false, blending: THREE.AdditiveBlending, opacity: 0.6 });
-    var glow = new THREE.Sprite(glowMat); glow.scale.set(1.6, 1.6, 1); glow.position.y = 0.6; g.add(glow);
+    var glowMat = new THREE.SpriteMaterial({ map: T.soft, color: 0xff6cc4, transparent: true, depthWrite: false, blending: THREE.AdditiveBlending, opacity: 0.8 });
+    var glow = new THREE.Sprite(glowMat); glow.scale.set(4, 4, 1); glow.position.y = GEM_Y; g.add(glow);
     // 光の柱
-    var bh = 60;
-    var beamGeo = new THREE.CylinderGeometry(0.42, 0.42, bh, 20, 1, true); beamGeo.translate(0, bh / 2, 0);
-    var beamMat = new THREE.MeshBasicMaterial({ map: T.beam, color: 0xff7cc8, opacity: 0.32, transparent: true, depthWrite: false, blending: THREE.AdditiveBlending, side: THREE.DoubleSide });
+    var bh = 90;
+    var beamGeo = new THREE.CylinderGeometry(1.0, 1.0, bh, 24, 1, true); beamGeo.translate(0, bh / 2, 0);
+    var beamMat = new THREE.MeshBasicMaterial({ map: T.beam, color: 0xff4fb0, opacity: 0.5, transparent: true, depthWrite: false, side: THREE.DoubleSide }); // 空が明るいので、足し算でなく ふつうの重ね（ピンクのまま見える）
     var beam = new THREE.Mesh(beamGeo, beamMat); g.add(beam);
-    var beam2Geo = new THREE.CylinderGeometry(0.16, 0.16, bh, 12, 1, true); beam2Geo.translate(0, bh / 2, 0);
-    var beam2Mat = new THREE.MeshBasicMaterial({ map: T.beam, color: 0xfff0a0, opacity: 0.45, transparent: true, depthWrite: false, blending: THREE.AdditiveBlending, side: THREE.DoubleSide });
+    var beam2Geo = new THREE.CylinderGeometry(0.3, 0.3, bh, 14, 1, true); beam2Geo.translate(0, bh / 2, 0);
+    var beam2Mat = new THREE.MeshBasicMaterial({ map: T.beam, color: 0xff8fd0, opacity: 0.7, transparent: true, depthWrite: false, side: THREE.DoubleSide });
     var beam2 = new THREE.Mesh(beam2Geo, beam2Mat); g.add(beam2);
     // きらきら
     var sparks = [];
     var starMat = new THREE.SpriteMaterial({ map: T.star, color: 0xfff6a0, transparent: true, depthWrite: false, blending: THREE.AdditiveBlending });
-    for (var i = 0; i < 6; i++) { var s = new THREE.Sprite(starMat); s.scale.setScalar(0.2); g.add(s); sparks.push(s); }
+    for (var i = 0; i < 6; i++) { var s = new THREE.Sprite(starMat); s.scale.setScalar(0.4); g.add(s); sparks.push(s); }
     // 俯瞰のための大きな目じるし（光の輪）
     var far = new THREE.Sprite(new THREE.SpriteMaterial({ map: T.star, color: 0xff3fa8, transparent: true, depthWrite: false, depthTest: false }));
     far.renderOrder = 9; far.visible = false; g.add(far);
     add(g);
     S.treasure = { group: g, gem: gem, glow: glow, sparks: sparks, far: far, beam: beam, x: t.x, z: t.z, celebrate: 0 };
-    S.gemLight.position.set(t.x + 0.5, g.position.y + 0.8, t.z + 0.5);
-    S.gemLight.intensity = 1.6;
+    S.gemLight.position.set(t.x + 0.5, g.position.y + 1.4, t.z + 0.5);
+    S.gemLight.intensity = 2.2;
     L.dispose.push(gemGeo, gemMat, glowMat, beamGeo, beamMat, beam2Geo, beam2Mat, starMat, far.material);
   }
 
@@ -695,22 +703,22 @@
     var t = S.time;
     tr.gem.rotation.y += dt * 1.6;
     var c = tr.celebrate; if (c > 0) tr.celebrate = Math.max(0, c - dt);
-    tr.gem.position.y = 0.6 + Math.sin(t * 2.4) * 0.09 + (c > 0 ? Math.sin((1.5 - c) * 6) * 0.4 + 0.3 : 0);
-    var pulse = 1.1 + Math.sin(t * 4) * 0.15 + (c > 0 ? 1.0 : 0);
+    tr.gem.position.y = GEM_Y + Math.sin(t * 2.4) * 0.14 + (c > 0 ? Math.sin((1.5 - c) * 6) * 0.5 + 0.4 : 0);
+    var pulse = 3.6 + Math.sin(t * 4) * 0.45 + (c > 0 ? 2.5 : 0);
     tr.glow.position.y = tr.gem.position.y;
     tr.glow.scale.set(pulse, pulse, 1);
-    S.gemLight.intensity = 0.7 + Math.sin(t * 4) * 0.2;
+    S.gemLight.intensity = 1.6 + Math.sin(t * 4) * 0.4;
     for (var i = 0; i < tr.sparks.length; i++) {
       var a = t * 1.3 + i / tr.sparks.length * Math.PI * 2;
-      var r = 0.55 + (c > 0 ? 0.6 : 0);
-      tr.sparks[i].position.set(Math.cos(a) * r, 0.6 + Math.sin(t * 3 + i) * 0.35, Math.sin(a) * r);
-      var ss = 0.14 + 0.1 * Math.abs(Math.sin(t * 5 + i * 1.7));
+      var r = 1.0 + (c > 0 ? 0.8 : 0);
+      tr.sparks[i].position.set(Math.cos(a) * r, GEM_Y + Math.sin(t * 3 + i) * 0.6, Math.sin(a) * r);
+      var ss = 0.3 + 0.22 * Math.abs(Math.sin(t * 5 + i * 1.7));
       tr.sparks[i].scale.set(ss, ss, 1);
     }
     // 遠くからでも見える光（カメラが高いほど大きく）
     var camH = S.camera.position.y;
-    tr.far.visible = camH > 9;
-    if (tr.far.visible) { var fs = camH * 0.06 * (1 + 0.12 * Math.sin(t * 5)); tr.far.material.rotation = Math.sin(t * 2) * 0.3; tr.far.scale.set(fs, fs, 1); tr.far.position.y = 0.8; tr.far.material.opacity = clamp((camH - 9) / 8, 0, 1); }
+    tr.far.visible = camH > 7;
+    if (tr.far.visible) { var fs = camH * 0.11 * (1 + 0.12 * Math.sin(t * 5)); tr.far.material.rotation = Math.sin(t * 2) * 0.3; tr.far.scale.set(fs, fs, 1); tr.far.position.y = 0.8; tr.far.material.opacity = clamp((camH - 7) / 6, 0, 1); }
   }
 
   // ---------- 破壊 ----------
@@ -723,12 +731,12 @@
       if (!inMap(x, z)) continue;
       var i = idx(x, z), hh = S.heights[i];
       done.push([x, z]);
-      cx += x + 0.5; cz += z + 0.5; cy = Math.max(cy, hh * STEP_H); cnt++;
+      cx += x + 0.5; cz += z + 0.5; cy = Math.max(cy, vis(hh)); cnt++;
       if (withFx) {
         cellColor(i, c);
         if (hh > 0) {
-          spawnDebris(x + 0.5, hh * STEP_H * 0.5, z + 0.5, c, Math.min(90, 26 + hh * 7), 1);
-          for (var p = 0; p < 3; p++) spawnPuff(x + 0.5 + rand(-0.4, 0.4), hh * STEP_H * rand(0.2, 0.9), z + 0.5 + rand(-0.4, 0.4), { color: 0xdedad2, vx: rand(-1, 1), vy: rand(0.8, 2), vz: rand(-1, 1), s0: 0.6, s1: 2.4, life: 1.4, a: 0.85 });
+          spawnDebris(x + 0.5, vis(hh) * 0.5, z + 0.5, c, Math.min(90, 26 + hh * 7), 1);
+          for (var p = 0; p < 3; p++) spawnPuff(x + 0.5 + rand(-0.4, 0.4), vis(hh) * rand(0.2, 0.9) + 0.1, z + 0.5 + rand(-0.4, 0.4), { color: 0xdedad2, vx: rand(-1, 1), vy: rand(0.8, 2), vz: rand(-1, 1), s0: 0.6, s1: 2.4, life: 1.4, a: 0.85 });
         } else {
           spawnDebris(x + 0.5, 0.05, z + 0.5, c.lerp(new THREE.Color(0x9a9080), 0.5), 8, 0.6);
           spawnPuff(x + 0.5, 0.3, z + 0.5, { color: 0xe8e2d6, vy: 1, s0: 0.5, s1: 1.8, life: 1 });
@@ -805,7 +813,7 @@
 
     // つぎの動き
     if (!me.move && !me.turn && !me.bump) {
-      var groundY = hAt(me.cx, me.cz) * STEP_H;
+      var groundY = vis(hAt(me.cx, me.cz));
       tk.y += (groundY - tk.y) * Math.min(1, dt * 12); // 足元が壊れたら下りる
       if (want('fwd')) { S.tapQ.fwd = false; tryMove(1); }
       else if (want('back')) { S.tapQ.back = false; tryMove(-1); }
@@ -826,7 +834,7 @@
       sfx('bump');
       return;
     }
-    me.move = { fx: me.cx, fz: me.cz, tx: tx, tz: tz, fy: tk.y, ty: hAt(tx, tz) * STEP_H, t: 0 };
+    me.move = { fx: me.cx, fz: me.cz, tx: tx, tz: tz, fy: tk.y, ty: vis(hAt(tx, tz)), t: 0 };
     // 走るときのほこり
     spawnPuff(tk.x + 0.5 - DX[me.dir] * 0.4 * sign, tk.y + 0.1, tk.z + 0.5 - DZ[me.dir] * 0.4 * sign, { color: 0xf3eee4, vy: 0.3, s0: 0.25, s1: 0.75, life: 0.6, a: 0.6 });
     sfx('move');
@@ -853,20 +861,30 @@
     tk.recoil = 1;
     var bx = Math.round(tk.x), bz = Math.round(tk.z), d = me.dir;
     var tx = bx + DX[d] * 2, tz = bz + DZ[d] * 2;
-    var cells = [[tx, tz], [tx + DX[d], tz + DZ[d]]];
-    // 発射口の位置
+    var all = [[tx, tz], [tx + DX[d], tz + DZ[d]]];
+    var cells = all.filter(function (c) { return inMap(c[0], c[1]); });
+    shootBall(tk.x, tk.z, tk.y, d, all, false);
+    sfx('fire');
+    // 発射のしらせ（通信のときは、これを相手へ1回だけ送る）
+    emit('fire', { cells: cells, from: { x: Math.round(tk.x * 100) / 100, z: Math.round(tk.z * 100) / 100, dir: d } });
+  }
+  // 弾を飛ばす。px,pz は撃つ戦車の位置（マス単位の小数）、cells の先頭が着弾のマス。
+  function shootBall(px, pz, py, d, cells, remote) {
+    if (!cells || !cells.length) return;
     var fwdx = DX[d], fwdz = DZ[d];
-    var from = new THREE.Vector3(tk.x + 0.5 + fwdx * 0.5, tk.y + 0.55, tk.z + 0.5 + fwdz * 0.5);
+    var bx = Math.round(px), bz = Math.round(pz);
+    var tx = cells[0][0], tz = cells[0][1];
+    var from = new THREE.Vector3(px + 0.5 + fwdx * 0.5, py + 0.55, pz + 0.5 + fwdz * 0.5);
     var to = new THREE.Vector3(tx + 0.5, groundTopAt(tx + 0.5, tz + 0.5), tz + 0.5);
-    var mid = Math.max(hAt(bx + fwdx, bz + fwdz), hAt(tx, tz)) * STEP_H;
+    var mid = vis(Math.max(hAt(bx + fwdx, bz + fwdz), hAt(tx, tz)));
     var apex = Math.max(from.y, to.y, mid) + 1.3;
     var ball = S.fx.balls.find(function (b) { return !b.visible; }) || S.fx.balls[0];
     ball.visible = true; ball.position.copy(from);
-    S.projectiles.push({ ball: ball, from: from, to: to, arc: apex - (from.y + to.y) / 2, t: 0, cells: cells, trail: 0 });
+    S.projectiles.push({ ball: ball, from: from, to: to, arc: apex - (from.y + to.y) / 2, t: 0, cells: cells, trail: 0, remote: !!remote });
     // 発射のけむり
     spawnPuff(from.x, from.y, from.z, { color: 0xffffff, vx: fwdx * 1.5, vy: 0.6, vz: fwdz * 1.5, s0: 0.3, s1: 1.1, life: 0.6, a: 0.9 });
     spawnPuff(from.x, from.y, from.z, { color: 0xffe08a, vx: fwdx * 0.5, vy: 0.2, vz: fwdz * 0.5, s0: 0.35, s1: 0.6, life: 0.18, a: 1 });
-    sfx('fire');
+    if (remote) sfx('fire');
   }
 
   function updateProjectiles(dt) {
@@ -882,7 +900,7 @@
         pr.ball.visible = false;
         S.projectiles.splice(i, 1);
         var done = destroyCells(pr.cells, true);
-        emit('boom', done);
+        emit('boom', done, pr.remote);
       }
     }
   }
@@ -905,7 +923,7 @@
       r.anim = st.anim || 'idle';
       if (snap || Math.hypot(r.tank.x - r.tx, r.tank.z - r.tz) > 3) {
         r.tank.x = r.tx; r.tank.z = r.tz; r.tank.heading = dirToHeading(r.tdir);
-        r.tank.y = hAt(Math.round(r.tx), Math.round(r.tz)) * STEP_H;
+        r.tank.y = vis(hAt(Math.round(r.tx), Math.round(r.tz)));
       }
     }
     return r;
@@ -917,7 +935,7 @@
       var ox = tk.x, oz = tk.z;
       tk.x += (r.tx - tk.x) * k; tk.z += (r.tz - tk.z) * k;
       tk.heading = angLerp(tk.heading, dirToHeading(r.tdir), 1 - Math.exp(-dt * 14));
-      var gy = hAt(Math.round(tk.x), Math.round(tk.z)) * STEP_H;
+      var gy = vis(hAt(Math.round(tk.x), Math.round(tk.z)));
       tk.y += (gy - tk.y) * Math.min(1, dt * 10);
       tk.moving = r.anim === 'move' || Math.hypot(tk.x - ox, tk.z - oz) > dt * 0.5;
     }
@@ -941,8 +959,9 @@
       tg.set(px + fx * 5, py + 0.2, pz + fz * 5);
       poseM.lookAt(p, tg, UP);
     } else if (mode === 1) {
-      p.set(px - fx * 3.3, py + 3.5 + S.chaseLift, pz - fz * 3.3);
-      tg.set(px + fx * 1.7, py + 0.2, pz + fz * 1.7);
+      // 少し平らに見下ろす：前の遠くの宝の光の柱が、壁の上に見える
+      p.set(px - fx * 3.8, py + 3.0 + S.chaseLift, pz - fz * 3.8);
+      tg.set(px + fx * 5.5, py + 0.7, pz + fz * 5.5);
       poseM.lookAt(p, tg, UP);
     } else {
       var hh = overheadHeight();
@@ -957,10 +976,10 @@
   function chaseLiftTarget() {
     var tk = S.me ? S.me.tank : null; if (!tk) return 0;
     var fx = -Math.sin(tk.heading), fz = -Math.cos(tk.heading), lift = 0;
-    for (var s = 0.6; s <= 3.2; s += 0.4) {
+    for (var s = 0.6; s <= 3.8; s += 0.4) {
       var wx = tk.x + 0.5 - fx * s, wz = tk.z + 0.5 - fz * s;
       var top = groundTopAt(wx, wz);
-      var lineY = tk.y + 0.4 + 3.3 * (s / 3.3);
+      var lineY = tk.y + 0.4 + 2.6 * (s / 3.8);
       if (top + 0.4 > lineY) lift = Math.max(lift, top + 0.4 - lineY + 0.6);
     }
     return Math.min(lift, 6);
@@ -969,6 +988,7 @@
     mode = ((mode | 0) % 3 + 3) % 3;
     if (!S.camera || !S.camFrom) { S.camMode = mode; return; }
     if (mode === S.camMode) return;
+    S.intro = null; // 自分で視点を変えたら、開始演出は終わり
     S.camFrom.p.copy(S.camera.position).sub(S.shakeOff || tmpV.set(0, 0, 0));
     S.camFrom.q.copy(S.camera.quaternion);
     S.camMode = mode; S.camBlendT = 0;
@@ -979,7 +999,18 @@
     if (!S.camera) return;
     S.chaseLift += (chaseLiftTarget() - S.chaseLift) * (1 - Math.exp(-dt * 5));
     var target = poseFor(S.camMode);
-    if (S.camBlendT < 1) {
+    var top = S.camMode === 2 || !!(S.intro && S.intro.t < INTRO_HOLD + 0.5);
+    if (top !== S.topFlag) { S.topFlag = top; emit('cam', top); }
+    if (S.intro) {
+      if (!S.paused) S.intro.t += dt;
+      if (S.intro.t >= INTRO_HOLD + INTRO_MOVE) S.intro = null;
+    }
+    if (S.intro) {
+      var ov = poseFor(2), ie = ease(clamp((S.intro.t - INTRO_HOLD) / INTRO_MOVE, 0, 1));
+      S.camera.position.lerpVectors(ov.p, target.p, ie);
+      S.camera.position.y += Math.sin(ie * Math.PI) * 1.5;
+      THREE.Quaternion.slerp(ov.q, target.q, S.camera.quaternion, ie);
+    } else if (S.camBlendT < 1) {
       S.camBlendT = Math.min(1, S.camBlendT + dt / CAM_BLEND);
       var e = ease(S.camBlendT);
       S.camera.position.lerpVectors(S.camFrom.p, target.p, e);
@@ -1102,9 +1133,16 @@
       if (!S.level || !st || i === S.myIndex) return;
       ensureRemote(i, st, false);
     },
-    applyRemoteBoom: function (cells) {
+    // cells: 壊れるマス。from（任意）: 撃った戦車の {x,z,dir}。あれば弾を山なりに飛ばしてから壊す。
+    applyRemoteBoom: function (cells, from) {
       if (!S.level || !cells || !cells.length) return;
-      destroyCells(cells, true); // 再現のときは boom を発火しない
+      if (from && isFinite(from.x) && isFinite(from.z)) {
+        var d = ((from.dir | 0) % 4 + 4) % 4;
+        shootBall(+from.x, +from.z, vis(hAt(Math.round(from.x), Math.round(from.z))), d, cells.map(function (c) { return [c[0] | 0, c[1] | 0]; }), true);
+        return;
+      }
+      var done = destroyCells(cells, true);
+      emit('boom', done, true); // 弾なしで壊すとき（遠隔）。通信には送らない
     },
     remoteFound: function (i) {
       if (S.treasure) S.treasure.celebrate = 1.5;
@@ -1114,7 +1152,7 @@
     _debug: function (qx, qz) {
       var me = S.me;
       return {
-        cam: S.camMode, blend: S.camBlendT, paused: S.paused, running: S.running,
+        cam: S.camMode, blend: S.camBlendT, intro: S.intro ? S.intro.t : -1, paused: S.paused, running: S.running,
         me: me ? { cx: me.cx, cz: me.cz, dir: me.dir, x: me.tank.x, z: me.tank.z, y: me.tank.y } : null,
         debris: S.fx ? S.fx.parts.length : 0, projectiles: S.projectiles.length,
         remotes: Object.keys(S.remotes).map(function (k) { var r = S.remotes[k]; return { i: +k, x: r.tank.x, z: r.tank.z }; }),

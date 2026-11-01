@@ -50,8 +50,8 @@ CDN（この2つだけ。変えない）:
 - `MapGen.fromCanvas(canvas, title, reading)` → MapData（同期。上の2つの共通処理）。
 - `MapGen.encode(map)` → JSONで送れる形（配列はbase64文字列）。`MapGen.decode(obj)` → MapData。
 - 高さ：輝度 L（0..1、`0.299R+0.587G+0.114B`）から `h = round((1-L)*10)`。透明画素は白扱い。
-- 宝：高さ9以上を壁とみなし、壁でないマスを4近傍でつないだ領域のうち、地図の端に触れない領域を「囲まれた領域」とする。そのうち画像画素で4画素（＝16マス）未満は除外し、最小の領域を選ぶ。宝はその領域の重心に最も近い、領域内のマス。候補が無ければ、スタートから最も遠い到達可能マス。
-- スタート：地図の端に触れる最大の非壁領域の中で、高さ0のマスを2つ（互いに離す）。
+- 宝：高さ10（真っ黒）だけを壁とみなし、壁でないマスを4近傍でつないだ領域のうち、地図の端に触れない領域を「囲まれた領域」とする。そのうち画像画素で4画素（＝16マス）未満は除外し、最小の領域を選ぶ。宝はその領域の重心に最も近い、領域内のマス。候補が無ければ、スタートから最も遠い到達可能マス。
+- スタート：地図の端に触れる最大の非壁領域の中で、高さ0のマスを2つ（互いに離す）。**地図のふちから6マス以上内側**（置けなければ順に縮める）で、前に7マス以上進める向きがあり、宝へ向ける所。dir は宝の方向を向く（開けている向き優先）。 *(v2で追記)*
 
 ## window.World
 ```js
@@ -62,15 +62,17 @@ World.setPaused(bool); World.isPaused  // true の間は更新を止める（描
 World.press(action, isDown)      // action: 'fwd'|'back'|'left'|'right'|'fire'
 World.setCamera(mode)            // 0=1人称、1=斜め後ろ、2=俯瞰。滑らかに補間
 World.cycleCamera() → 新しいmode
-World.on(event, fn)              // 'found'(idx) / 'boom'(cells) / 'state'(stateObj, 約10回/秒)
+World.on(event, fn)              // 'found'(idx) / 'boom'(cells, remote) 着弾時 / 'state'(stateObj, 約10回/秒) / 'fire'({cells,from:{x,z,dir}}) 自分が撃った瞬間 / 'cam'(isTop) 俯瞰・開始演出の真上のあいだ true  *(v2：fire, cam を追加)*
 World.applyRemoteState(idx, stateObj)
-World.applyRemoteBoom(cells)     // cells: [[x,z],...] 高さを0にし、破片演出も出す
+World.applyRemoteBoom(cells, from) // cells: [[x,z],...]。from（任意）={x,z,dir}（撃った戦車）があれば弾を山なりに飛ばしてから高さを0にし破片演出も出す。無ければすぐ壊す *(v2：from を追加)*
 World.remoteFound(idx)
 ```
 - stateObj：`{x, z, dir, color, anim}`（x,z はマス単位の小数、anim は 'idle'|'move'|'turn'|'fire'）。相手側は補間して表示。
 - 移動はマス単位：まえ/うしろを押すと1マス分を約0.22秒で滑らかに移動。押し続けると連続。行き先との高さの差が1段以内なら進め、段差は滑らかに上下。ひだり/みぎは90度回転（約0.2秒）。ジャンプ無し。
 - 大砲：0.8秒の間隔制限。黒い玉が放物線でdir方向2マス先の中心へ約0.6秒で飛ぶ。着弾で2マス先と3マス先（範囲内のみ）の高さを0にし、そのマスの色の破片を飛ばし、画面を少し揺らし、`boom` を発火。弾は戦車に当たらない。
 - 宝：光る宝石（回転・上下）と、上空から見える光の柱。自分の戦車が宝のマスに入ったら `found`。
+- 開始演出 *(v2)*：`World.load` のあと、まず真上（俯瞰）から地図全体と宝を約2秒見せ、そのあと約1.8秒で斜め後ろ（mode 1）へ滑らかに寄せる。操作はその間も受け付ける。`setCamera` で別の視点にしたら演出は終わる。
+- 見た目の高さ *(v2)*：高さ0と1は床に塗った色（平ら）、2〜10が積み木。壁（10）は 5.0 の高さ。高い段ほど黒く、壁はほぼ真っ黒。
 - 俯瞰カメラ：仕様は高さ20だが、地図全体が入らない場合は全体が入る高さまで上げる（全体と宝を把握するという仕様の目的を優先）。
 - 描画量：地形の箱は InstancedMesh 1つ（色はインスタンスカラー）。高さ0の床も色付きで見せる。
 - 効果音は `window.Sfx && Sfx.play(name)`（name: 'move','turn','fire','boom','found','tap','bump'）。
@@ -86,11 +88,13 @@ Net.isHost; Net.connected
 - PeerのIDは `'seecar-hoshi-' + code`。
 - URLの `?peerhost=&peerport=&peerpath=&peersecure=0` があればその中継サーバーを使う（検査用）。無ければPeerJSの公開サーバー。
 - 'error' には子ども向けの文（例：「つながらなかったよ。ばんごうを たしかめてね」）を渡す。
-- メッセージ：`{t:'hello',color}`、`{t:'map',map:encoded}`、`{t:'st',s:stateObj}`、`{t:'boom',cells}`、`{t:'found',idx}`、`{t:'bye'}`。地図は接続後に1回だけホストが送る。
+- メッセージ：`{t:'hello',color}`、`{t:'map',map:encoded}`、`{t:'st',s:stateObj}`、`{t:'boom',cells,from:{x,z,dir}}`（撃った瞬間に1回だけ送る。*v2：from を追加、送るのは着弾時でなく発射時*）、`{t:'found',idx}`、`{t:'bye'}`。地図は接続後に1回だけホストが送る。
 
 ## window.App（ui.js）
 - 状態：'boot','title','setting','play','ending','quit'。`App.go(name)`。
 - 画面の作り：`#stage`（16:9、中央、`container-type:size`、内側の寸法は cqmin/cqw/cqh）。最上位に `#nav`（進行ボタン共通コンテナ）と `#home`（右上の白い円、safe-area考慮）と `#modal`。縦持ち警告 `#portrait`。
 - すべてのボタンは共通関数 `tap(el, fn)` で登録し、pointerdown で `e.stopPropagation(); e.preventDefault();`。押し続ける操作ボタンは pointerdown/pointerup/pointercancel/pointerleave で `World.press`。**例外**：ファイル選択の `<input type=file>` はボタンの上に透明に重ね、既定動作を止めない（止めると選択画面が開かないため）。
+- カメラボタンの名前 *(v2)*：め／おいかけ／そら（移動の「うしろ」とかぶらない）。今の視点と次の視点の絵を出す。ゲスト（青）は戦車の絵も青。
+- 相手が抜けた知らせは、プレイ中は消さず小さく出し続ける *(v2)*。
 - 表記：和語はひらがな、外来語はカタカナ。漢字は四字熟語の表示だけ（読みのひらがなを添える）。
 - キーボード（PCでの確認用）：矢印/WASD、スペース=大砲、C=カメラ。

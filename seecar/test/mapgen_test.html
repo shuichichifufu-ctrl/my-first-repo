@@ -27,7 +27,7 @@ window.T = {
       if (x === 0 || z === 0 || x === w - 1 || z === h - 1) edge = true;
       [[1, 0], [-1, 0], [0, 1], [0, -1]].forEach(function (d) {
         var nx = x + d[0], nz = z + d[1]; if (nx < 0 || nz < 0 || nx >= w || nz >= h) return;
-        var j = nz * w + nx; if (!seen[j] && m.heights[j] < 9) { seen[j] = 1; q.push(j); }
+        var j = nz * w + nx; if (!seen[j] && m.heights[j] < 10) { seen[j] = 1; q.push(j); }
       });
     }
     return { cells: n, touchesEdge: edge, treasureHeight: m.heights[m.treasure.z * w + m.treasure.x], seen: seen };
