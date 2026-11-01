@@ -3,7 +3,8 @@
 (function () {
   'use strict';
   var PLAYERS = [{ color: '#e53935' }, { color: '#1e88e5' }];
-  var CAM_LABEL = ['め', 'おいかけ', 'そら']; // 移動の「うしろ」とかぶらない名前
+  var CAM_LABEL = ['め', 'おいかけ', 'そら']; // 視点の名前
+  var CAM_GO = ['めへ', 'おいかけへ', 'そらへ'];  // カメラボタンの文字：おすと つぎに なる視点（絵と同じ） // 移動の「うしろ」とかぶらない名前
   var DEFAULT_ERR = 'つながらなかったよ。ばんごうを たしかめてね';
   var doc = document;
 
@@ -378,7 +379,8 @@
     netConnected = false;
     if (state === 'play' && netOn) {
       netOn = false;
-      showNotice('あいてが いなくなったよ');
+      call('World', 'dropRemote', 1 - myIndex); // 相手の戦車を地図から消す
+      showNotice('あいてが いなくなったよ　ひとりで つづけよう', true);
     } else if (state === 'setting' && mode === 'net') {
       failNet('あいてと つながらなくなったよ');
     }
@@ -406,10 +408,10 @@
   }
   function updateCam() {
     var col = PLAYERS[myIndex] ? PLAYERS[myIndex].color : PLAYERS[0].color, nx = (camMode + 1) % 3;
-    els.camIco.innerHTML = camIcon(camMode, col);
-    els.camNext.innerHTML = camIcon(nx, col);
-    els.camLabel.textContent = CAM_LABEL[camMode];
-    els.cam.setAttribute('aria-label', CAM_LABEL[camMode] + '。おすと ' + CAM_LABEL[nx]);
+    // 押したら次になる視点だけを、絵と文字の両方で見せる（絵＝次の視点、文字＝「〜へ」）
+    els.camIco.innerHTML = camIcon(nx, col);
+    els.camLabel.textContent = CAM_GO[nx];
+    els.cam.setAttribute('aria-label', 'おすと ' + CAM_LABEL[nx] + 'に なる');
   }
   function cycleCam() {
     var m = call('World', 'cycleCamera');
@@ -422,10 +424,14 @@
     clearTimeout(boomTimer);
     boomTimer = setTimeout(function () { b.classList.remove('on'); }, 800);
   }
-  function showNotice(t) {
-    els.notice.textContent = t; els.notice.classList.add('on'); // プレイが終わるまで出しつづける（小さく）
+  // 知らせ：big なら大きく出して、4.5秒あとに小さくする。プレイが終わるまで出しつづける
+  function showNotice(t, big) {
+    clearTimeout(noticeTimer);
+    els.notice.textContent = t; els.notice.classList.add('on');
+    els.notice.classList.toggle('big', !!big);
+    if (big) noticeTimer = setTimeout(function () { els.notice.classList.remove('big'); }, 4500);
   }
-  function hideNotice() { clearTimeout(noticeTimer); els.notice.classList.remove('on'); }
+  function hideNotice() { clearTimeout(noticeTimer); els.notice.classList.remove('on'); els.notice.classList.remove('big'); }
 
   function onFound(idx) {
     if (state !== 'play' || guard) return;
@@ -468,7 +474,7 @@
 
   // ---------------- ホームとモーダル ----------------
   function openModal() {
-    if (modalOpen || state === 'boot') return;
+    if (modalOpen) return;
     modalOpen = true; els.modal.classList.add('on');
     releaseAll();
     if (state === 'play') call('World', 'setPaused', true);
@@ -531,7 +537,7 @@
     ['stage', 'nav', 'home', 'modal', 'setting', 'sethead', 'cards', 'preview', 'keypad', 'codein', 'codeshow', 'msgface', 'msgtext',
       'cam', 'notice', 'boom', 'confetti'].forEach(function (id) { els[id] = $(id); });
     els.ptTitle = $('pt-title'); els.ptYomi = $('pt-yomi');
-    els.camIco = $('cam-ico'); els.camNext = $('cam-next'); els.camLabel = $('cam-label');
+    els.camIco = $('cam-ico'); els.camLabel = $('cam-label');
     els.endDisc = $('end-disc'); els.endWho = $('end-who'); els.endTitle = $('end-title'); els.endYomi = $('end-yomi'); els.endPic = $('end-pic');
 
     doc.addEventListener('contextmenu', function (e) { e.preventDefault(); });

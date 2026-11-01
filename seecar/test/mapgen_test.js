@@ -20,6 +20,25 @@ const ok = (c, msg, extra) => { if (!c) fails++; console.log((c ? 'OK   ' : 'NG 
     ok(!r.reg.touchesEdge && r.reg.cells >= 16, p.id + ' 宝は囲まれた領域内', { t: r.t, ...r.reg });
     ok(r.starts.every(s => s.h === 0 && !s.inTreasureRegion), p.id + ' スタート高さ0・領域外', r.starts);
     ok(r.pic.startsWith('data:image/jpeg') , p.id + ' picture jpeg', r.picLen);
+    // v3: 色の積み木（高さ2〜6）が少しある／戦車が通れる道（高さ0〜1）がつながっている／宝は低い所
+    const q = await page.evaluate((id) => {
+      const m = MapGen.fromPreset(id), w = m.w, h = m.h, n = w * h;
+      const blocks = m.heights.filter(v => v >= 2 && v <= 6).length, low = m.heights.filter(v => v <= 1).length;
+      const seen = new Uint8Array(n), st = m.starts[0], qu = [st.z * w + st.x]; seen[qu[0]] = 1; let reach = 0, reachLow = 0, k = 0;
+      while (k < qu.length) { const i = qu[k++], x = i % w, z = (i - x) / w; reach++; if (m.heights[i] <= 1) reachLow++;
+        for (const [dx, dz] of [[1, 0], [-1, 0], [0, 1], [0, -1]]) { const nx = x + dx, nz = z + dz; if (nx < 0 || nz < 0 || nx >= w || nz >= h) continue; const j = nz * w + nx;
+          if (!seen[j] && m.heights[j] < 10 && Math.abs(m.heights[j] - m.heights[i]) <= 1) { seen[j] = 1; qu.push(j); } } }
+      const s1 = m.starts[1], colored = [...Array(n).keys()].filter(i => { const r = m.colors[i * 3], g = m.colors[i * 3 + 1], b = m.colors[i * 3 + 2]; return Math.max(r, g, b) - Math.min(r, g, b) > 40; }).length;
+      const c = document.createElement('canvas'); c.width = w * 5; c.height = h * 5; const g = c.getContext('2d');
+      for (let z = 0; z < h; z++) for (let x = 0; x < w; x++) { const i = z * w + x; g.fillStyle = `rgb(${m.colors[i * 3]},${m.colors[i * 3 + 1]},${m.colors[i * 3 + 2]})`; g.fillRect(x * 5, z * 5, 5, 5); }
+      return { blocks, low, reachLow, s1ok: !!seen[s1.z * w + s1.x], th: m.heights[m.treasure.z * w + m.treasure.x], colored, img: c.toDataURL('image/png') };
+    }, p.id);
+    save('mapgen_color_' + p.id + '.png', q.img);
+    ok(q.blocks >= 300 && q.blocks <= 6000, p.id + ' 色の積み木(高さ2〜6)が少しある', q.blocks);
+    ok(q.reachLow / q.low >= 0.6, p.id + ' 高さ0〜1の道がつながっている(開始地点から)', { ratio: +(q.reachLow / q.low).toFixed(2), s1ok: q.s1ok });
+    ok(q.s1ok, p.id + ' ゲストのスタートにも行ける');
+    ok(q.th <= 1, p.id + ' 宝は低い所(高さ0〜1)', q.th);
+    ok(q.colored >= 2500, p.id + ' 色のついたマスが多い', q.colored);
     console.log('     高さ分布', r.hist.join(','), ' ms=' + r.ms.toFixed(0));
   }
   // 塗り絵風：大枠・中枠・小枠（内側6x6画素）。ごみの小さな囲み(1画素)も入れる

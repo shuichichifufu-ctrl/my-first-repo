@@ -139,9 +139,12 @@
     }
     var treasure = null;
     if (best) {
-      var gx = best.sx / best.size, gz = best.sz / best.size, bd = Infinity;
+      var gx = best.sx / best.size, gz = best.sz / best.size, bd = Infinity, rmin = 255;
+      // 領域の中でも、戦車が立てる低い所（高さ0〜1、無ければ領域でいちばん低い所）に置く
+      for (i = 0; i < n; i++) if (label[i] === best.id && heights[i] < rmin) rmin = heights[i];
+      var tmaxH = Math.max(1, rmin);
       for (i = 0; i < n; i++) {
-        if (label[i] !== best.id) continue;
+        if (label[i] !== best.id || heights[i] > tmaxH) continue;
         x = i % w; z = (i - x) / w;
         var d = (x - gx) * (x - gx) + (z - gz) * (z - gz);
         if (d < bd) { bd = d; treasure = { x: x, z: z }; }
@@ -185,6 +188,28 @@
         return true;
       });
       if (flat.length) picked = flat; else if (pool.length && margin === 0) picked = pool;
+    }
+    // 戦車が実際に歩いて行ける（高さの差1以内でつながる）いちばん広い範囲に、2つのスタートを置く（色の積み木でふさがれた所を避ける）
+    if (picked) {
+      var wl = new Int32Array(n).fill(-1), wsz = [], wq = new Int32Array(n);
+      for (i = 0; i < n; i++) {
+        if (label[i] !== main.id || wl[i] !== -1) continue;
+        var wid = wsz.length, a0 = 0, a1 = 0; wl[i] = wid; wq[a1++] = i;
+        while (a0 < a1) {
+          var cc = wq[a0++], cx2 = cc % w, cz2 = (cc - cx2) / w;
+          for (k = 0; k < 4; k++) {
+            var ax = cx2 + DX[k], az = cz2 + DZ[k];
+            if (ax < 0 || az < 0 || ax >= w || az >= h) continue;
+            var aj = az * w + ax;
+            if (wl[aj] !== -1 || heights[aj] >= WALL_H || Math.abs(heights[aj] - heights[cc]) > 1) continue;
+            wl[aj] = wid; wq[a1++] = aj;
+          }
+        }
+        wsz.push(a1);
+      }
+      var bigW = 0; for (k = 1; k < wsz.length; k++) if (wsz[k] > wsz[bigW]) bigW = k;
+      var inBig = picked.filter(function (c) { return wl[c] === bigW; });
+      if (inBig.length > 1) picked = inBig;
     }
     function dirFor(c) { // 前に7マス以上進める向きのうち、宝にいちばん向いている向き
       var cx = c % w, cz = (c - cx) / w, vx = treasure.x - cx, vz = treasure.z - cz, len = Math.sqrt(vx * vx + vz * vz) || 1, best = null;
@@ -341,10 +366,11 @@
     { id: 'jiyu', title: '自由自在', reading: 'じゆうじざい' },
     { id: 'shiho', title: '四方八方', reading: 'しほうはっぽう' },
     { id: 'hinkou', title: '品行方正', reading: 'ひんこうほうせい' },
-    { id: 'isseki', title: '一石二鳥', reading: 'いっせきにちょう' },
+    { id: 'mikka', title: '三日坊主', reading: 'みっかぼうず' },
     { id: 'ichinichi', title: '一日千秋', reading: 'いちじつせんしゅう' }
   ];
   var STROKE = 10;
+  var THIN = { '鳥': 0, '麗': 0, '龍': 0 }; // 字ごとの太らせる量（線の多い字は細く。0=太らせない）
   var FONT = "'Hiragino Kaku Gothic ProN','Hiragino Sans','Noto Sans JP','Yu Gothic',sans-serif";
 
   function rng(seed) { // mulberry32
@@ -357,8 +383,11 @@
       return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
     };
   }
-  // 淡い色（明るい＝低い段）。ほとんど1段、ときどき2段になる明るさ。
-  var CRAYONS = ['#ffc9d6', '#fff3a8', '#bfe3ff', '#c9f0c0', '#ffe0b0', '#e3d1ff', '#ffe98a', '#cfeec3', '#ffd0dc', '#c4e6fb', '#ffc08a', '#b5e3a5'];
+  // 床の色（明るい＝高さ0〜1。戦車が通れる）。できるだけ濃い色。明るさ L >= 0.86 を保つ。
+  var CRAYONS = ['#ffe45c', '#ffd0e0', '#b8ecff', '#c6f5b0', '#ffd9a0', '#e6d6ff', '#fff06e', '#ffc4d6', '#a8e8ff', '#b4f09a'];
+  // 積み木の色（やや暗い＝高さ2〜6くらい）。色つきの積み木になる。
+  var BLOCKS = ['#e84a4a', '#3f8fe8', '#4cb54c', '#ff9a2e', '#9b5de5', '#ffd23f', '#2bb5c8', '#ff6fa5'];
+  var BLOCK_RATE = 0.18;     // 落書きのうち、色の積み木になる割合（少しだけ）
 
   function crayonStroke(g, rand, pts, width, color) {
     // 同じ線を少しずらして3回重ね、クレヨンのかすれを出す
@@ -376,7 +405,8 @@
     g.globalAlpha = 1;
   }
   function doodle(g, rand, W, H) {
-    var kind = Math.floor(rand() * 5), color = CRAYONS[Math.floor(rand() * CRAYONS.length)];
+    var kind = Math.floor(rand() * 5), block = rand() < BLOCK_RATE;
+    var color = block ? BLOCKS[Math.floor(rand() * BLOCKS.length)] : CRAYONS[Math.floor(rand() * CRAYONS.length)];
     var cx = rand() * W, cz = rand() * H, s = 50 + rand() * 90, pts = [], i;
     if (kind === 0) {          // ぐるぐるうず
       for (i = 0; i < 60; i++) { var a = i * 0.45, r = 3 + i * s / 60; pts.push([cx + Math.cos(a) * r, cz + Math.sin(a) * r]); }
@@ -400,17 +430,42 @@
     var S = 640, c = newCanvas(S, S), g = c.getContext('2d');
     g.fillStyle = '#fff'; g.fillRect(0, 0, S, S);
     var rand = rng(seed);
-    for (var d = 0; d < 26; d++) doodle(g, rand, S, S);
+    for (var d = 0; d < 32; d++) doodle(g, rand, S, S);
     // 字：2x2に並べる。太く（fillText の上に strokeText を太い線で重ねる）
     var chars = def.title.split(''), size = 262, cell = S / 2;
-    g.font = '900 ' + size + 'px ' + FONT;
-    g.textAlign = 'center'; g.textBaseline = 'middle';
-    g.fillStyle = '#000'; g.strokeStyle = '#000'; g.lineJoin = 'round'; g.lineWidth = STROKE;
-    for (var i = 0; i < 4; i++) {
-      var cx = (i % 2) * cell + cell / 2, cz = Math.floor(i / 2) * cell + cell / 2 + 6;
-      g.fillText(chars[i], cx, cz);
-      g.strokeText(chars[i], cx, cz);
+    function drawChars(gx) {
+      gx.font = '900 ' + size + 'px ' + FONT;
+      gx.textAlign = 'center'; gx.textBaseline = 'middle';
+      gx.fillStyle = '#000'; gx.strokeStyle = '#000'; gx.lineJoin = 'round';
+      for (var i = 0; i < 4; i++) {
+        var cx = (i % 2) * cell + cell / 2, cz = Math.floor(i / 2) * cell + cell / 2 + 6;
+        gx.fillText(chars[i], cx, cz);
+        // 線の多い字（鳥など）は太らせすぎると黒い塊につぶれるので、太らせる量を字ごとに変える
+        var lw = THIN[chars[i]] != null ? THIN[chars[i]] : STROKE;
+        if (lw > 0) { gx.lineWidth = lw; gx.strokeText(chars[i], cx, cz); }
+      }
     }
+    // 字だけの下書きで「字に囲まれた部分（口・日の中など）」を見つけ、そこには色の積み木をかかない（宝の部屋は低い床のまま）
+    var m = newCanvas(S, S), mg = m.getContext('2d');
+    mg.fillStyle = '#fff'; mg.fillRect(0, 0, S, S); drawChars(mg);
+    var md = mg.getImageData(0, 0, S, S).data, outside = new Uint8Array(S * S), stack = [], k;
+    // 字の線を少し太らせて見て、すきまのある囲み（縮小すると壁でつながる所）も「囲まれた部分」にする
+    var blk = new Uint8Array(S * S), blk2 = new Uint8Array(S * S), x0, z0, R = 3;
+    for (k = 0; k < S * S; k++) blk[k] = md[k * 4] < 128 ? 1 : 0;
+    for (z0 = 0; z0 < S; z0++) for (x0 = 0; x0 < S; x0++) if (blk[z0 * S + x0]) for (k = Math.max(0, x0 - R); k <= Math.min(S - 1, x0 + R); k++) blk2[z0 * S + k] = 1;
+    for (x0 = 0; x0 < S; x0++) for (z0 = 0; z0 < S; z0++) if (blk2[z0 * S + x0]) for (k = Math.max(0, z0 - R); k <= Math.min(S - 1, z0 + R); k++) blk[k * S + x0] = 1;
+    function push(i) { if (!outside[i] && !blk[i]) { outside[i] = 1; stack.push(i); } }
+    for (k = 0; k < S; k++) { push(k); push((S - 1) * S + k); push(k * S); push(k * S + S - 1); }
+    while (stack.length) {
+      var q = stack.pop(), qx = q % S;
+      if (qx > 0) push(q - 1); if (qx < S - 1) push(q + 1); if (q >= S) push(q - S); if (q < S * (S - 1)) push(q + S);
+    }
+    drawChars(g);
+    var fd = g.getImageData(0, 0, S, S), p = fd.data;
+    for (k = 0; k < S * S; k++) {
+      if (!outside[k] && md[k * 4] >= 128) { p[k * 4] = 255; p[k * 4 + 1] = 244; p[k * 4 + 2] = 196; p[k * 4 + 3] = 255; }
+    }
+    g.putImageData(fd, 0, 0);
     return c;
   }
   function fromPreset(id) {

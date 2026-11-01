@@ -1,0 +1,2987 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,minimum-scale=1,maximum-scale=1,user-scalable=no,viewport-fit=cover">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="format-detection" content="telephone=no">
+<title>見つめて見つけてほシーカー（SEE-CAR）</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+<script src="https://unpkg.com/peerjs@1.5.4/dist/peerjs.min.js"></script>
+<style>
+/* 見つめて見つけてほシーカー style.css  寸法は #stage（16:9）を基準に cqmin で指定 */
+*{user-select:none;-webkit-user-select:none;touch-action:none;-webkit-touch-callout:none;-webkit-tap-highlight-color:transparent;box-sizing:border-box}
+html,body{margin:0;padding:0;background:#000;overflow:hidden;overscroll-behavior:none}
+body{position:fixed;inset:0;height:100vh;height:100dvh;width:100%;
+  font-family:"Hiragino Maru Gothic ProN","Hiragino Kaku Gothic ProN","Yu Gothic UI","Meiryo","Noto Sans CJK JP","Noto Sans JP","IPAGothic",system-ui,sans-serif;font-weight:800;color:#12327a}
+#app{position:fixed;inset:0;height:100vh;height:100dvh;background:#000}
+button{font-family:inherit;font-weight:inherit;color:inherit;border:0;padding:0;margin:0;background:none;cursor:pointer;outline:none}
+svg{display:block}
+
+#stage{position:absolute;left:50%;top:50%;transform:translate(-50%,-50%);
+  width:min(100vw,177.7778vh);height:min(100vh,56.25vw);
+  width:min(100vw,177.7778dvh);height:min(100dvh,56.25vw);
+  container-type:size;overflow:hidden;background:#bfe6ff}
+
+/* ---------- 背景（クレヨンと紙） ---------- */
+#bg{position:absolute;inset:0;overflow:hidden;
+  background:
+    radial-gradient(ellipse 30% 40% at 8% 88%,rgba(255,120,150,.40),transparent 70%),
+    radial-gradient(ellipse 28% 36% at 95% 85%,rgba(255,200,60,.45),transparent 70%),
+    radial-gradient(ellipse 26% 30% at 70% 98%,rgba(120,210,140,.40),transparent 70%),
+    radial-gradient(ellipse 24% 30% at 4% 12%,rgba(190,150,255,.35),transparent 70%),
+    repeating-linear-gradient(112deg,rgba(255,255,255,0) 0 .9cqmin,rgba(255,255,255,.22) .9cqmin 1.1cqmin),
+    linear-gradient(#8fd3ff 0%,#c9ecff 45%,#fffaf0 78%,#fff3d6 100%)}
+#bg::after{content:"";position:absolute;inset:0;opacity:.55;mix-blend-mode:multiply;pointer-events:none;
+  background-image:url("data:image/svg+xml;utf8,%3Csvg xmlns='http://www.w3.org/2000/svg' width='220' height='220'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='.85' numOctaves='2' stitchTiles='stitch'/%3E%3CfeColorMatrix values='0 0 0 0 .55 0 0 0 0 .5 0 0 0 0 .42 0 0 0 .45 0'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E")}
+.blk{position:absolute;display:block;border:.6cqmin solid rgba(40,40,60,.55);border-radius:.8cqmin;box-shadow:.8cqmin 1cqmin 0 rgba(40,40,60,.18)}
+.b1{left:-4cqmin;bottom:-4cqmin;width:34cqmin;height:20cqmin;transform:rotate(-8deg);
+  background:repeating-linear-gradient(60deg,#ff6b6b 0 1.2cqmin,#ff8f8f 1.2cqmin 2.2cqmin)}
+.b2{right:-5cqmin;bottom:-3cqmin;width:38cqmin;height:22cqmin;transform:rotate(6deg);
+  background:repeating-linear-gradient(-55deg,#4d9bff 0 1.2cqmin,#7fb8ff 1.2cqmin 2.2cqmin)}
+.b3{left:58cqmin;bottom:-9cqmin;width:30cqmin;height:16cqmin;transform:rotate(-3deg);
+  background:repeating-linear-gradient(80deg,#ffd23f 0 1.2cqmin,#ffe58a 1.2cqmin 2.2cqmin)}
+.tw{position:absolute;display:block;width:4cqmin;height:4cqmin;background:#ffd23f;
+  clip-path:polygon(50% 0%,61% 35%,98% 35%,68% 57%,79% 91%,50% 70%,21% 91%,32% 57%,2% 35%,39% 35%);animation:twinkle 2.4s ease-in-out infinite}
+.t1{left:6cqmin;top:10cqmin}.t2{right:8cqmin;top:8cqmin;width:3cqmin;height:3cqmin;animation-delay:.5s;background:#ff8fb8}
+.t3{left:24cqmin;top:58cqmin;width:3cqmin;height:3cqmin;animation-delay:1s;background:#8ee0a5}
+.t4{right:20cqmin;top:52cqmin;animation-delay:1.4s}.t5{left:70cqmin;top:6cqmin;width:2.4cqmin;height:2.4cqmin;animation-delay:.9s;background:#b79cff}
+@keyframes twinkle{0%,100%{transform:scale(1) rotate(0)}50%{transform:scale(1.35) rotate(18deg)}}
+body[data-state=play] #bg{display:none}
+
+#worldbox{position:absolute;inset:0;background:#6fc2ff;visibility:hidden}
+#worldbox canvas{display:block;width:100%;height:100%}
+body[data-state=play] #worldbox{visibility:visible}
+
+/* ---------- 画面の切り替え ---------- */
+.screen{position:absolute;inset:0;display:none}
+body[data-state=boot] #boot,body[data-state=title] #title,body[data-state=setting] #setting,
+body[data-state=play] #play,body[data-state=ending] #ending,body[data-state=quit] #quit{display:block}
+.center{position:absolute;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:5cqmin}
+
+/* ---------- ロゴ ---------- */
+.logo{--k:1;display:flex;flex-direction:column;align-items:center;gap:calc(var(--k)*.6cqmin);
+  filter:drop-shadow(0 calc(var(--k)*1cqmin) 0 rgba(20,40,100,.28))}
+.outl{color:#1f5fd9;text-shadow:
+  -.5em 0 0 #fff,.5em 0 0 #fff,0 -.5em 0 #fff,0 .5em 0 #fff,
+  -.36em -.36em 0 #fff,.36em -.36em 0 #fff,-.36em .36em 0 #fff,.36em .36em 0 #fff,
+  -.5em -.2em 0 #fff,.5em -.2em 0 #fff,-.5em .2em 0 #fff,.5em .2em 0 #fff,
+  -.2em -.5em 0 #fff,.2em -.5em 0 #fff,-.2em .5em 0 #fff,.2em .5em 0 #fff}
+.logo-top{font-size:calc(var(--k)*6.6cqmin);letter-spacing:.04em;line-height:1.1;--e:calc(var(--k)*.28cqmin);color:#1f5fd9;
+  text-shadow:calc(var(--e)*-1) 0 #fff,var(--e) 0 #fff,0 calc(var(--e)*-1) #fff,0 var(--e) #fff,calc(var(--e)*-1) calc(var(--e)*-1) #fff,var(--e) calc(var(--e)*-1) #fff,calc(var(--e)*-1) var(--e) #fff,var(--e) var(--e) #fff,
+  calc(var(--e)*2) 0 #fff,calc(var(--e)*-2) 0 #fff,0 calc(var(--e)*2) #fff,0 calc(var(--e)*-2) #fff}
+.logo-main{display:flex;align-items:center;gap:calc(var(--k)*1cqmin)}
+.logo-name{font-size:calc(var(--k)*17cqmin);line-height:1;letter-spacing:.02em;font-weight:900;--e:calc(var(--k)*.55cqmin);color:#1f66e8;
+  text-shadow:calc(var(--e)*-1) 0 #fff,var(--e) 0 #fff,0 calc(var(--e)*-1) #fff,0 var(--e) #fff,calc(var(--e)*-1) calc(var(--e)*-1) #fff,var(--e) calc(var(--e)*-1) #fff,calc(var(--e)*-1) var(--e) #fff,var(--e) var(--e) #fff,
+  calc(var(--e)*2) 0 #fff,calc(var(--e)*-2) 0 #fff,0 calc(var(--e)*2) #fff,0 calc(var(--e)*-2) #fff,calc(var(--e)*2) calc(var(--e)*2) #fff,calc(var(--e)*-2) calc(var(--e)*2) #fff,calc(var(--e)*2) calc(var(--e)*-2) #fff,calc(var(--e)*-2) calc(var(--e)*-2) #fff,
+  0 calc(var(--e)*3.4) 0 #0e2f7a}
+.logo-en{font-size:calc(var(--k)*5.6cqmin);letter-spacing:.14em;line-height:1;padding:calc(var(--k)*.8cqmin) calc(var(--k)*5cqmin);border-radius:calc(var(--k)*5cqmin);
+  background:linear-gradient(#2a5fd0,#143c9c);color:#ffe45e;border:calc(var(--k)*.6cqmin) solid #fff}
+.star{position:relative;width:calc(var(--k)*29cqmin);height:calc(var(--k)*29cqmin);flex:none;animation:bob 2.6s ease-in-out infinite}
+.star i{position:absolute;inset:0;clip-path:polygon(50% 0%,61% 35%,98% 35%,68% 57%,79% 91%,50% 70%,21% 91%,32% 57%,2% 35%,39% 35%)}
+.star .s1{background:#fff}
+.star .s2{transform:scale(.93);background:conic-gradient(#ff5d8f,#ffb703,#8ecae6,#7bd389,#b388ff,#ff5d8f)}
+.star .s3{transform:scale(.8);background:radial-gradient(circle at 40% 30%,#fff6a8,#ffd23f 55%,#ffae00)}
+.star b{position:absolute;left:0;right:0;top:38%;transform:translateY(-50%);text-align:center;font-size:calc(var(--k)*14cqmin);line-height:1;font-weight:900;color:#1f5fd9;--e:calc(var(--k)*.4cqmin);
+  text-shadow:calc(var(--e)*-1) 0 #fff,var(--e) 0 #fff,0 calc(var(--e)*-1) #fff,0 var(--e) #fff,calc(var(--e)*-1) calc(var(--e)*-1) #fff,var(--e) calc(var(--e)*-1) #fff,calc(var(--e)*-1) var(--e) #fff,var(--e) var(--e) #fff}
+@keyframes bob{0%,100%{transform:translateY(0) rotate(-3deg)}50%{transform:translateY(-1.4cqmin) rotate(3deg)}}
+.titlelogo{position:absolute;left:0;right:0;top:9cqmin;display:flex;justify-content:center}
+
+/* ---------- Boot / Quit ---------- */
+.touchme{position:relative;font-size:7.4cqmin;color:#12327a;background:rgba(255,255,255,.9);padding:2cqmin 7cqmin;border-radius:9cqmin;border:.7cqmin solid #fff;box-shadow:0 1cqmin 0 rgba(20,40,100,.25);animation:blink 1.4s ease-in-out infinite}
+.touchme .ring{position:absolute;right:-5cqmin;bottom:-6cqmin;width:11cqmin;height:11cqmin;border-radius:50%;background:rgba(255,93,143,.85);border:.8cqmin solid #fff;animation:pulse 1.4s ease-out infinite}
+@keyframes blink{0%,100%{opacity:1}50%{opacity:.55}}
+@keyframes pulse{0%{transform:scale(.6);opacity:1}100%{transform:scale(1.6);opacity:0}}
+.bye{font-size:12cqmin;font-weight:900;color:#1f5fd9;background:rgba(255,255,255,.92);padding:2cqmin 8cqmin;border-radius:10cqmin;border:.8cqmin solid #fff;box-shadow:0 1.2cqmin 0 rgba(20,40,100,.25)}
+body[data-state=quit] #quit .center{padding-bottom:14cqmin}
+
+/* ---------- 進行ボタン #nav（全画面で同じ大きさ・同じホップ） ---------- */
+#nav{position:absolute;left:0;right:0;bottom:4cqmin;display:flex;justify-content:center;align-items:flex-end;gap:5cqmin;z-index:50;pointer-events:none}
+.nbtn{pointer-events:auto;display:flex;align-items:center;justify-content:center;gap:2cqmin;width:64cqmin;height:16cqmin;border-radius:8cqmin;
+  font-size:6.4cqmin;line-height:1;white-space:nowrap;border:.8cqmin solid #fff;box-shadow:0 1.3cqmin 0 rgba(20,40,100,.3);animation:hop 1.15s ease-in-out infinite}
+.nbtn i{display:block;width:8cqmin;height:8cqmin;flex:none}
+.nbtn i svg{width:100%;height:100%;fill:currentColor}
+.nbtn.primary{background:linear-gradient(#ffe86b,#ffb703);color:#3d2800}
+.nbtn.secondary{background:linear-gradient(#8fd0ff,#3b8df0);color:#fff;text-shadow:0 .3cqmin 0 rgba(0,40,120,.5);animation:none} /* 跳ねるのは次に押す1つ（primary）だけ */
+@keyframes hop{0%,100%{transform:translateY(0)}35%{transform:translateY(-2cqmin)}60%{transform:translateY(0)}}
+.nbtn.down,.ctl.down,.card.down,.bigcard.down,.key.down,.backbtn.down,#home.down,#cam.down{animation:none;transform:translateY(.7cqmin) scale(.95);filter:brightness(.92)}
+
+/* ---------- ホーム（最前面） ---------- */
+#home{position:absolute;z-index:100;top:max(2cqmin,env(safe-area-inset-top));right:max(2.4cqmin,env(safe-area-inset-right));
+  width:12cqmin;height:12cqmin;border-radius:50%;background:#fff;box-shadow:0 .8cqmin 0 rgba(20,40,100,.3);border:.5cqmin solid #d7e3f7;display:none;align-items:center;justify-content:center}
+#home svg{width:7.4cqmin;height:7.4cqmin;fill:#1f5fd9}
+#home{display:flex}
+
+/* ---------- モーダル ---------- */
+#modal{position:absolute;inset:0;z-index:200;display:none;align-items:center;justify-content:center;background:rgba(10,30,70,.6)}
+#modal.on{display:flex}
+.mcard{background:#fff;border-radius:5cqmin;padding:6cqmin 6cqmin 7cqmin;display:flex;flex-direction:column;align-items:center;gap:6cqmin;border:.9cqmin solid #ffd23f;box-shadow:0 2cqmin 0 rgba(0,0,0,.25)}
+.mtitle{font-size:9cqmin;color:#12327a;font-weight:900}
+.mbtns{display:flex;gap:5cqmin}
+.mbtns .nbtn{width:44cqmin}
+#m-no{background:linear-gradient(#9af0a8,#2fbf5a);color:#07431c}
+#m-yes{animation:none;background:linear-gradient(#c9d6ea,#8fa4c8);color:#fff}
+
+/* ---------- 縦持ち警告 ---------- */
+#portrait{position:fixed;inset:0;z-index:99999;display:none;flex-direction:column;align-items:center;justify-content:center;gap:8vmin;background:#12327a;color:#fff}
+.phone{width:18vmin;height:30vmin;border:1.6vmin solid #fff;border-radius:3vmin;background:#ffd23f;animation:rot 2.4s ease-in-out infinite}
+.ptext{font-size:7.6vmin;font-weight:900;text-align:center;line-height:1.4;padding:0 6vmin}
+@keyframes rot{0%,20%{transform:rotate(0)}60%,100%{transform:rotate(-90deg)}}
+@media screen and (orientation: portrait){#portrait{display:flex}}
+
+/* ---------- Setting ---------- */
+.head{position:absolute;top:3cqmin;left:50%;transform:translateX(-50%);font-size:6.4cqmin;white-space:nowrap;background:rgba(255,255,255,.92);color:#12327a;
+  padding:1.4cqmin 6cqmin;border-radius:8cqmin;border:.6cqmin solid #fff;box-shadow:0 .8cqmin 0 rgba(20,40,100,.2)}
+.backbtn{position:absolute;left:3cqmin;top:3cqmin;height:12cqmin;min-width:25cqmin;padding:0 3cqmin;display:flex;align-items:center;justify-content:center;gap:1.4cqmin;
+  background:#fff;border-radius:6cqmin;font-size:4.8cqmin;color:#1f5fd9;border:.5cqmin solid #d7e3f7;box-shadow:0 .8cqmin 0 rgba(20,40,100,.25)}
+.backbtn i{width:0;height:0;border-top:2.4cqmin solid transparent;border-bottom:2.4cqmin solid transparent;border-right:3.6cqmin solid #1f5fd9}
+.pane{position:absolute;left:6cqmin;right:6cqmin;top:19cqmin;bottom:23cqmin;display:none}
+#setting[data-sub=choice] .sub-choice,#setting[data-sub=code] .sub-code,#setting[data-sub=pick] .sub-pick,
+#setting[data-sub=keypad] .sub-keypad,#setting[data-sub=msg] .sub-msg,#setting[data-sub=error] .sub-msg{display:flex}
+.sub-choice{align-items:center;justify-content:center;gap:9cqmin}
+.bigcard{width:62cqmin;height:50cqmin;border-radius:5cqmin;background:#fff;border:.9cqmin solid #fff;box-shadow:0 1.4cqmin 0 rgba(20,40,100,.28);display:flex;flex-direction:column;align-items:center;justify-content:center;gap:3cqmin;font-size:7.4cqmin;color:#1f5fd9}
+.bigcard svg{width:24cqmin;height:24cqmin}
+#c-host{background:linear-gradient(#fff,#fff3b8)}#c-join{background:linear-gradient(#fff,#d6ecff)}
+
+.sub-code{flex-direction:column;align-items:center;justify-content:center;gap:5cqmin}
+.digits{display:flex;gap:3cqmin;justify-content:center}
+.digits b{width:23cqmin;height:30cqmin;border-radius:3cqmin;background:#fff;border:.8cqmin solid #ffb703;box-shadow:0 1cqmin 0 rgba(20,40,100,.25);display:flex;align-items:center;justify-content:center;font-size:21cqmin;line-height:1;color:#1f5fd9}
+.digits.grid2{display:grid;grid-template-columns:repeat(2,23cqmin);gap:3cqmin;align-content:center}
+.digits.grid2 b{height:23cqmin;font-size:17cqmin}
+.waiting{font-size:6.4cqmin;background:rgba(255,255,255,.92);padding:1.4cqmin 6cqmin;border-radius:8cqmin}
+.dots i{font-style:normal;animation:dot 1.2s infinite}.dots i:nth-child(2){animation-delay:.2s}.dots i:nth-child(3){animation-delay:.4s}
+@keyframes dot{0%,100%{opacity:.2}50%{opacity:1}}
+
+.sub-pick{gap:4cqmin;align-items:stretch}
+.pickgrid{flex:1.25;display:grid;grid-template-columns:repeat(var(--cols,2),1fr);grid-auto-rows:1fr;gap:3cqmin;min-width:0}
+.card{position:relative;border-radius:4cqmin;background:#fff;border:.8cqmin solid #fff;box-shadow:0 1.1cqmin 0 rgba(20,40,100,.28);display:flex;flex-direction:column;align-items:center;justify-content:center;gap:.8cqmin;overflow:hidden;color:#1f5fd9}
+.card .kan{font-size:8.4cqmin;line-height:1.1;font-weight:900;letter-spacing:.04em;color:#12327a}
+.card .yomi{font-size:3.5cqmin;color:#4a6aa8}
+.pickgrid.c3 .kan{font-size:6cqmin}.pickgrid.c3 .yomi{font-size:2.8cqmin}
+.card.on{background:linear-gradient(#fff9c4,#ffe45e);border-color:#ff9f1c;box-shadow:0 1.1cqmin 0 rgba(255,140,0,.5)}
+.card.file{background:linear-gradient(#fff,#e3f3ff)}
+.card.file svg{width:11cqmin;height:11cqmin}
+.card{text-align:center}
+.card.file{padding:0 1cqmin}
+.card.file .kan{font-size:4.2cqmin;white-space:nowrap;text-align:center;width:100%;letter-spacing:0}
+.card input[type=file]{position:absolute;inset:0;width:100%;height:100%;opacity:0;cursor:pointer;font-size:0}
+.preview{flex:1;border-radius:4cqmin;background:rgba(255,255,255,.88);border:.8cqmin dashed #8fb4e8;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:1.2cqmin;padding:2cqmin;min-width:0;overflow:hidden}
+.preview img{max-width:100%;max-height:38cqmin;object-fit:contain;border-radius:1.6cqmin;border:.6cqmin solid #fff;box-shadow:0 .8cqmin 0 rgba(20,40,100,.25);background:#fff}
+.preview .pt{font-size:7cqmin;line-height:1.1;color:#12327a;font-weight:900}
+.preview .py{font-size:3.6cqmin;color:#4a6aa8}
+.preview .hint{font-size:6cqmin;color:#4a6aa8;text-align:center;line-height:1.4}
+.spin{width:10cqmin;height:10cqmin;border-radius:50%;border:1.4cqmin solid #cfe0f7;border-top-color:#ff9f1c;animation:spin .9s linear infinite}
+@keyframes spin{to{transform:rotate(360deg)}}
+
+.sub-keypad{gap:8cqmin;align-items:center;justify-content:center}
+.keypad{display:grid;grid-template-columns:repeat(3,18cqmin);grid-auto-rows:13.4cqmin;gap:1.4cqmin}
+.key{border-radius:3cqmin;background:#fff;border:.6cqmin solid #fff;box-shadow:0 .9cqmin 0 rgba(20,40,100,.28);font-size:8cqmin;color:#1f5fd9;font-weight:900;display:flex;align-items:center;justify-content:center}
+.key.del{background:linear-gradient(#ffd0d8,#ff8fa6);color:#7a1230;font-size:4.8cqmin}
+.key.nul{visibility:hidden}
+
+.sub-msg{flex-direction:column;align-items:center;justify-content:center;gap:5cqmin}
+.msgtext{font-size:6.6cqmin;line-height:1.5;text-align:center;background:rgba(255,255,255,.92);padding:2.4cqmin 7cqmin;border-radius:6cqmin;max-width:150cqmin}
+.msgface svg{width:20cqmin;height:20cqmin}
+
+/* ---------- Play ---------- */
+#play{pointer-events:none}
+#play>*{pointer-events:auto}
+#maptag{position:absolute;top:2cqmin;left:max(2cqmin,env(safe-area-inset-left));display:flex;align-items:baseline;gap:1.4cqmin;background:rgba(255,255,255,.88);border-radius:4cqmin;padding:.5cqmin 3cqmin;border:.4cqmin solid #fff;box-shadow:0 .5cqmin 0 rgba(20,40,100,.25);white-space:nowrap;pointer-events:none;transition:opacity .4s}
+#maptag b{font-size:4.4cqmin;color:#12327a;font-weight:900}#maptag small{font-size:2.4cqmin;color:#4a6aa8}
+body.camtop #maptag{opacity:0} /* 真上のときは地図の上はしと戦車をかくさない */
+#notice{position:absolute;top:10.5cqmin;left:max(2cqmin,env(safe-area-inset-left));display:none;font-size:3.6cqmin;background:#fff5d6;color:#7a3b00;border:.5cqmin solid #ffb703;border-radius:4cqmin;padding:.7cqmin 3cqmin;white-space:nowrap;pointer-events:none;transition:all .5s}
+/* 大きく出して次にすることを伝え、数秒あとに小さくして出しつづける */
+#notice.big{top:34cqmin;left:50%;transform:translateX(-50%);font-size:6.4cqmin;font-weight:900;padding:2cqmin 5cqmin;border-width:.8cqmin;border-radius:6cqmin;box-shadow:0 1cqmin 0 rgba(122,59,0,.25);text-align:center;line-height:1.35;white-space:normal;width:max-content;max-width:84cqmin}
+#notice.big.on{animation:pop2 .35s ease-out}
+#notice.on{display:block;animation:pop2 .35s ease-out}
+.ctl{display:flex;flex-direction:column;align-items:center;justify-content:center;gap:.2cqmin;color:#12327a}
+#dpad{position:absolute;left:max(3cqmin,env(safe-area-inset-left));bottom:3cqmin;display:grid;grid-template-columns:repeat(3,15cqmin);grid-template-rows:repeat(3,15cqmin);gap:1cqmin;pointer-events:none}
+#dpad .ctl{pointer-events:auto;border-radius:3.4cqmin;background:rgba(255,255,255,.86);border:.6cqmin solid #fff;box-shadow:0 .9cqmin 0 rgba(20,40,100,.35)}
+#dpad .ctl svg{width:6.6cqmin;height:6.6cqmin;fill:#1f5fd9}
+#dpad .ctl span{font-size:3.2cqmin;line-height:1}
+#dpad [data-act=fwd]{grid-column:2;grid-row:1}#dpad [data-act=left]{grid-column:1;grid-row:2}
+#dpad [data-act=right]{grid-column:3;grid-row:2}#dpad [data-act=back]{grid-column:2;grid-row:3}
+#dpad .ctl.down{background:#ffe45e}
+#fire{position:absolute;right:max(3cqmin,env(safe-area-inset-right));bottom:3cqmin;width:31cqmin;height:31cqmin;border-radius:50%;background:radial-gradient(circle at 35% 30%,#ff9a6b,#f0451c 70%);border:.9cqmin solid #fff;box-shadow:0 1.4cqmin 0 rgba(120,20,0,.45);color:#fff}
+#fire svg{width:16cqmin;height:16cqmin}
+#fire span{font-size:5.6cqmin;line-height:1;text-shadow:0 .3cqmin 0 rgba(100,20,0,.6)}
+#fire.down{background:radial-gradient(circle at 35% 30%,#ffc09a,#ff6b3d 70%)}
+#cam{position:absolute;right:max(3cqmin,env(safe-area-inset-right));top:23cqmin;width:30cqmin;height:20cqmin;border-radius:4cqmin;background:rgba(255,255,255,.92);border:.6cqmin solid #fff;box-shadow:0 .9cqmin 0 rgba(20,40,100,.35);display:flex;flex-direction:column;align-items:center;justify-content:center;gap:.4cqmin;color:#12327a}
+#cam .camrow{display:flex;align-items:center;justify-content:center;gap:1cqmin}
+#cam i{display:block;width:12.4cqmin;height:12.4cqmin;flex:none}
+#cam i svg{width:100%;height:100%}
+#cam i.next{width:8cqmin;height:8cqmin;opacity:.8;border:.45cqmin dashed #8fb4e8;border-radius:2cqmin;padding:.3cqmin}
+#cam .arr{display:block;width:0;height:0;border-top:2cqmin solid transparent;border-bottom:2cqmin solid transparent;border-left:3cqmin solid #ff9f1c;flex:none}
+#cam span#cam-label{font-size:4.4cqmin;line-height:1;font-weight:900}
+#boom{position:absolute;left:50%;top:30%;z-index:60;pointer-events:none;display:none;font-size:20cqmin;font-weight:900;color:#ffd23f;white-space:nowrap;--e:.5cqmin;
+  text-shadow:calc(var(--e)*-1) 0 #7a1c00,var(--e) 0 #7a1c00,0 calc(var(--e)*-1) #7a1c00,0 var(--e) #7a1c00,calc(var(--e)*2) calc(var(--e)*2) #7a1c00,calc(var(--e)*-2) calc(var(--e)*-2) #7a1c00,calc(var(--e)*-2) calc(var(--e)*2) #7a1c00,calc(var(--e)*2) calc(var(--e)*-2) #7a1c00,0 1.6cqmin 0 #7a1c00,0 0 3cqmin #ff6a00}
+#boom.on{display:block;animation:boom .75s ease-out forwards}
+@keyframes boom{0%{transform:translate(-50%,-50%) scale(.3) rotate(-14deg);opacity:0}18%{transform:translate(-50%,-50%) scale(1.25) rotate(-6deg);opacity:1}70%{transform:translate(-50%,-50%) scale(1) rotate(-6deg);opacity:1}100%{transform:translate(-50%,-60%) scale(1.05) rotate(-6deg);opacity:0}}
+@keyframes pop2{0%{transform:scale(.6);transform-origin:left top}100%{transform:scale(1);transform-origin:left top}}
+@keyframes pop{0%{transform:translateX(-50%) scale(.6)}100%{transform:translateX(-50%) scale(1)}}
+
+/* ---------- Ending ---------- */
+.endleft{position:absolute;left:7cqmin;top:9cqmin;width:70cqmin;display:flex;flex-direction:column;align-items:center;gap:2.6cqmin}
+.found{font-size:17cqmin;font-weight:900;line-height:1.05;color:#ff6a00;white-space:nowrap;--e:.55cqmin;
+  text-shadow:calc(var(--e)*-1) 0 #fff,var(--e) 0 #fff,0 calc(var(--e)*-1) #fff,0 var(--e) #fff,calc(var(--e)*2) calc(var(--e)*2) #fff,calc(var(--e)*-2) calc(var(--e)*-2) #fff,calc(var(--e)*-2) calc(var(--e)*2) #fff,calc(var(--e)*2) calc(var(--e)*-2) #fff,0 1.4cqmin 0 #a63d00;animation:bob 2s ease-in-out infinite}
+.who{display:flex;align-items:center;gap:2.4cqmin;background:rgba(255,255,255,.92);padding:1.2cqmin 5cqmin 1.2cqmin 2.4cqmin;border-radius:7cqmin;font-size:5.4cqmin}
+.who i{width:8cqmin;height:8cqmin;border-radius:50%;border:.7cqmin solid #fff;box-shadow:0 0 0 .5cqmin #12327a}
+.endtitle{font-size:11cqmin;font-weight:900;color:#12327a;line-height:1.1;margin-top:2cqmin;background:rgba(255,255,255,.9);padding:1cqmin 4cqmin;border-radius:4cqmin}
+.endyomi{font-size:4.6cqmin;color:#4a6aa8}
+.endpic{position:absolute;left:82cqmin;right:6cqmin;top:7cqmin;bottom:25cqmin;display:flex;align-items:center;justify-content:center}
+.endpic img{max-width:100%;max-height:100%;object-fit:contain;background:#fff;padding:1.6cqmin;border-radius:2cqmin;border:.6cqmin solid #e4d9bf;box-shadow:0 1.4cqmin 0 rgba(20,40,100,.3);transform:rotate(1.2deg)}
+#confetti{position:absolute;inset:0;overflow:hidden;pointer-events:none}
+#confetti i{position:absolute;top:-6cqmin;width:2cqmin;height:3.2cqmin;opacity:.9;animation:fall linear infinite}
+@keyframes fall{to{transform:translateY(112cqmin) rotate(540deg)}}
+
+</style>
+</head>
+<body data-state="boot">
+<div id="app">
+  <div id="stage">
+    <div id="bg" aria-hidden="true">
+      <i class="blk b1"></i><i class="blk b2"></i><i class="blk b3"></i>
+      <i class="tw t1"></i><i class="tw t2"></i><i class="tw t3"></i><i class="tw t4"></i><i class="tw t5"></i>
+    </div>
+    <div id="worldbox"></div>
+
+    <!-- 1 Boot -->
+    <section id="boot" class="screen">
+      <div class="center">
+        <div data-logo="0.55"></div>
+        <div class="touchme"><span class="ring"></span>がめんを さわってね</div>
+      </div>
+    </section>
+
+    <!-- 2 Title -->
+    <section id="title" class="screen">
+      <div class="titlelogo" data-logo="1"></div>
+    </section>
+
+    <!-- 3 Setting -->
+    <section id="setting" class="screen" data-sub="pick">
+      <button type="button" id="back" class="backbtn" tabindex="-1"><i></i><span>もどる</span></button>
+      <div id="sethead" class="head">ちずを えらんでね</div>
+
+      <div class="pane sub-choice">
+        <button type="button" class="bigcard" id="c-host" tabindex="-1">
+          <svg viewBox="0 0 64 64"><path d="M32 6 6 30h8v26h36V30h8z" fill="#ffd23f" stroke="#fff" stroke-width="3" stroke-linejoin="round"/><path d="M32 22l3.5 7.5 8 1-6 5.5 1.7 8L32 39.800 24.800 44l1.700-8-6-5.500 8-1z" fill="#ff5d8f"/></svg>
+          <span>へやを つくる</span>
+        </button>
+        <button type="button" class="bigcard" id="c-join" tabindex="-1">
+          <svg viewBox="0 0 64 64"><rect x="14" y="8" width="36" height="50" rx="4" fill="#7cc4ff" stroke="#fff" stroke-width="3"/><rect x="20" y="14" width="24" height="38" rx="2" fill="#3b8df0"/><circle cx="39" cy="34" r="3" fill="#ffd23f"/><path d="M2 34h14m-5-6 6 6-6 6" stroke="#ff5d8f" stroke-width="5" fill="none" stroke-linecap="round" stroke-linejoin="round"/></svg>
+          <span>へやに はいる</span>
+        </button>
+      </div>
+
+      <div class="pane sub-code">
+        <div class="digits" id="codeshow"></div>
+        <div class="waiting">あいてを まっているよ<span class="dots"><i>.</i><i>.</i><i>.</i></span></div>
+      </div>
+
+      <div class="pane sub-pick">
+        <div class="pickgrid" id="cards"></div>
+        <div class="preview" id="preview"></div>
+      </div>
+
+      <div class="pane sub-keypad">
+        <div class="digits grid2" id="codein"></div>
+        <div class="keypad" id="keypad"></div>
+      </div>
+
+      <div class="pane sub-msg">
+        <div class="msgface" id="msgface"></div>
+        <div class="msgtext" id="msgtext"></div>
+      </div>
+    </section>
+
+    <!-- 4 Play -->
+    <section id="play" class="screen">
+      <div id="maptag"><b id="pt-title"></b><small id="pt-yomi"></small></div>
+      <div id="notice"></div>
+      <div id="dpad">
+        <button type="button" class="ctl" data-act="fwd" tabindex="-1"><svg viewBox="0 0 24 24"><path d="M12 3l9 12H3z"/></svg><span>まえ</span></button>
+        <button type="button" class="ctl" data-act="left" tabindex="-1"><svg viewBox="0 0 24 24"><path d="M3 12l12-9v18z"/></svg><span>ひだり</span></button>
+        <button type="button" class="ctl" data-act="right" tabindex="-1"><svg viewBox="0 0 24 24"><path d="M21 12 9 3v18z"/></svg><span>みぎ</span></button>
+        <button type="button" class="ctl" data-act="back" tabindex="-1"><svg viewBox="0 0 24 24"><path d="M12 21 3 9h18z"/></svg><span>うしろ</span></button>
+      </div>
+      <button type="button" id="fire" class="ctl" data-act="fire" tabindex="-1">
+        <svg viewBox="0 0 64 64"><g fill="#fff"><rect x="6" y="30" width="34" height="14" rx="4" transform="rotate(-25 20 37)"/><circle cx="26" cy="46" r="13"/><circle cx="54" cy="12" r="5" fill="#222"/></g><circle cx="26" cy="46" r="6" fill="#d9480f"/></svg>
+        <span>うつ</span>
+      </button>
+      <button type="button" id="cam" tabindex="-1"><span class="camrow"><i id="cam-ico"></i></span><span id="cam-label">おいかけ</span></button>
+    </section>
+
+    <!-- 5 Ending -->
+    <section id="ending" class="screen">
+      <div id="confetti"></div>
+      <div class="endleft">
+        <div class="found">みつけた！</div>
+        <div class="who"><i id="end-disc"></i><span id="end-who"></span></div>
+        <div class="endtitle" id="end-title"></div>
+        <div class="endyomi" id="end-yomi"></div>
+      </div>
+      <div class="endpic"><img id="end-pic" alt=""></div>
+    </section>
+
+    <!-- 6 Quit -->
+    <section id="quit" class="screen">
+      <div class="center">
+        <div data-logo="0.55"></div>
+        <div class="bye">おしまい またね！</div>
+      </div>
+    </section>
+
+    <div id="boom">ドゴォーン！</div>
+    <div id="nav"></div>
+    <button type="button" id="home" aria-label="ホーム" tabindex="-1"><svg viewBox="0 0 24 24"><path d="M12 3 1.500 12.500H5V21h5.500v-6h3v6H19v-8.500h3.500z"/></svg></button>
+
+    <div id="modal">
+      <div class="mcard">
+        <div class="mtitle">おわりにしますか？</div>
+        <div class="mbtns">
+          <button type="button" id="m-no" class="nbtn primary" tabindex="-1"><span>いいえ</span></button>
+          <button type="button" id="m-yes" class="nbtn secondary" tabindex="-1"><span>はい</span></button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div id="portrait">
+    <div class="phone"></div>
+    <div class="ptext">スマホを よこに してね！</div>
+  </div>
+</div>
+<script>
+// ===== sfx.js =====
+// sfx.js : WebAudio の合成効果音（window.Sfx だけ公開）。音声ファイルは使わない。
+(function () {
+  'use strict';
+  var ctx = null, master = null, noiseBuf = null, lastMove = 0;
+  var api = { muted: false };
+
+  function unlock() {
+    try {
+      if (!ctx) {
+        var AC = window.AudioContext || window.webkitAudioContext;
+        if (!AC) return;
+        ctx = new AC();
+        master = ctx.createGain();
+        master.gain.value = 0.7;
+        var comp = ctx.createDynamicsCompressor();
+        master.connect(comp); comp.connect(ctx.destination);
+        var len = Math.floor(ctx.sampleRate * 1.2);
+        noiseBuf = ctx.createBuffer(1, len, ctx.sampleRate);
+        var d = noiseBuf.getChannelData(0);
+        for (var i = 0; i < len; i++) d[i] = Math.random() * 2 - 1;
+      }
+      if (ctx.state === 'suspended') { var p = ctx.resume(); if (p && p.catch) p.catch(function () {}); }
+    } catch (e) {}
+  }
+
+  // 音の高さ f0 → f1、長さ dur、波形 type、音量 vol、開始の遅れ at
+  function tone(type, f0, f1, dur, vol, at) {
+    var t = ctx.currentTime + (at || 0);
+    var o = ctx.createOscillator(), g = ctx.createGain();
+    o.type = type;
+    o.frequency.setValueAtTime(f0, t);
+    if (f1 && f1 !== f0) o.frequency.exponentialRampToValueAtTime(f1, t + dur);
+    g.gain.setValueAtTime(0.0001, t);
+    g.gain.exponentialRampToValueAtTime(vol, t + Math.min(0.015, dur / 3));
+    g.gain.exponentialRampToValueAtTime(0.0001, t + dur);
+    o.connect(g); g.connect(master);
+    o.start(t); o.stop(t + dur + 0.05);
+  }
+
+  function noise(dur, vol, fType, f0, f1, at) {
+    var t = ctx.currentTime + (at || 0);
+    var s = ctx.createBufferSource(), f = ctx.createBiquadFilter(), g = ctx.createGain();
+    s.buffer = noiseBuf;
+    f.type = fType;
+    f.frequency.setValueAtTime(f0, t);
+    if (f1) f.frequency.exponentialRampToValueAtTime(f1, t + dur);
+    g.gain.setValueAtTime(vol, t);
+    g.gain.exponentialRampToValueAtTime(0.0001, t + dur);
+    s.connect(f); f.connect(g); g.connect(master);
+    s.start(t, Math.random() * 0.2); s.stop(t + dur + 0.05);
+  }
+
+  var sounds = {
+    move: function () {   // 小さくやわらかい「ぽ」
+      var now = ctx.currentTime;
+      if (now - lastMove < 0.12) return;   // 連続でも耳障りにならない
+      lastMove = now;
+      tone('sine', 220 + Math.random() * 20, 170, 0.09, 0.07);
+    },
+    turn: function () { tone('triangle', 420, 560, 0.12, 0.12); },
+    tap: function () { tone('sine', 660, 880, 0.08, 0.2); tone('sine', 990, 990, 0.06, 0.08, 0.04); },
+    bump: function () { tone('square', 140, 90, 0.12, 0.1); noise(0.08, 0.12, 'lowpass', 500); },
+    fire: function () {   // ぽんっと打ち上げる
+      tone('sine', 300, 90, 0.25, 0.35);
+      tone('triangle', 700, 250, 0.15, 0.12);
+      noise(0.12, 0.15, 'bandpass', 1500, 500);
+    },
+    boom: function () {   // 低い爆発音＋破片っぽいノイズ
+      tone('sine', 140, 38, 0.7, 0.6);
+      tone('sawtooth', 90, 40, 0.45, 0.2);
+      noise(0.55, 0.45, 'lowpass', 1800, 120);
+      for (var i = 0; i < 6; i++) {
+        noise(0.05 + Math.random() * 0.06, 0.12, 'highpass', 2500 + Math.random() * 3000, null, 0.08 + i * 0.07 + Math.random() * 0.04);
+      }
+    },
+    found: function () {  // キラキラ上昇のファンファーレ
+      var n = [523.25, 659.25, 783.99, 1046.5, 1318.5, 1568];
+      n.forEach(function (f, i) {
+        tone('triangle', f, f, 0.28, 0.2, i * 0.09);
+        tone('sine', f * 2, f * 2, 0.2, 0.06, i * 0.09 + 0.02);
+      });
+      var t0 = 0.6;
+      [1046.5, 1318.5, 1568].forEach(function (f) { tone('triangle', f, f, 0.7, 0.18, t0); });
+      tone('sine', 523.25, 523.25, 0.7, 0.15, t0);
+      for (var i = 0; i < 8; i++) tone('sine', 2000 + Math.random() * 2500, null, 0.08, 0.04, 0.45 + i * 0.07);
+    }
+  };
+
+  api.unlock = unlock;
+  api.play = function (name) {
+    try {
+      if (api.muted || !ctx || !sounds[name]) return;
+      if (ctx.state === 'suspended') { var p = ctx.resume(); if (p && p.catch) p.catch(function () {}); }
+      sounds[name]();
+    } catch (e) {}
+  };
+  window.Sfx = api;
+})();
+
+// ===== mapgen.js =====
+/* mapgen.js : 画像 -> 地図データ（MapData）、宝の位置、既定地図。公開する名前は window.MapGen だけ。 */
+(function () {
+  'use strict';
+
+  var MAX_LONG = 64;        // 縮小後の長い辺（画素）
+  var BLOCK = 2;            // 画像1画素 = 2x2マス
+  var PIC_LONG = 512;       // みつけた！画面用の元画像の長い辺
+  var WALL_H = 10;          // 高さ10（真っ黒）だけが壁。濃い青や赤の塗りは壁にしない
+  var MIN_PIXELS = 4;       // 4画素（=16マス）未満の領域は除外
+  var DX = [0, 1, 0, -1], DZ = [-1, 0, 1, 0];
+  var KID_ERROR = 'この え は つかえないよ';
+
+  // ---------- 小さな道具 ----------
+  function newCanvas(w, h) {
+    var c = document.createElement('canvas');
+    c.width = Math.max(1, w); c.height = Math.max(1, h);
+    return c;
+  }
+  function whiteCanvas(w, h) {
+    var c = newCanvas(w, h), g = c.getContext('2d');
+    g.fillStyle = '#fff'; g.fillRect(0, 0, c.width, c.height);
+    g.imageSmoothingEnabled = true;
+    try { g.imageSmoothingQuality = 'high'; } catch (e) { /* 古いブラウザ */ }
+    return c;
+  }
+  // src（canvas か img）を、長い辺が maxLong 以下になるまで縮小。半分ずつ縮めて画質を保ち、大きな写真でも速い。
+  // 透明部分は白になる。小さい画像は拡大しない。
+  function shrink(src, sw, sh, maxLong) {
+    var k = Math.min(1, maxLong / Math.max(sw, sh));
+    var tw = Math.max(1, Math.round(sw * k)), th = Math.max(1, Math.round(sh * k));
+    var cur = src, cw = sw, ch = sh;
+    while (cw > tw * 2 || ch > th * 2) {
+      var nw = Math.max(tw, Math.ceil(cw / 2)), nh = Math.max(th, Math.ceil(ch / 2));
+      var c = whiteCanvas(nw, nh);
+      c.getContext('2d').drawImage(cur, 0, 0, cw, ch, 0, 0, nw, nh);
+      cur = c; cw = nw; ch = nh;
+    }
+    var out = whiteCanvas(tw, th);
+    out.getContext('2d').drawImage(cur, 0, 0, cw, ch, 0, 0, tw, th);
+    return out;
+  }
+
+  // ---------- 解析 ----------
+  // 画素(pw x ph)のRGBA -> MapData（絵の部分）。picture/title/reading は呼び出し側で入れる。
+  function analyze(rgba, pw, ph, darkL) {
+    var w = pw * BLOCK, h = ph * BLOCK, n = w * h;
+    var heights = new Uint8Array(n), colors = new Uint8Array(n * 3);
+    var px, pz, i, j, dx, dz;
+    for (pz = 0; pz < ph; pz++) {
+      for (px = 0; px < pw; px++) {
+        var p = (pz * pw + px) * 4;
+        var a = rgba[p + 3] / 255;
+        // 透明は白扱い
+        var r = Math.round(rgba[p] * a + 255 * (1 - a));
+        var g = Math.round(rgba[p + 1] * a + 255 * (1 - a));
+        var b = Math.round(rgba[p + 2] * a + 255 * (1 - a));
+        var L = (0.299 * r + 0.587 * g + 0.114 * b) / 255;
+        // 高さは「その画素が受け持つ範囲で一番濃い色」で決める（縮小で細い線が薄れて壁が途切れるのを防ぐ）
+        if (darkL) L = Math.min(L, darkL[pz * pw + px]);
+        var hh = Math.round((1 - L) * 10);
+        if (hh < 0) hh = 0; if (hh > 10) hh = 10;
+        for (dz = 0; dz < BLOCK; dz++) {
+          for (dx = 0; dx < BLOCK; dx++) {
+            i = (pz * BLOCK + dz) * w + (px * BLOCK + dx);
+            heights[i] = hh;
+            colors[i * 3] = r; colors[i * 3 + 1] = g; colors[i * 3 + 2] = b;
+          }
+        }
+      }
+    }
+
+    return analyzeCells(heights, colors, w, h);
+  }
+  function analyzeCells(heights, colors, w, h) {
+    var n = w * h, label = new Int32Array(n).fill(-1), queue = new Int32Array(n), regions = [], i, j, x, z;
+    for (i = 0; i < n; i++) {
+      if (heights[i] >= WALL_H || label[i] !== -1) continue;
+      var id = regions.length, qh = 0, qt = 0, reg = { id: id, size: 0, edge: false, sx: 0, sz: 0 };
+      label[i] = id; queue[qt++] = i;
+      while (qh < qt) {
+        j = queue[qh++]; x = j % w; z = (j - x) / w;
+        reg.size++; reg.sx += x; reg.sz += z;
+        if (x === 0 || z === 0 || x === w - 1 || z === h - 1) reg.edge = true;
+        if (x > 0 && label[j - 1] === -1 && heights[j - 1] < WALL_H) { label[j - 1] = id; queue[qt++] = j - 1; }
+        if (x < w - 1 && label[j + 1] === -1 && heights[j + 1] < WALL_H) { label[j + 1] = id; queue[qt++] = j + 1; }
+        if (z > 0 && label[j - w] === -1 && heights[j - w] < WALL_H) { label[j - w] = id; queue[qt++] = j - w; }
+        if (z < h - 1 && label[j + w] === -1 && heights[j + w] < WALL_H) { label[j + w] = id; queue[qt++] = j + w; }
+      }
+      regions.push(reg);
+    }
+    // 外の領域（スタートを置く所）: 端に触れる最大の非壁領域。無ければ最大の領域。
+    var main = null;
+    for (i = 0; i < regions.length; i++) if (regions[i].edge && (!main || regions[i].size > main.size)) main = regions[i];
+    if (!main) for (i = 0; i < regions.length; i++) if (!main || regions[i].size > main.size) main = regions[i];
+    if (!main) { // 全面が壁：中央に小さな空き地を掘ってやり直す
+      var cx = Math.floor(w / 2), cz = Math.floor(h / 2), ex, ez;
+      for (ez = -1; ez <= 1; ez++) for (ex = -1; ex <= 1; ex++) {
+        x = Math.min(w - 1, Math.max(0, cx + ex)); z = Math.min(h - 1, Math.max(0, cz + ez));
+        heights[z * w + x] = 0;
+      }
+      return analyzeCells(heights, colors, w, h);
+    }
+    return finish(heights, colors, w, h, label, regions, main);
+  }
+
+  function finish(heights, colors, w, h, label, regions, main) {
+    var n = w * h, i, x, z, k;
+
+    // --- スタート2つ：外の領域の、高さ0（無ければ最も低い）のマスから、互いに離して選ぶ ---
+    var minH = 255;
+    for (i = 0; i < n; i++) if (label[i] === main.id && heights[i] < minH) minH = heights[i];
+    var cand = [], soft = [];
+    for (i = 0; i < n; i++) {
+      if (label[i] !== main.id || heights[i] !== minH) continue;
+      cand.push(i);
+      x = i % w; z = (i - x) / w;
+      var ok = x > 0 && z > 0 && x < w - 1 && z < h - 1;
+      for (k = 0; ok && k < 4; k++) {
+        var nj = (z + DZ[k]) * w + (x + DX[k]);
+        if (Math.abs(heights[nj] - minH) > 1) ok = false;
+      }
+      if (ok) soft.push(i);
+    }
+    if (soft.length) cand = soft; // 周りが平らな所を優先（1x1の戦車が動きやすい）
+    function d2(a, b) { var ax = a % w, az = (a - ax) / w, bx = b % w, bz = (b - bx) / w; return (ax - bx) * (ax - bx) + (az - bz) * (az - bz); }
+    function farthest(from, list) { var best = list[0], bd = -1; for (var q = 0; q < list.length; q++) { var d = d2(from, list[q]); if (d > bd) { bd = d; best = list[q]; } } return best; }
+    var s0 = farthest(cand[0], cand);      // 端の一つ（仮。宝が決まったあと、ふちから離して選び直す）
+    var s1 = farthest(s0, cand);           // そこから最も遠い所
+    if (s1 === s0 && cand.length > 1) s1 = cand[cand.length - 1] !== s0 ? cand[cand.length - 1] : cand[0];
+    // ホストは宝に近い側ではなく、地図の左上寄りの端（見た目が安定するように）
+    if (d2(s0, 0) > d2(s1, 0)) { var t = s0; s0 = s1; s1 = t; }
+
+    // --- 宝：端に触れない領域のうち 4画素(16マス)以上で最小の領域の、重心に最も近いマス ---
+    var minCells = MIN_PIXELS * BLOCK * BLOCK, best = null;
+    for (k = 0; k < regions.length; k++) {
+      var r = regions[k];
+      if (r.edge || r.id === main.id || r.size < minCells) continue;
+      if (!best || r.size < best.size) best = r;
+    }
+    var treasure = null;
+    if (best) {
+      var gx = best.sx / best.size, gz = best.sz / best.size, bd = Infinity, rmin = 255;
+      // 領域の中でも、戦車が立てる低い所（高さ0〜1、無ければ領域でいちばん低い所）に置く
+      for (i = 0; i < n; i++) if (label[i] === best.id && heights[i] < rmin) rmin = heights[i];
+      var tmaxH = Math.max(1, rmin);
+      for (i = 0; i < n; i++) {
+        if (label[i] !== best.id || heights[i] > tmaxH) continue;
+        x = i % w; z = (i - x) / w;
+        var d = (x - gx) * (x - gx) + (z - gz) * (z - gz);
+        if (d < bd) { bd = d; treasure = { x: x, z: z }; }
+      }
+    } else {
+      // 候補が無い：スタートから最も遠い、行ける（高さの差1以内）マス
+      var dist = new Int32Array(n).fill(-1), q = new Int32Array(n), qh = 0, qt = 0, last = s0;
+      dist[s0] = 0; q[qt++] = s0;
+      while (qh < qt) {
+        var c = q[qh++]; last = c; x = c % w; z = (c - x) / w;
+        for (k = 0; k < 4; k++) {
+          var nx = x + DX[k], nz = z + DZ[k];
+          if (nx < 0 || nz < 0 || nx >= w || nz >= h) continue;
+          var nj2 = nz * w + nx;
+          if (dist[nj2] !== -1 || Math.abs(heights[nj2] - heights[c]) > 1) continue;
+          dist[nj2] = dist[c] + 1; q[qt++] = nj2;
+        }
+      }
+      if (last === s0 || last === s1) { // 狭すぎるとき：スタートでない別のマス
+        for (i = 0; i < n; i++) if (i !== s0 && i !== s1 && heights[i] < WALL_H) { last = i; break; }
+      }
+      treasure = { x: last % w, z: (last - (last % w)) / w };
+    }
+
+    // --- スタートの選び直し：地図のふちから離し（前方に迷路が広がる所）、宝から遠い側を host にする ---
+    var tI = treasure.z * w + treasure.x, EDGE_MIN = 6;
+    function edgeDist(c) { var cx = c % w, cz = (c - cx) / w; return Math.min(cx, cz, w - 1 - cx, h - 1 - cz); }
+    var picked = null;
+    for (var margin = EDGE_MIN; margin >= 0 && !picked; margin--) {
+      var pool = [];
+      for (i = 0; i < n; i++) {
+        if (label[i] !== main.id || heights[i] !== minH || i === tI || edgeDist(i) < margin) continue;
+        pool.push(i);
+      }
+      var flat = pool.filter(function (c) {
+        var cx = c % w, cz = (c - cx) / w;
+        for (var zz = -1; zz <= 1; zz++) for (var xx = -1; xx <= 1; xx++) {
+          var nx = cx + xx, nz = cz + zz;
+          if (nx < 0 || nz < 0 || nx >= w || nz >= h || Math.abs(heights[nz * w + nx] - minH) > 1) return false;
+        }
+        return true;
+      });
+      if (flat.length) picked = flat; else if (pool.length && margin === 0) picked = pool;
+    }
+    // 戦車が実際に歩いて行ける（高さの差1以内でつながる）いちばん広い範囲に、2つのスタートを置く（色の積み木でふさがれた所を避ける）
+    if (picked) {
+      var wl = new Int32Array(n).fill(-1), wsz = [], wq = new Int32Array(n);
+      for (i = 0; i < n; i++) {
+        if (label[i] !== main.id || wl[i] !== -1) continue;
+        var wid = wsz.length, a0 = 0, a1 = 0; wl[i] = wid; wq[a1++] = i;
+        while (a0 < a1) {
+          var cc = wq[a0++], cx2 = cc % w, cz2 = (cc - cx2) / w;
+          for (k = 0; k < 4; k++) {
+            var ax = cx2 + DX[k], az = cz2 + DZ[k];
+            if (ax < 0 || az < 0 || ax >= w || az >= h) continue;
+            var aj = az * w + ax;
+            if (wl[aj] !== -1 || heights[aj] >= WALL_H || Math.abs(heights[aj] - heights[cc]) > 1) continue;
+            wl[aj] = wid; wq[a1++] = aj;
+          }
+        }
+        wsz.push(a1);
+      }
+      var bigW = 0; for (k = 1; k < wsz.length; k++) if (wsz[k] > wsz[bigW]) bigW = k;
+      var inBig = picked.filter(function (c) { return wl[c] === bigW; });
+      if (inBig.length > 1) picked = inBig;
+    }
+    function dirFor(c) { // 前に7マス以上進める向きのうち、宝にいちばん向いている向き
+      var cx = c % w, cz = (c - cx) / w, vx = treasure.x - cx, vz = treasure.z - cz, len = Math.sqrt(vx * vx + vz * vz) || 1, best = null;
+      for (var d = 0; d < 4; d++) {
+        if (runLen(c, d) < 7) continue;
+        var cs = (vx * DX[d] + vz * DZ[d]) / len;
+        if (!best || cs > best.cs) best = { d: d, cs: cs };
+      }
+      return best;
+    }
+    if (picked) {
+      // 前方がひらけ、宝のほうを向ける所だけに絞り、宝から ほどよい遠さ（遠すぎず近すぎず）の所を選ぶ
+      var WANT = Math.min(35, 0.3 * Math.sqrt(w * w + h * h)), good = [], open = [];
+      picked.forEach(function (c) {
+        var bd = dirFor(c); if (!bd) return;
+        open.push(c);
+        var dist = Math.sqrt(d2(c, tI));
+        if (bd.cs >= 0.5 && dist >= 8) good.push({ c: c, key: Math.abs(dist - WANT) });
+      });
+      good.sort(function (p, q) { return p.key - q.key; });
+      if (good.length) s0 = good[0].c; else s0 = farthest(tI, open.length ? open : picked);
+      var pool2 = good.length > 1 ? good.map(function (g) { return g.c; }) : (open.length > 1 ? open : picked);
+      pool2 = pool2.filter(function (c) { return c !== s0; });
+      s1 = pool2.length ? farthest(s0, pool2) : s0;
+    }
+    function runLen(cell, d) {
+      var cx = cell % w, cz = (cell - cx) / w, run = 0, ph = heights[cell];
+      for (;;) {
+        var qx = cx + DX[d] * (run + 1), qz = cz + DZ[d] * (run + 1);
+        if (qx < 0 || qz < 0 || qx >= w || qz >= h) break;
+        if (Math.abs(heights[qz * w + qx] - ph) > 1 || heights[qz * w + qx] >= WALL_H) break;
+        run++; if (run >= 8) break;
+      }
+      return run;
+    }
+    if (d2(s0, 0) > d2(s1, 0)) { var t2 = s0; s0 = s1; s1 = t2; }
+
+    // --- 向き：すぐ前に進める所が長く続く向き。同じなら宝の方へ ---
+    function pickDir(cell) {
+      var cx = cell % w, cz = (cell - cx) / w, bestDir = 0, bestScore = -1e9;
+      for (var d = 0; d < 4; d++) {
+        var run = runLen(cell, d);
+        var tvx = treasure.x - cx, tvz = treasure.z - cz, toward = 100 * (tvx * DX[d] + tvz * DZ[d]) / (Math.sqrt(tvx * tvx + tvz * tvz) || 1);
+        // 開けている（7マス以上進める）向きのうち宝に近い向き。どれも狭ければ、いちばん開けている向き
+        var score = (run >= 7 ? 100000 : run * 1000) + (run >= 1 ? toward : -999);
+        if (score > bestScore) { bestScore = score; bestDir = d; }
+      }
+      return bestDir;
+    }
+    return {
+      w: w, h: h, heights: heights, colors: colors,
+      treasure: treasure,
+      starts: [{ x: s0 % w, z: (s0 - s0 % w) / w, dir: pickDir(s0) }, { x: s1 % w, z: (s1 - s1 % w) / w, dir: pickDir(s1) }],
+      title: '', reading: '', picture: ''
+    };
+  }
+
+  // ---------- 共通処理 ----------
+  // src: canvas か img。大きい画像でも半分ずつ縮めるので速い。
+  function build(src, sw, sh, title, reading) {
+    if (!(sw > 0 && sh > 0)) throw new Error(KID_ERROR);
+    var pic = shrink(src, sw, sh, PIC_LONG);
+    var small = shrink(pic, pic.width, pic.height, MAX_LONG);
+    var pw = small.width, ph = small.height;
+    var rgba = small.getContext('2d').getImageData(0, 0, pw, ph).data;
+    var map = analyze(rgba, pw, ph, darkest(src, sw, sh, pw, ph));
+    map.title = title; map.reading = reading;
+    map.picture = pic.toDataURL('image/jpeg', 0.82);
+    return map;
+  }
+  // 元画像（長辺2048まで）を見て、縮小後の各画素が受け持つ範囲の最も暗い輝度を求める。
+  // 3x3 の近傍で2番目に暗い値を使い、写真の1画素だけの汚れは拾わない。
+  function darkest(src, sw, sh, pw, ph) {
+    var big = shrink(src, sw, sh, 2048), bw = big.width, bh = big.height;
+    var d = big.getContext('2d').getImageData(0, 0, bw, bh).data;
+    var lum = new Float32Array(bw * bh), i;
+    for (i = 0; i < bw * bh; i++) {
+      var a = d[i * 4 + 3] / 255;
+      lum[i] = ((0.299 * d[i * 4] + 0.587 * d[i * 4 + 1] + 0.114 * d[i * 4 + 2]) * a + 255 * (1 - a)) / 255;
+    }
+    var out = new Float32Array(pw * ph);
+    for (var pz = 0; pz < ph; pz++) {
+      var z0 = Math.floor(pz * bh / ph), z1 = Math.max(z0 + 1, Math.floor((pz + 1) * bh / ph));
+      for (var px = 0; px < pw; px++) {
+        var x0 = Math.floor(px * bw / pw), x1 = Math.max(x0 + 1, Math.floor((px + 1) * bw / pw));
+        var m1 = 1, m2 = 1;
+        for (var z = z0; z < z1; z++) for (var x = x0; x < x1; x++) {
+          var v = lum[z * bw + x];
+          if (v < m1) { m2 = m1; m1 = v; } else if (v < m2) m2 = v;
+        }
+        out[pz * pw + px] = (z1 - z0) * (x1 - x0) > 1 ? m2 : m1;
+      }
+    }
+    return out;
+  }
+  function fromCanvas(canvas, title, reading) {
+    return build(canvas, canvas.width, canvas.height, title || 'よみこんだ え', reading || 'よみこんだ え');
+  }
+  function fromFile(file) {
+    return new Promise(function (resolve, reject) {
+      var fail = function () { reject(new Error(KID_ERROR)); };
+      if (!file || !file.size || (file.type && file.type.indexOf('image/') !== 0)) { fail(); return; }
+      var url;
+      try { url = URL.createObjectURL(file); } catch (e) { fail(); return; }
+      var img = new Image();
+      img.onload = function () {
+        // 描画を一度ブラウザに返してから重い処理（固まった感じを減らす）
+        setTimeout(function () {
+          try {
+            var m = build(img, img.naturalWidth, img.naturalHeight, 'よみこんだ え', 'よみこんだ え');
+            URL.revokeObjectURL(url);
+            resolve(m);
+          } catch (e) { URL.revokeObjectURL(url); fail(); }
+        }, 0);
+      };
+      img.onerror = function () { URL.revokeObjectURL(url); fail(); };
+      img.src = url;
+    });
+  }
+
+  // ---------- encode / decode ----------
+  function toB64(u8) {
+    var s = '', CH = 0x2000;
+    for (var i = 0; i < u8.length; i += CH) s += String.fromCharCode.apply(null, u8.subarray(i, i + CH));
+    return btoa(s);
+  }
+  function fromB64(str) {
+    var s = atob(str), u8 = new Uint8Array(s.length);
+    for (var i = 0; i < s.length; i++) u8[i] = s.charCodeAt(i);
+    return u8;
+  }
+  function encode(map) {
+    return {
+      w: map.w, h: map.h,
+      heights: toB64(map.heights), colors: toB64(map.colors),
+      treasure: { x: map.treasure.x, z: map.treasure.z },
+      starts: map.starts.map(function (s) { return { x: s.x, z: s.z, dir: s.dir }; }),
+      title: map.title, reading: map.reading, picture: map.picture
+    };
+  }
+  function decode(o) {
+    var m = {
+      w: o.w, h: o.h, heights: fromB64(o.heights), colors: fromB64(o.colors),
+      treasure: { x: o.treasure.x, z: o.treasure.z },
+      starts: o.starts.map(function (s) { return { x: s.x, z: s.z, dir: s.dir }; }),
+      title: o.title, reading: o.reading, picture: o.picture
+    };
+    if (m.heights.length !== m.w * m.h || m.colors.length !== m.w * m.h * 3) throw new Error('map size mismatch');
+    return m;
+  }
+
+  // ---------- 既定地図（四字熟語） ----------
+  var PRESETS = [ // 字の中に閉じた部分（口・日・田など）があり、小さい字でもつぶれにくい熟語
+    { id: 'jiyu', title: '自由自在', reading: 'じゆうじざい' },
+    { id: 'shiho', title: '四方八方', reading: 'しほうはっぽう' },
+    { id: 'hinkou', title: '品行方正', reading: 'ひんこうほうせい' },
+    { id: 'mikka', title: '三日坊主', reading: 'みっかぼうず' },
+    { id: 'ichinichi', title: '一日千秋', reading: 'いちじつせんしゅう' }
+  ];
+  var STROKE = 10;
+  var THIN = { '鳥': 0, '麗': 0, '龍': 0 }; // 字ごとの太らせる量（線の多い字は細く。0=太らせない）
+  var FONT = "'Hiragino Kaku Gothic ProN','Hiragino Sans','Noto Sans JP','Yu Gothic',sans-serif";
+
+  function rng(seed) { // mulberry32
+    var a = seed >>> 0;
+    return function () {
+      a = (a + 0x6D2B79F5) >>> 0;
+      var t = a;
+      t = Math.imul(t ^ (t >>> 15), t | 1);
+      t ^= t + Math.imul(t ^ (t >>> 7), t | 61);
+      return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
+    };
+  }
+  // 床の色（明るい＝高さ0〜1。戦車が通れる）。できるだけ濃い色。明るさ L >= 0.86 を保つ。
+  var CRAYONS = ['#ffe45c', '#ffd0e0', '#b8ecff', '#c6f5b0', '#ffd9a0', '#e6d6ff', '#fff06e', '#ffc4d6', '#a8e8ff', '#b4f09a'];
+  // 積み木の色（やや暗い＝高さ2〜6くらい）。色つきの積み木になる。
+  var BLOCKS = ['#e84a4a', '#3f8fe8', '#4cb54c', '#ff9a2e', '#9b5de5', '#ffd23f', '#2bb5c8', '#ff6fa5'];
+  var BLOCK_RATE = 0.18;     // 落書きのうち、色の積み木になる割合（少しだけ）
+
+  function crayonStroke(g, rand, pts, width, color) {
+    // 同じ線を少しずらして3回重ね、クレヨンのかすれを出す
+    for (var pass = 0; pass < 3; pass++) {
+      g.beginPath();
+      g.globalAlpha = 0.55 + rand() * 0.3;
+      g.strokeStyle = color; g.lineWidth = width * (0.8 + rand() * 0.4);
+      g.lineCap = 'round'; g.lineJoin = 'round';
+      for (var i = 0; i < pts.length; i++) {
+        var px = pts[i][0] + (rand() - 0.5) * 6, pz = pts[i][1] + (rand() - 0.5) * 6;
+        if (i === 0) g.moveTo(px, pz); else g.lineTo(px, pz);
+      }
+      g.stroke();
+    }
+    g.globalAlpha = 1;
+  }
+  function doodle(g, rand, W, H) {
+    var kind = Math.floor(rand() * 5), block = rand() < BLOCK_RATE;
+    var color = block ? BLOCKS[Math.floor(rand() * BLOCKS.length)] : CRAYONS[Math.floor(rand() * CRAYONS.length)];
+    var cx = rand() * W, cz = rand() * H, s = 50 + rand() * 90, pts = [], i;
+    if (kind === 0) {          // ぐるぐるうず
+      for (i = 0; i < 60; i++) { var a = i * 0.45, r = 3 + i * s / 60; pts.push([cx + Math.cos(a) * r, cz + Math.sin(a) * r]); }
+      crayonStroke(g, rand, pts, 16, color);
+    } else if (kind === 1) {   // ジグザグのぬりつぶし
+      for (i = 0; i < 14; i++) pts.push([cx + (i % 2 ? s : 0), cz + i * s / 10]);
+      crayonStroke(g, rand, pts, 20, color);
+    } else if (kind === 2) {   // 星
+      for (i = 0; i <= 5; i++) { var b = -Math.PI / 2 + i * 4 * Math.PI / 5; pts.push([cx + Math.cos(b) * s, cz + Math.sin(b) * s]); }
+      crayonStroke(g, rand, pts, 16, color);
+    } else if (kind === 3) {   // まるをぬる
+      for (var ring = s; ring > 8; ring -= 14) for (i = 0; i <= 24; i++) { var c = i / 24 * Math.PI * 2; pts.push([cx + Math.cos(c) * ring, cz + Math.sin(c) * ring]); }
+      crayonStroke(g, rand, pts, 18, color);
+    } else {                   // なみ線
+      for (i = 0; i < 16; i++) pts.push([cx + i * s / 6, cz + Math.sin(i * 0.9) * s / 3]);
+      crayonStroke(g, rand, pts, 16, color);
+    }
+  }
+
+  function drawPreset(def, seed) {
+    var S = 640, c = newCanvas(S, S), g = c.getContext('2d');
+    g.fillStyle = '#fff'; g.fillRect(0, 0, S, S);
+    var rand = rng(seed);
+    for (var d = 0; d < 32; d++) doodle(g, rand, S, S);
+    // 字：2x2に並べる。太く（fillText の上に strokeText を太い線で重ねる）
+    var chars = def.title.split(''), size = 262, cell = S / 2;
+    function drawChars(gx) {
+      gx.font = '900 ' + size + 'px ' + FONT;
+      gx.textAlign = 'center'; gx.textBaseline = 'middle';
+      gx.fillStyle = '#000'; gx.strokeStyle = '#000'; gx.lineJoin = 'round';
+      for (var i = 0; i < 4; i++) {
+        var cx = (i % 2) * cell + cell / 2, cz = Math.floor(i / 2) * cell + cell / 2 + 6;
+        gx.fillText(chars[i], cx, cz);
+        // 線の多い字（鳥など）は太らせすぎると黒い塊につぶれるので、太らせる量を字ごとに変える
+        var lw = THIN[chars[i]] != null ? THIN[chars[i]] : STROKE;
+        if (lw > 0) { gx.lineWidth = lw; gx.strokeText(chars[i], cx, cz); }
+      }
+    }
+    // 字だけの下書きで「字に囲まれた部分（口・日の中など）」を見つけ、そこには色の積み木をかかない（宝の部屋は低い床のまま）
+    var m = newCanvas(S, S), mg = m.getContext('2d');
+    mg.fillStyle = '#fff'; mg.fillRect(0, 0, S, S); drawChars(mg);
+    var md = mg.getImageData(0, 0, S, S).data, outside = new Uint8Array(S * S), stack = [], k;
+    // 字の線を少し太らせて見て、すきまのある囲み（縮小すると壁でつながる所）も「囲まれた部分」にする
+    var blk = new Uint8Array(S * S), blk2 = new Uint8Array(S * S), x0, z0, R = 3;
+    for (k = 0; k < S * S; k++) blk[k] = md[k * 4] < 128 ? 1 : 0;
+    for (z0 = 0; z0 < S; z0++) for (x0 = 0; x0 < S; x0++) if (blk[z0 * S + x0]) for (k = Math.max(0, x0 - R); k <= Math.min(S - 1, x0 + R); k++) blk2[z0 * S + k] = 1;
+    for (x0 = 0; x0 < S; x0++) for (z0 = 0; z0 < S; z0++) if (blk2[z0 * S + x0]) for (k = Math.max(0, z0 - R); k <= Math.min(S - 1, z0 + R); k++) blk[k * S + x0] = 1;
+    function push(i) { if (!outside[i] && !blk[i]) { outside[i] = 1; stack.push(i); } }
+    for (k = 0; k < S; k++) { push(k); push((S - 1) * S + k); push(k * S); push(k * S + S - 1); }
+    while (stack.length) {
+      var q = stack.pop(), qx = q % S;
+      if (qx > 0) push(q - 1); if (qx < S - 1) push(q + 1); if (q >= S) push(q - S); if (q < S * (S - 1)) push(q + S);
+    }
+    drawChars(g);
+    var fd = g.getImageData(0, 0, S, S), p = fd.data;
+    for (k = 0; k < S * S; k++) {
+      if (!outside[k] && md[k * 4] >= 128) { p[k * 4] = 255; p[k * 4 + 1] = 244; p[k * 4 + 2] = 196; p[k * 4 + 3] = 255; }
+    }
+    g.putImageData(fd, 0, 0);
+    return c;
+  }
+  function fromPreset(id) {
+    var def = null;
+    for (var i = 0; i < PRESETS.length; i++) if (PRESETS[i].id === id) def = PRESETS[i];
+    if (!def) def = PRESETS[0];
+    var canvas = drawPreset(def, 1000 + PRESETS.indexOf(def) * 37);
+    return fromCanvas(canvas, def.title, def.reading);
+  }
+
+  window.MapGen = {
+    presets: PRESETS.map(function (p) { return { id: p.id, title: p.title, reading: p.reading }; }),
+    fromPreset: fromPreset,
+    fromFile: fromFile,
+    fromCanvas: fromCanvas,
+    encode: encode,
+    decode: decode
+  };
+})();
+
+// ===== world.js =====
+/* world.js — 3Dの世界（地形・戦車・操作・カメラ・大砲・破片・宝）
+   公開するのは window.World だけ。THREE は r128 のグローバルを使う。 */
+(function () {
+  'use strict';
+
+  // 見た目の高さ：1段 = STEP_H。高さ0と1は「紙に塗った色」（平ら）、2〜10が積み木。壁（10）は 9段 = 1.8 の高さ（約2マス分）。
+  // 戦車が段差を上り下りする高さも、同じ vis() を使うので同じ尺度。
+  var STEP_H = 0.2;
+  function vis(h) { return h <= 1 ? 0 : (h - 1) * STEP_H; }
+  var FLOOR_SAT = 1.9; // 床の色の鮮やかさ（1で元の色）
+  var TANK_SCALE = 1.12; // 戦車の見た目の大きさ（1マスの中におさまる範囲で、少し大きく）
+  var DX = [0, 1, 0, -1];
+  var DZ = [-1, 0, 1, 0];
+  var MOVE_DUR = 0.22, TURN_DUR = 0.2, BUMP_DUR = 0.28;
+  var FIRE_CD = 0.8, BALL_DUR = 0.6;
+  var CAM_BLEND = 0.9;
+  var INTRO_HOLD = 2.0, INTRO_MOVE = 1.8; // 開始演出：真上から2秒見せて、斜め後ろへ寄せる
+  var DEBRIS_MAX = 900, PUFF_MAX = 48;
+  var GEM_R = 0.55, GEM_Y = 1.15; // 宝石の大きさと高さ（遠くからでも目立つように大きく）
+
+  // ---------- 小さな道具 ----------
+  function sfx(name) { try { if (window.Sfx && window.Sfx.play) window.Sfx.play(name); } catch (e) { /* 音が無くても続ける */ } }
+  function clamp(v, a, b) { return v < a ? a : v > b ? b : v; }
+  function ease(t) { return t < 0.5 ? 2 * t * t : 1 - Math.pow(-2 * t + 2, 2) / 2; }
+  function rand(a, b) { return a + Math.random() * (b - a); }
+  function angLerp(a, b, t) { var d = b - a; while (d > Math.PI) d -= Math.PI * 2; while (d < -Math.PI) d += Math.PI * 2; return a + d * t; }
+  function dirToHeading(d) { return -d * Math.PI / 2; }
+
+  function makeCanvas(w, h) { var c = document.createElement('canvas'); c.width = w; c.height = h; return c; }
+
+  // ---------- 共通テクスチャ（init で1回だけ作る） ----------
+  var T = null;
+  function buildSharedTextures() {
+    T = {};
+    // クレヨンで塗った紙のざらざら（白地に薄い灰色のすじ）
+    var c = makeCanvas(128, 128), g = c.getContext('2d');
+    g.fillStyle = '#fff'; g.fillRect(0, 0, 128, 128);
+    for (var i = 0; i < 520; i++) {
+      var x = Math.random() * 128, y = Math.random() * 128, l = rand(6, 22), a = rand(-0.9, -0.5);
+      var v = Math.floor(rand(205, 245));
+      g.strokeStyle = 'rgba(' + v + ',' + v + ',' + v + ',' + rand(0.25, 0.6).toFixed(2) + ')';
+      g.lineWidth = rand(0.6, 2.2);
+      g.beginPath(); g.moveTo(x, y); g.lineTo(x + Math.cos(a) * l, y + Math.sin(a) * l); g.stroke();
+    }
+    for (i = 0; i < 1600; i++) {
+      var v2 = Math.floor(rand(190, 255));
+      g.fillStyle = 'rgba(' + v2 + ',' + v2 + ',' + v2 + ',0.35)';
+      g.fillRect(Math.random() * 128, Math.random() * 128, 1, 1);
+    }
+    T.crayonCanvas = c;
+    T.crayon = new THREE.CanvasTexture(c);
+    T.crayon.wrapS = T.crayon.wrapT = THREE.RepeatWrapping;
+    T.crayon.anisotropy = 4;
+
+    // ぼかした丸（影・煙・光）
+    c = makeCanvas(64, 64); g = c.getContext('2d');
+    var gr = g.createRadialGradient(32, 32, 0, 32, 32, 32);
+    gr.addColorStop(0, 'rgba(255,255,255,1)'); gr.addColorStop(0.45, 'rgba(255,255,255,0.55)'); gr.addColorStop(1, 'rgba(255,255,255,0)');
+    g.fillStyle = gr; g.fillRect(0, 0, 64, 64);
+    T.soft = new THREE.CanvasTexture(c);
+
+    // 煙のもくもく（少しでこぼこ）
+    c = makeCanvas(64, 64); g = c.getContext('2d');
+    for (i = 0; i < 7; i++) {
+      var cx = 32 + rand(-10, 10), cy = 32 + rand(-10, 10), r = rand(12, 20);
+      gr = g.createRadialGradient(cx, cy, 0, cx, cy, r);
+      gr.addColorStop(0, 'rgba(255,255,255,0.9)'); gr.addColorStop(1, 'rgba(255,255,255,0)');
+      g.fillStyle = gr; g.beginPath(); g.arc(cx, cy, r, 0, Math.PI * 2); g.fill();
+    }
+    T.puff = new THREE.CanvasTexture(c);
+
+    // ドカンのギザギザ（黄色とオレンジのマンガ風の爆発）
+    c = makeCanvas(256, 256); g = c.getContext('2d');
+    function spiky(n, r0, r1, fill, stroke) {
+      g.beginPath();
+      for (var k = 0; k < n * 2; k++) {
+        var ang = k / (n * 2) * Math.PI * 2 + rand(-0.06, 0.06);
+        var rr = (k % 2 ? r0 : r1) * rand(0.85, 1.1);
+        var px = 128 + Math.cos(ang) * rr, py = 128 + Math.sin(ang) * rr;
+        if (k === 0) g.moveTo(px, py); else g.lineTo(px, py);
+      }
+      g.closePath(); g.fillStyle = fill; g.fill();
+      if (stroke) { g.lineWidth = 7; g.strokeStyle = stroke; g.stroke(); }
+    }
+    spiky(13, 70, 122, '#ff7a00', '#2b1a10');
+    spiky(11, 48, 92, '#ffd21f', null);
+    spiky(9, 26, 56, '#fffbe0', null);
+    T.burst = new THREE.CanvasTexture(c);
+
+    // 星（宝のきらきら）
+    c = makeCanvas(64, 64); g = c.getContext('2d');
+    g.translate(32, 32); g.beginPath();
+    for (i = 0; i < 10; i++) { var rr2 = i % 2 ? 9 : 30, an = i / 10 * Math.PI * 2 - Math.PI / 2; g.lineTo(Math.cos(an) * rr2, Math.sin(an) * rr2); }
+    g.closePath(); g.fillStyle = '#fff'; g.shadowColor = '#fff'; g.shadowBlur = 8; g.fill();
+    T.star = new THREE.CanvasTexture(c);
+
+    // 光の柱（下が明るく、上へ消える）
+    c = makeCanvas(4, 128); g = c.getContext('2d');
+    gr = g.createLinearGradient(0, 0, 0, 128);
+    gr.addColorStop(0, 'rgba(255,255,255,0)'); gr.addColorStop(0.6, 'rgba(255,255,255,0.35)'); gr.addColorStop(1, 'rgba(255,255,255,0.9)');
+    g.fillStyle = gr; g.fillRect(0, 0, 4, 128);
+    T.beam = new THREE.CanvasTexture(c);
+
+    // 空（上は水色、下は白っぽい）
+    c = makeCanvas(4, 256); g = c.getContext('2d');
+    gr = g.createLinearGradient(0, 0, 0, 256);
+    gr.addColorStop(0, '#5fb8f0'); gr.addColorStop(0.6, '#bfe6fb'); gr.addColorStop(1, '#f4fbff');
+    g.fillStyle = gr; g.fillRect(0, 0, 4, 256);
+    T.sky = new THREE.CanvasTexture(c);
+
+    // 机（地図の外側）
+    c = makeCanvas(128, 128); g = c.getContext('2d');
+    g.fillStyle = '#e9d2a8'; g.fillRect(0, 0, 128, 128);
+    for (i = 0; i < 60; i++) {
+      g.strokeStyle = 'rgba(160,110,60,' + rand(0.08, 0.2).toFixed(2) + ')'; g.lineWidth = rand(1, 3);
+      var yy = Math.random() * 128; g.beginPath(); g.moveTo(0, yy); g.bezierCurveTo(40, yy + rand(-4, 4), 90, yy + rand(-4, 4), 128, yy); g.stroke();
+    }
+    T.desk = new THREE.CanvasTexture(c);
+    T.desk.wrapS = T.desk.wrapT = THREE.RepeatWrapping;
+  }
+
+  // ---------- 角の丸い箱 ----------
+  function roundedBox(w, h, d, r) {
+    var s = new THREE.Shape();
+    var iw = w - 2 * r, ih = h - 2 * r, cr = Math.min(iw, ih) * 0.35;
+    var x0 = -iw / 2, y0 = -ih / 2;
+    s.moveTo(x0 + cr, y0);
+    s.lineTo(x0 + iw - cr, y0); s.quadraticCurveTo(x0 + iw, y0, x0 + iw, y0 + cr);
+    s.lineTo(x0 + iw, y0 + ih - cr); s.quadraticCurveTo(x0 + iw, y0 + ih, x0 + iw - cr, y0 + ih);
+    s.lineTo(x0 + cr, y0 + ih); s.quadraticCurveTo(x0, y0 + ih, x0, y0 + ih - cr);
+    s.lineTo(x0, y0 + cr); s.quadraticCurveTo(x0, y0, x0 + cr, y0);
+    var geo = new THREE.ExtrudeGeometry(s, { depth: Math.max(0.001, d - 2 * r), bevelEnabled: true, bevelThickness: r, bevelSize: r, bevelSegments: 3, curveSegments: 4 });
+    geo.center();
+    return geo;
+  }
+
+  // ---------- 戦車 ----------
+  var tankGeo = null;
+  function buildTankGeometry() {
+    tankGeo = {
+      body: roundedBox(0.5, 0.26, 0.74, 0.07),
+      track: roundedBox(0.17, 0.2, 0.84, 0.07),
+      wheel: new THREE.CylinderGeometry(0.075, 0.075, 0.03, 14),
+      hub: new THREE.CylinderGeometry(0.035, 0.035, 0.035, 10),
+      turret: new THREE.SphereGeometry(0.2, 20, 14, 0, Math.PI * 2, 0, Math.PI * 0.55),
+      ring: new THREE.CylinderGeometry(0.2, 0.21, 0.05, 20),
+      barrel: new THREE.CylinderGeometry(0.048, 0.055, 0.38, 14),
+      muzzle: new THREE.CylinderGeometry(0.068, 0.068, 0.07, 14),
+      eye: new THREE.SphereGeometry(0.07, 14, 10),
+      pupil: new THREE.SphereGeometry(0.036, 10, 8),
+      shine: new THREE.SphereGeometry(0.013, 6, 5),
+      cheek: new THREE.CircleGeometry(0.035, 12),
+      hatch: new THREE.CylinderGeometry(0.07, 0.07, 0.03, 14),
+      antenna: new THREE.CylinderGeometry(0.008, 0.008, 0.22, 5),
+      knob: new THREE.SphereGeometry(0.03, 8, 6),
+      shadow: new THREE.PlaneGeometry(1.05, 1.15),
+      marker: new THREE.ConeGeometry(0.5, 0.9, 16),
+      lamp: new THREE.SphereGeometry(0.035, 8, 6)
+    };
+    tankGeo.shadow.rotateX(-Math.PI / 2);
+    tankGeo.marker.rotateX(Math.PI); // 下向きの矢印
+  }
+
+  function makeTank(colorStr) {
+    var col = new THREE.Color(colorStr || '#e53935');
+    var dark = col.clone().multiplyScalar(0.62);
+    var light = col.clone().lerp(new THREE.Color('#ffffff'), 0.35);
+    var mats = {
+      main: new THREE.MeshStandardMaterial({ color: col, roughness: 0.42, metalness: 0.05 }),
+      dark: new THREE.MeshStandardMaterial({ color: dark, roughness: 0.5 }),
+      light: new THREE.MeshStandardMaterial({ color: light, roughness: 0.4 }),
+      track: new THREE.MeshStandardMaterial({ color: 0x2e2f36, roughness: 0.8 }),
+      wheel: new THREE.MeshStandardMaterial({ color: 0xcfd3da, roughness: 0.4, metalness: 0.2 }),
+      white: new THREE.MeshStandardMaterial({ color: 0xffffff, roughness: 0.25 }),
+      black: new THREE.MeshStandardMaterial({ color: 0x15151a, roughness: 0.3 }),
+      cheek: new THREE.MeshBasicMaterial({ color: 0xff8fa8, transparent: true, opacity: 0.85 }),
+      yellow: new THREE.MeshStandardMaterial({ color: 0xffd23f, roughness: 0.3, emissive: 0x332200 }),
+      shadow: new THREE.MeshBasicMaterial({ map: T.soft, color: 0x000000, transparent: true, opacity: 0.38, depthWrite: false }),
+      marker: new THREE.MeshBasicMaterial({ color: col, transparent: true, opacity: 0.95, depthTest: false })
+    };
+    var G = tankGeo;
+    var root = new THREE.Group();      // 位置・向き
+    var bump = new THREE.Group();      // ぶつかる・反動の前後ゆれ
+    var hull = new THREE.Group();      // 車体のゆれ
+    root.add(bump); bump.add(hull);
+
+    function M(geo, mat, x, y, z) { var m = new THREE.Mesh(geo, mat); m.position.set(x || 0, y || 0, z || 0); return m; }
+
+    // キャタピラと車輪
+    var wheels = [];
+    [-1, 1].forEach(function (side) {
+      var tr = M(G.track, mats.track, side * 0.31, 0.11, 0); hull.add(tr);
+      for (var k = 0; k < 3; k++) {
+        var wz = -0.25 + k * 0.25;
+        var wh = M(G.wheel, mats.wheel, side * 0.405, 0.11, wz); wh.rotation.z = Math.PI / 2; hull.add(wh); wheels.push(wh);
+        var hb = M(G.hub, mats.dark, side * 0.41, 0.11, wz); hb.rotation.z = Math.PI / 2; hull.add(hb);
+      }
+    });
+    // 車体
+    var body = M(G.body, mats.main, 0, 0.28, 0); body.rotation.y = 0; hull.add(body);
+    // 目（車体の前面）
+    var eyes = new THREE.Group(); eyes.position.set(0, 0.3, -0.345); hull.add(eyes);
+    [-1, 1].forEach(function (side) {
+      var e = M(G.eye, mats.white, side * 0.1, 0, 0); e.scale.set(1, 1.15, 0.6); eyes.add(e);
+      var p = M(G.pupil, mats.black, side * 0.095, -0.005, -0.04); p.scale.set(1, 1.2, 0.6); eyes.add(p);
+      var s = M(G.shine, mats.white, side * 0.085, 0.022, -0.06); eyes.add(s);
+      var ck = M(G.cheek, mats.cheek, side * 0.19, -0.065, 0.005); ck.rotation.y = Math.PI; eyes.add(ck);
+    });
+    // 前のライト
+    hull.add(M(G.lamp, mats.yellow, -0.2, 0.36, -0.36));
+    hull.add(M(G.lamp, mats.yellow, 0.2, 0.36, -0.36));
+    // 砲塔
+    var turret = new THREE.Group(); turret.position.set(0, 0.41, 0.06); hull.add(turret);
+    turret.add(M(G.ring, mats.dark, 0, 0.0, 0));
+    var dome = M(G.turret, mats.main, 0, 0.02, 0); dome.scale.set(1, 0.95, 1.05); turret.add(dome);
+    turret.add(M(G.hatch, mats.light, 0, 0.21, 0.03));
+    var ant = M(G.antenna, mats.track, 0.11, 0.24, 0.12); turret.add(ant);
+    turret.add(M(G.knob, mats.yellow, 0.11, 0.35, 0.12));
+    // 砲身（少し上向き）
+    var gun = new THREE.Group(); gun.position.set(0, 0.07, -0.1); gun.rotation.x = 0.12; turret.add(gun);
+    var barrelPivot = new THREE.Group(); gun.add(barrelPivot);
+    var barrel = M(G.barrel, mats.light, 0, 0, -0.19); barrel.rotation.x = Math.PI / 2; barrelPivot.add(barrel);
+    var muzzle = M(G.muzzle, mats.dark, 0, 0, -0.38); muzzle.rotation.x = Math.PI / 2; barrelPivot.add(muzzle);
+    // 足元の柔らかい影
+    var shadow = new THREE.Mesh(G.shadow, mats.shadow); shadow.position.y = 0.012; shadow.renderOrder = 1; root.add(shadow);
+    // 俯瞰のときの目じるし
+    var marker = new THREE.Mesh(G.marker, mats.marker); marker.renderOrder = 10; marker.visible = false; root.add(marker);
+
+    return {
+      root: root, bump: bump, hull: hull, turret: turret, barrel: barrelPivot, wheels: wheels, eyes: eyes, marker: marker, mats: mats,
+      colorStr: colorStr,
+      x: 0, z: 0, y: 0, heading: 0, // 表示の位置（マス単位）
+      wobble: 0, recoil: 0, blink: rand(1, 4), wheelRot: 0, moving: false
+    };
+  }
+  function disposeTank(tk) {
+    if (!tk) return;
+    if (tk.root.parent) tk.root.parent.remove(tk.root);
+    for (var k in tk.mats) tk.mats[k].dispose();
+  }
+  function recolorTank(tk, colorStr) {
+    var col = new THREE.Color(colorStr);
+    tk.mats.main.color.copy(col);
+    tk.mats.dark.color.copy(col).multiplyScalar(0.62);
+    tk.mats.light.color.copy(col).lerp(new THREE.Color('#ffffff'), 0.35);
+    tk.mats.marker.color.copy(col);
+    tk.colorStr = colorStr;
+  }
+  // 毎フレームの小さな動き（ゆれ・反動・まばたき・車輪）
+  function animateTank(tk, dt, time) {
+    var r = tk.root;
+    r.position.set(tk.x + 0.5, tk.y, tk.z + 0.5);
+    r.rotation.y = tk.heading;
+    r.scale.setScalar(TANK_SCALE);
+    var bob = tk.moving ? Math.sin(time * 34) * 0.018 : Math.sin(time * 2.2) * 0.006;
+    tk.hull.position.y = bob;
+    tk.hull.rotation.x = (tk.moving ? Math.sin(time * 17) * 0.035 : 0) + tk.recoil * 0.22;
+    tk.wobble *= Math.exp(-dt * 6);
+    tk.hull.rotation.z = Math.sin(time * 25) * tk.wobble * 0.15;
+    if (tk.moving) tk.wheelRot += dt * 14;
+    for (var i = 0; i < tk.wheels.length; i++) tk.wheels[i].rotation.x = tk.wheelRot;
+    tk.barrel.position.z = tk.recoil * 0.12;
+    tk.recoil = Math.max(0, tk.recoil - dt * 3.2);
+    tk.blink -= dt;
+    var ey = 1;
+    if (tk.blink < 0.12) ey = 0.15;
+    if (tk.blink < 0) tk.blink = rand(2, 5);
+    tk.eyes.scale.y = ey;
+  }
+
+  // ---------- 状態 ----------
+  var S = {
+    inited: false, container: null, renderer: null, scene: null, camera: null, ro: null, onWinResize: null,
+    raf: 0, running: false, paused: false, last: 0, time: 0,
+    map: null, w: 0, h: 0, heights: null, colors: null, destroyed: null,
+    level: null, // 地図ごとに作った物
+    myIndex: 0, players: [], net: false,
+    me: null, remotes: {}, held: {}, tapQ: {},
+    camMode: 1, camBlendT: 1, camFrom: null, chaseLift: 0, intro: null, topFlag: null,
+    shake: 0, stateAcc: 0, found: false, treasure: null,
+    projectiles: [], fx: null
+  };
+  var handlers = { found: [], boom: [], state: [], fire: [], cam: [] };
+  function emit(ev, a, b) {
+    var list = handlers[ev]; if (!list) return;
+    list.slice().forEach(function (fn) { try { fn(a, b); } catch (e) { console.warn('World handler error', e); } });
+  }
+
+  // ---------- 初期化 ----------
+  function init(containerEl) {
+    if (!window.THREE) throw new Error('THREE is not loaded');
+    if (S.inited) {
+      if (containerEl && containerEl !== S.container) { S.container = containerEl; containerEl.appendChild(S.renderer.domElement); watchResize(); }
+      resize();
+      return;
+    }
+    S.container = containerEl || document.body;
+    if (!T) buildSharedTextures();
+    if (!tankGeo) buildTankGeometry();
+    var r = new THREE.WebGLRenderer({ antialias: true, powerPreference: 'high-performance' });
+    r.setPixelRatio(Math.min(window.devicePixelRatio || 1, 2));
+    r.domElement.style.display = 'block';
+    r.domElement.style.width = '100%';
+    r.domElement.style.height = '100%';
+    r.domElement.style.touchAction = 'none';
+    S.container.appendChild(r.domElement);
+    S.renderer = r;
+
+    var sc = new THREE.Scene();
+    sc.background = T.sky;
+    S.scene = sc;
+    S.camera = new THREE.PerspectiveCamera(55, 16 / 9, 0.05, 400);
+    S.camera.position.set(0, 10, 10);
+
+    // 明かり：やわらかい環境光＋左上からの日ざし
+    sc.add(new THREE.HemisphereLight(0xffffff, 0xf0f0f2, 0.88)); // 色をつけない（壁は黒く、紙は白く見せる）
+    var sun = new THREE.DirectionalLight(0xffffff, 0.5);
+    sun.position.set(-0.55, 1, -0.4);
+    sc.add(sun);
+    // 爆発の光（いつも置いておき、明るさだけ変える）
+    S.boomLight = new THREE.PointLight(0xffb040, 0, 9, 2);
+    sc.add(S.boomLight);
+    // 宝の光
+    S.gemLight = new THREE.PointLight(0xff5fc0, 0, 7, 2);
+    sc.add(S.gemLight);
+
+    S.camFrom = { p: new THREE.Vector3(), q: new THREE.Quaternion() };
+    buildFx();
+    watchResize();
+    resize();
+    S.inited = true;
+  }
+  function watchResize() {
+    if (S.ro) { S.ro.disconnect(); S.ro = null; }
+    if (window.ResizeObserver) { S.ro = new ResizeObserver(function () { resize(); }); S.ro.observe(S.container); }
+    if (!S.onWinResize) { S.onWinResize = function () { resize(); }; window.addEventListener('resize', S.onWinResize); }
+  }
+  function resize() {
+    if (!S.renderer) return;
+    var el = S.container;
+    var w = Math.max(1, el.clientWidth || window.innerWidth), h = Math.max(1, el.clientHeight || window.innerHeight);
+    S.renderer.setSize(w, h, false);
+    S.camera.aspect = w / h;
+    S.camera.updateProjectionMatrix();
+  }
+
+  // ---------- 演出の部品（破片・煙・閃光・弾） ----------
+  function buildFx() {
+    var fx = {};
+    // 破片：InstancedMesh 1つ
+    var dg = new THREE.BoxGeometry(1, 1, 1);
+    var dm = new THREE.MeshLambertMaterial({ map: T.crayon });
+    fx.debris = new THREE.InstancedMesh(dg, dm, DEBRIS_MAX);
+    fx.debris.instanceMatrix.setUsage(THREE.DynamicDrawUsage);
+    fx.debris.frustumCulled = false;
+    var zero = new THREE.Matrix4().makeScale(0, 0, 0), white = new THREE.Color(1, 1, 1);
+    for (var i = 0; i < DEBRIS_MAX; i++) { fx.debris.setMatrixAt(i, zero); fx.debris.setColorAt(i, white); }
+    fx.debris.count = 0;
+    S.scene.add(fx.debris);
+    fx.parts = []; // {i, p, v, r, av, s, life, max}
+    fx.free = []; for (i = DEBRIS_MAX - 1; i >= 0; i--) fx.free.push(i);
+    // 煙・ほこり
+    fx.puffs = [];
+    for (i = 0; i < PUFF_MAX; i++) {
+      var sp = new THREE.Sprite(new THREE.SpriteMaterial({ map: T.puff, color: 0xffffff, transparent: true, depthWrite: false, opacity: 0 }));
+      sp.visible = false; S.scene.add(sp);
+      fx.puffs.push({ sp: sp, life: 0, max: 1, v: new THREE.Vector3(), s0: 1, s1: 2, a0: 0.8 });
+    }
+    fx.puffNext = 0;
+    // ドカン！の閃光（ギザギザ）
+    fx.bursts = [];
+    for (i = 0; i < 4; i++) {
+      var bs = new THREE.Sprite(new THREE.SpriteMaterial({ map: T.burst, transparent: true, depthWrite: false, depthTest: false }));
+      bs.visible = false; bs.renderOrder = 20; S.scene.add(bs);
+      var fl = new THREE.Sprite(new THREE.SpriteMaterial({ map: T.soft, color: 0xfff1b0, transparent: true, depthWrite: false, blending: THREE.AdditiveBlending }));
+      fl.visible = false; fl.renderOrder = 19; S.scene.add(fl);
+      var rg = new THREE.Mesh(new THREE.RingGeometry(0.7, 1, 40), new THREE.MeshBasicMaterial({ color: 0xfaf6ee, transparent: true, depthWrite: false, side: THREE.DoubleSide }));
+      rg.rotation.x = -Math.PI / 2; rg.visible = false; S.scene.add(rg);
+      fx.bursts.push({ sp: bs, fl: fl, ring: rg, life: 0, max: 0.9, pos: new THREE.Vector3() });
+    }
+    fx.burstNext = 0;
+    // 弾
+    fx.ballGeo = new THREE.SphereGeometry(0.12, 16, 12);
+    fx.ballMat = new THREE.MeshStandardMaterial({ color: 0x1a1a1f, roughness: 0.25, metalness: 0.4 });
+    fx.balls = [];
+    for (i = 0; i < 6; i++) { var b = new THREE.Mesh(fx.ballGeo, fx.ballMat); b.visible = false; S.scene.add(b); fx.balls.push(b); }
+    S.fx = fx;
+  }
+  function resetFx() {
+    var fx = S.fx; if (!fx) return;
+    var zero = new THREE.Matrix4().makeScale(0, 0, 0);
+    fx.parts.forEach(function (p) { fx.debris.setMatrixAt(p.i, zero); fx.free.push(p.i); });
+    fx.parts.length = 0; fx.debris.count = 0; fx.debris.instanceMatrix.needsUpdate = true;
+    fx.puffs.forEach(function (p) { p.life = 0; p.sp.visible = false; });
+    fx.bursts.forEach(function (b) { b.life = 0; b.sp.visible = b.fl.visible = b.ring.visible = false; });
+    fx.balls.forEach(function (b) { b.visible = false; });
+    S.projectiles.length = 0;
+    S.shake = 0;
+    if (S.boomLight) S.boomLight.intensity = 0;
+  }
+
+  function spawnPuff(x, y, z, opt) {
+    var fx = S.fx; opt = opt || {};
+    var p = fx.puffs[fx.puffNext]; fx.puffNext = (fx.puffNext + 1) % fx.puffs.length;
+    p.sp.position.set(x, y, z);
+    p.sp.material.color.set(opt.color || 0xffffff);
+    p.v.set(opt.vx || 0, opt.vy || 0.4, opt.vz || 0);
+    p.life = p.max = opt.life || 0.8;
+    p.s0 = opt.s0 || 0.3; p.s1 = opt.s1 || 0.9; p.a0 = opt.a == null ? 0.75 : opt.a;
+    p.sp.scale.setScalar(p.s0); p.sp.material.opacity = p.a0; p.sp.visible = true;
+  }
+
+  var tmpM = new THREE.Matrix4(), tmpQ = new THREE.Quaternion(), tmpE = new THREE.Euler(), tmpV = new THREE.Vector3(), tmpS = new THREE.Vector3(), tmpC = new THREE.Color(), tmpE2 = new THREE.Color();
+  function spawnDebris(x, y, z, color, n, power) {
+    var fx = S.fx;
+    for (var k = 0; k < n; k++) {
+      if (!fx.free.length) break;
+      var i = fx.free.pop();
+      var ang = Math.random() * Math.PI * 2, sp = rand(1.2, 4.2) * power;
+      var part = {
+        i: i,
+        p: new THREE.Vector3(x + rand(-0.4, 0.4), y + rand(0, 0.5), z + rand(-0.4, 0.4)),
+        v: new THREE.Vector3(Math.cos(ang) * sp, rand(3.5, 8.5) * power, Math.sin(ang) * sp),
+        r: new THREE.Vector3(Math.random() * 6, Math.random() * 6, Math.random() * 6),
+        av: new THREE.Vector3(rand(-12, 12), rand(-12, 12), rand(-12, 12)),
+        s: rand(0.1, 0.3), life: rand(1.6, 2.6), max: 0, rest: false
+      };
+      part.max = part.life;
+      tmpC.copy(color);
+      if (tmpC.r + tmpC.g + tmpC.b < 0.4) tmpC.lerp(tmpE2.set(0.3, 0.29, 0.3), 0.55); // 黒い壁の破片も、紙の上で見える濃い灰色に
+      tmpC.offsetHSL(0, 0, rand(-0.07, 0.07));
+      if (Math.random() < 0.12) tmpC.set(0xffd23f); // 少しだけ黄色い火花
+      fx.debris.setColorAt(i, tmpC);
+      fx.parts.push(part);
+    }
+    if (fx.debris.instanceColor) fx.debris.instanceColor.needsUpdate = true;
+    fx.debris.count = DEBRIS_MAX;
+  }
+
+  function spawnBurst(x, y, z, big) {
+    var fx = S.fx;
+    var b = fx.bursts[fx.burstNext]; fx.burstNext = (fx.burstNext + 1) % fx.bursts.length;
+    b.pos.set(x, y, z); b.ground = groundTopAt(x, z); b.life = b.max = 0.9; b.big = big ? 1 : 0.55;
+    b.sp.material.rotation = rand(-0.4, 0.4);
+    b.sp.visible = b.fl.visible = b.ring.visible = true;
+  }
+
+  function updateFx(dt) {
+    var fx = S.fx, i;
+    // 破片
+    if (fx.parts.length) {
+      for (i = fx.parts.length - 1; i >= 0; i--) {
+        var p = fx.parts[i];
+        p.life -= dt;
+        if (p.life <= 0) { fx.debris.setMatrixAt(p.i, tmpM.makeScale(0, 0, 0)); fx.free.push(p.i); fx.parts.splice(i, 1); continue; }
+        if (!p.rest) {
+          p.v.y -= 22 * dt;
+          p.p.addScaledVector(p.v, dt);
+          p.r.addScaledVector(p.av, dt);
+          var gy = groundTopAt(p.p.x, p.p.z) + p.s * 0.5;
+          if (p.p.y < gy) {
+            p.p.y = gy;
+            if (p.v.y < -2) { p.v.y *= -0.38; p.v.x *= 0.6; p.v.z *= 0.6; p.av.multiplyScalar(0.5); }
+            else { p.v.set(0, 0, 0); p.rest = true; }
+          }
+        }
+        var sc = p.s * Math.min(1, p.life / 0.45);
+        tmpQ.setFromEuler(tmpE.set(p.r.x, p.r.y, p.r.z));
+        tmpM.compose(p.p, tmpQ, tmpS.set(sc, sc, sc));
+        fx.debris.setMatrixAt(p.i, tmpM);
+      }
+      fx.debris.instanceMatrix.needsUpdate = true;
+      if (!fx.parts.length) fx.debris.count = 0;
+    }
+    // 煙
+    for (i = 0; i < fx.puffs.length; i++) {
+      var q = fx.puffs[i]; if (q.life <= 0) continue;
+      q.life -= dt;
+      if (q.life <= 0) { q.sp.visible = false; continue; }
+      var t = 1 - q.life / q.max;
+      q.sp.position.addScaledVector(q.v, dt); q.v.multiplyScalar(Math.exp(-dt * 2.5));
+      q.sp.scale.setScalar(q.s0 + (q.s1 - q.s0) * (1 - Math.pow(1 - t, 2)));
+      q.sp.material.opacity = q.a0 * (1 - t);
+    }
+    // 閃光
+    for (i = 0; i < fx.bursts.length; i++) {
+      var b = fx.bursts[i]; if (b.life <= 0) continue;
+      b.life -= dt;
+      if (b.life <= 0) { b.sp.visible = b.fl.visible = b.ring.visible = false; continue; }
+      var u = 1 - b.life / b.max;
+      var k1 = clamp(u / 0.12, 0, 1);
+      var s1 = (0.8 + 1.7 * (1 - Math.pow(1 - k1, 3))) * b.big;
+      b.sp.position.set(b.pos.x, b.pos.y + 0.9 * b.big, b.pos.z);
+      b.sp.scale.set(s1, s1, 1);
+      b.sp.material.opacity = u < 0.3 ? 1 : Math.max(0, 1 - (u - 0.3) / 0.25);
+      b.sp.material.rotation += dt * 0.6;
+      b.fl.position.copy(b.sp.position);
+      var fs = 5.5 * b.big * (0.4 + u);
+      b.fl.scale.set(fs, fs, 1);
+      b.fl.material.opacity = Math.max(0, 1 - u * 2.4);
+      b.ring.position.set(b.pos.x, b.ground + 0.06, b.pos.z);
+      var rs = (0.6 + u * 3.4) * b.big * 1.2;
+      b.ring.scale.set(rs, rs, rs);
+      b.ring.material.opacity = 0.85 * (1 - u);
+    }
+    if (S.boomLight.intensity > 0) S.boomLight.intensity = Math.max(0, S.boomLight.intensity - dt * 9);
+  }
+
+  // ---------- 地図 ----------
+  function idx(x, z) { return z * S.w + x; }
+  function inMap(x, z) { return x >= 0 && z >= 0 && x < S.w && z < S.h; }
+  function hAt(x, z) { return inMap(x, z) ? S.heights[idx(x, z)] : 0; }
+  function groundTopAt(wx, wz) { var x = Math.floor(wx), z = Math.floor(wz); return inMap(x, z) ? vis(S.heights[idx(x, z)]) : 0; }
+  function cellColor(i, out) { return out.setRGB(S.colors[i * 3] / 255, S.colors[i * 3 + 1] / 255, S.colors[i * 3 + 2] / 255); }
+
+  function clearLevel() {
+    resetFx();
+    var L = S.level; if (!L) return;
+    L.objects.forEach(function (o) { if (o.parent) o.parent.remove(o); });
+    L.dispose.forEach(function (d) { try { d.dispose(); } catch (e) { } });
+    if (S.me) disposeTank(S.me.tank);
+    for (var k in S.remotes) disposeTank(S.remotes[k].tank);
+    S.level = null; S.me = null; S.remotes = {}; S.map = null; S.treasure = null;
+    if (S.gemLight) S.gemLight.intensity = 0;
+  }
+
+  function load(map, opts) {
+    if (!S.inited) { if (S.container) init(S.container); else throw new Error('World.init を先に呼んでください'); }
+    clearLevel();
+    opts = opts || {};
+    S.map = map; S.w = map.w; S.h = map.h;
+    S.heights = new Uint8Array(map.heights); // 自分用の写し（破壊で書きかえる）
+    S.colors = map.colors;
+    S.destroyed = new Uint8Array(S.w * S.h);
+    S.myIndex = opts.myIndex || 0;
+    S.players = opts.players || [{ color: '#e53935' }, { color: '#1e88e5' }];
+    S.net = !!opts.net;
+    S.found = false; S.held = {}; S.tapQ = {}; S.stateAcc = 0; S.shake = 0;
+    var L = S.level = { objects: [], dispose: [] };
+    function add(o) { S.scene.add(o); L.objects.push(o); return o; }
+
+    buildTerrain(L, add);
+    buildFloor(L, add);
+    buildTreasure(L, add);
+
+    // 自分の戦車
+    var st = (map.starts && map.starts[S.myIndex]) || { x: 1, z: 1, dir: 0 };
+    var tk = makeTank(S.players[S.myIndex] ? S.players[S.myIndex].color : '#e53935');
+    add(tk.root);
+    S.me = {
+      tank: tk, cx: st.x, cz: st.z, dir: st.dir || 0,
+      move: null, turn: null, bump: null, bumpCd: 0, fireCd: 0, fireAnim: 0
+    };
+    tk.x = st.x; tk.z = st.z; tk.y = vis(hAt(st.x, st.z)); tk.heading = dirToHeading(S.me.dir);
+    // 相手の戦車（通信のときは最初からスタート位置に置く）
+    if (S.net) {
+      for (var p = 0; p < S.players.length; p++) {
+        if (p === S.myIndex) continue;
+        var s2 = (map.starts && map.starts[p]) || st;
+        ensureRemote(p, { x: s2.x, z: s2.z, dir: s2.dir || 0, color: S.players[p] && S.players[p].color, anim: 'idle' }, true);
+      }
+    }
+    // カメラ（いまのモードへすぐ合わせる）
+    S.camBlendT = 1; S.chaseLift = 0;
+    var far = overheadHeight() * 1.6 + 60;
+    S.camera.far = far; S.camera.updateProjectionMatrix();
+    // 開始演出：まず真上から地図全体と宝を見せる（updateCamera が、のち斜め後ろへ寄せる）
+    S.camMode = 1; S.intro = { t: 0 }; S.topFlag = null; // 開始演出のあと斜め後ろ（1）へ
+    var pose = poseFor(2);
+    S.camera.position.copy(pose.p); S.camera.quaternion.copy(pose.q);
+    if (!S.running) render();
+  }
+
+  // 積み木の色：地図の色を少し鮮やかに。明るさが低い（黒に近い）色だけ、ほぼ真っ黒にする。
+  var hsl = { h: 0, s: 0, l: 0 };
+  function blockColor(c) {
+    var lum = 0.299 * c.r + 0.587 * c.g + 0.114 * c.b;
+    if (lum < 0.16) { c.setRGB(0.1, 0.1, 0.11); return c; }
+    c.getHSL(hsl);
+    c.setHSL(hsl.h, clamp(hsl.s * 1.6, 0, 1), clamp(hsl.l * 0.92, 0.22, 0.68));
+    return c;
+  }
+  function buildTerrain(L, add) {
+    var w = S.w, h = S.h, n = 0, i;
+    for (i = 0; i < w * h; i++) if (S.heights[i] > 1) n++; // 高さ0・1は紙の色（床に塗る）
+    var geo = new THREE.BoxGeometry(1, 1, 1);
+    geo.translate(0, 0.5, 0);
+    // 側面を少し暗く（上の面=明るい、側面=やや暗い、底=暗い）
+    var pos = geo.attributes.position, nor = geo.attributes.normal, cols = new Float32Array(pos.count * 3);
+    for (i = 0; i < pos.count; i++) {
+      var ny = nor.getY(i), nx = nor.getX(i), v;
+      if (ny > 0.5) v = 1; else if (ny < -0.5) v = 0.5; else v = nx !== 0 ? 0.86 : 0.93;
+      cols[i * 3] = cols[i * 3 + 1] = cols[i * 3 + 2] = v;
+    }
+    geo.setAttribute('color', new THREE.BufferAttribute(cols, 3));
+    var mat = new THREE.MeshLambertMaterial({ map: T.crayon, vertexColors: true });
+    var mesh = new THREE.InstancedMesh(geo, mat, Math.max(1, n));
+    mesh.instanceMatrix.setUsage(THREE.DynamicDrawUsage);
+    var cellToInst = new Int32Array(w * h).fill(-1);
+    var m = new THREE.Matrix4(), c = new THREE.Color(), k = 0;
+    for (var z = 0; z < h; z++) for (var x = 0; x < w; x++) {
+      i = z * w + x; var hh = S.heights[i];
+      if (hh <= 1) continue;
+      m.makeScale(1, vis(hh), 1); m.setPosition(x + 0.5, 0, z + 0.5);
+      mesh.setMatrixAt(k, m);
+      cellColor(i, c);
+      // 積み木は側面も含めて地図の色で塗る。黒に近い色（壁など）だけ黒にする
+      blockColor(c);
+      mesh.setColorAt(k, c);
+      cellToInst[i] = k++;
+    }
+    if (n === 0) { mesh.setMatrixAt(0, m.makeScale(0, 0, 0)); mesh.setColorAt(0, c.set(1, 1, 1)); }
+    mesh.instanceMatrix.needsUpdate = true;
+    if (mesh.instanceColor) mesh.instanceColor.needsUpdate = true;
+    add(mesh);
+    L.terrain = mesh; L.cellToInst = cellToInst;
+    L.dispose.push(geo, mat);
+  }
+
+  // 床：地図の色から作ったCanvasTexture（影とクレヨンのざらざらも描きこむ）
+  function buildFloor(L, add) {
+    var w = S.w, h = S.h;
+    var px = clamp(Math.floor(1024 / Math.max(w, h)), 4, 16);
+    var small = makeCanvas(w, h), big = makeCanvas(w * px, h * px);
+    L.floorSmall = small; L.floorBig = big; L.floorPx = px;
+    L.floorPattern = big.getContext('2d').createPattern(T.crayonCanvas, 'repeat');
+    var tex = new THREE.CanvasTexture(big);
+    tex.anisotropy = 4;
+    L.floorTex = tex;
+    paintFloor();
+    var fg = new THREE.PlaneGeometry(w, h); fg.rotateX(-Math.PI / 2);
+    var fm = new THREE.MeshLambertMaterial({ map: tex });
+    var floor = new THREE.Mesh(fg, fm); floor.position.set(w / 2, 0, h / 2);
+    add(floor);
+    // 紙のふち（少し影）と机
+    var eg = new THREE.PlaneGeometry(w + 1.2, h + 1.2); eg.rotateX(-Math.PI / 2);
+    var em = new THREE.MeshBasicMaterial({ color: 0x8a7458, transparent: true, opacity: 0.35, depthWrite: false });
+    var edge = new THREE.Mesh(eg, em); edge.position.set(w / 2 + 0.25, -0.02, h / 2 + 0.25); add(edge);
+    var size = Math.max(w, h) * 6 + 200;
+    var dg = new THREE.PlaneGeometry(size, size); dg.rotateX(-Math.PI / 2);
+    var dtex = T.desk.clone(); dtex.needsUpdate = true; dtex.repeat.set(size / 12, size / 12);
+    var dm = new THREE.MeshLambertMaterial({ map: dtex });
+    var desk = new THREE.Mesh(dg, dm); desk.position.set(w / 2, -0.05, h / 2); add(desk);
+    L.dispose.push(tex, fg, fm, eg, em, dg, dm, dtex);
+  }
+
+  function paintFloor() {
+    var L = S.level, w = S.w, h = S.h;
+    var sctx = L.floorSmall.getContext('2d');
+    var img = sctx.createImageData(w, h), d = img.data;
+    for (var z = 0; z < h; z++) for (var x = 0; x < w; x++) {
+      var i = z * w + x, hh = S.heights[i], r, g, b;
+      if (S.destroyed[i]) { r = 236; g = 230; b = 218; }
+      else if (hh > 1) { r = 40; g = 40; b = 42; } // 積み木の下：にじんで足元の影になる
+      else {
+        r = S.colors[i * 3]; g = S.colors[i * 3 + 1]; b = S.colors[i * 3 + 2];
+        // 塗った色をはっきり見せる（白は紙の白のまま。色のついたところだけ少し濃く）
+        var lum = 0.299 * r + 0.587 * g + 0.114 * b, sat = FLOOR_SAT;
+        r = clamp(lum + (r - lum) * sat, 0, 255); g = clamp(lum + (g - lum) * sat, 0, 255); b = clamp(lum + (b - lum) * sat, 0, 255);
+      }
+      // 柔らかい影：左上（北西）の高い物が、右下へ影を落とす
+      var sh = 1;
+      for (var k = 1; k <= 4; k++) {
+        var hx = vis(hAt(x - k, z - k)) - vis(hh);
+        if (hx > k * 0.35) { sh = Math.min(sh, 0.7 + k * 0.04); break; }
+      }
+      // まわりが高いとほんのり暗く（すみっこの影）
+      var ao = 0;
+      if (hAt(x - 1, z) > hh) ao++; if (hAt(x + 1, z) > hh) ao++; if (hAt(x, z - 1) > hh) ao++; if (hAt(x, z + 1) > hh) ao++;
+      sh *= 1 - ao * 0.05;
+      d[i * 4] = r * sh; d[i * 4 + 1] = g * sh; d[i * 4 + 2] = b * sh; d[i * 4 + 3] = 255;
+    }
+    sctx.putImageData(img, 0, 0);
+    var big = L.floorBig, g2 = big.getContext('2d');
+    g2.globalCompositeOperation = 'source-over';
+    g2.imageSmoothingEnabled = true;
+    g2.drawImage(L.floorSmall, 0, 0, big.width, big.height);
+    g2.globalCompositeOperation = 'multiply';
+    g2.globalAlpha = 0.55;
+    g2.fillStyle = L.floorPattern;
+    g2.fillRect(0, 0, big.width, big.height);
+    g2.globalAlpha = 1;
+    g2.globalCompositeOperation = 'source-over';
+    L.floorTex.needsUpdate = true;
+  }
+
+  function buildTreasure(L, add) {
+    var t = S.map.treasure; if (!t) return;
+    var g = new THREE.Group();
+    g.position.set(t.x + 0.5, vis(hAt(t.x, t.z)), t.z + 0.5);
+    var gemGeo = new THREE.OctahedronGeometry(GEM_R, 0);
+    var gemMat = new THREE.MeshStandardMaterial({ color: 0xff4fb0, emissive: 0xb01070, emissiveIntensity: 0.95, roughness: 0.12, metalness: 0.25, flatShading: true });
+    var gem = new THREE.Mesh(gemGeo, gemMat); gem.scale.set(1, 1.35, 1); gem.position.y = GEM_Y;
+    g.add(gem);
+    var glowMat = new THREE.SpriteMaterial({ map: T.soft, color: 0xff6cc4, transparent: true, depthWrite: false, blending: THREE.AdditiveBlending, opacity: 0.8 });
+    var glow = new THREE.Sprite(glowMat); glow.scale.set(4, 4, 1); glow.position.y = GEM_Y; g.add(glow);
+    // 光の柱
+    var bh = 90;
+    var beamGeo = new THREE.CylinderGeometry(1.0, 1.0, bh, 24, 1, true); beamGeo.translate(0, bh / 2, 0);
+    var beamMat = new THREE.MeshBasicMaterial({ map: T.beam, color: 0xff4fb0, opacity: 0.5, transparent: true, depthWrite: false, side: THREE.DoubleSide }); // 空が明るいので、足し算でなく ふつうの重ね（ピンクのまま見える）
+    var beam = new THREE.Mesh(beamGeo, beamMat); g.add(beam);
+    var beam2Geo = new THREE.CylinderGeometry(0.3, 0.3, bh, 14, 1, true); beam2Geo.translate(0, bh / 2, 0);
+    var beam2Mat = new THREE.MeshBasicMaterial({ map: T.beam, color: 0xff8fd0, opacity: 0.7, transparent: true, depthWrite: false, side: THREE.DoubleSide });
+    var beam2 = new THREE.Mesh(beam2Geo, beam2Mat); g.add(beam2);
+    // きらきら
+    var sparks = [];
+    var starMat = new THREE.SpriteMaterial({ map: T.star, color: 0xfff6a0, transparent: true, depthWrite: false, blending: THREE.AdditiveBlending });
+    for (var i = 0; i < 6; i++) { var s = new THREE.Sprite(starMat); s.scale.setScalar(0.4); g.add(s); sparks.push(s); }
+    // 俯瞰のための大きな目じるし（光の輪）
+    var far = new THREE.Sprite(new THREE.SpriteMaterial({ map: T.star, color: 0xff3fa8, transparent: true, depthWrite: false, depthTest: false }));
+    far.renderOrder = 9; far.visible = false; g.add(far);
+    add(g);
+    S.treasure = { group: g, gem: gem, glow: glow, sparks: sparks, far: far, beam: beam, x: t.x, z: t.z, celebrate: 0 };
+    S.gemLight.position.set(t.x + 0.5, g.position.y + 1.4, t.z + 0.5);
+    S.gemLight.intensity = 2.2;
+    L.dispose.push(gemGeo, gemMat, glowMat, beamGeo, beamMat, beam2Geo, beam2Mat, starMat, far.material);
+  }
+
+  function updateTreasure(dt) {
+    var tr = S.treasure; if (!tr) return;
+    var t = S.time;
+    tr.gem.rotation.y += dt * 1.6;
+    var c = tr.celebrate; if (c > 0) tr.celebrate = Math.max(0, c - dt);
+    tr.gem.position.y = GEM_Y + Math.sin(t * 2.4) * 0.14 + (c > 0 ? Math.sin((1.5 - c) * 6) * 0.5 + 0.4 : 0);
+    var pulse = 3.6 + Math.sin(t * 4) * 0.45 + (c > 0 ? 2.5 : 0);
+    tr.glow.position.y = tr.gem.position.y;
+    tr.glow.scale.set(pulse, pulse, 1);
+    S.gemLight.intensity = 1.6 + Math.sin(t * 4) * 0.4;
+    for (var i = 0; i < tr.sparks.length; i++) {
+      var a = t * 1.3 + i / tr.sparks.length * Math.PI * 2;
+      var r = 1.0 + (c > 0 ? 0.8 : 0);
+      tr.sparks[i].position.set(Math.cos(a) * r, GEM_Y + Math.sin(t * 3 + i) * 0.6, Math.sin(a) * r);
+      var ss = 0.3 + 0.22 * Math.abs(Math.sin(t * 5 + i * 1.7));
+      tr.sparks[i].scale.set(ss, ss, 1);
+    }
+    // 遠くからでも見える光（カメラが高いほど大きく）
+    var camH = S.camera.position.y;
+    tr.far.visible = camH > 7;
+    if (tr.far.visible) { var fs = camH * 0.11 * (1 + 0.12 * Math.sin(t * 5)); tr.far.material.rotation = Math.sin(t * 2) * 0.3; tr.far.scale.set(fs, fs, 1); tr.far.position.y = 0.8; tr.far.material.opacity = clamp((camH - 7) / 6, 0, 1); }
+  }
+
+  // ---------- 破壊 ----------
+  function destroyCells(cells, withFx) {
+    var L = S.level; if (!L) return [];
+    var done = [], zero = new THREE.Matrix4().makeScale(0, 0, 0), c = new THREE.Color(), changed = false;
+    var cx = 0, cz = 0, cy = 0, cnt = 0;
+    for (var k = 0; k < cells.length; k++) {
+      var x = cells[k][0] | 0, z = cells[k][1] | 0;
+      if (!inMap(x, z)) continue;
+      var i = idx(x, z), hh = S.heights[i];
+      done.push([x, z]);
+      cx += x + 0.5; cz += z + 0.5; cy = Math.max(cy, vis(hh)); cnt++;
+      if (withFx) {
+        cellColor(i, c);
+        if (hh > 0) {
+          blockColor(c); // 積み木と同じ色の破片
+          spawnDebris(x + 0.5, vis(hh) * 0.5, z + 0.5, c, Math.min(90, 26 + hh * 7), 1);
+          for (var p = 0; p < 3; p++) spawnPuff(x + 0.5 + rand(-0.4, 0.4), vis(hh) * rand(0.2, 0.9) + 0.1, z + 0.5 + rand(-0.4, 0.4), { color: 0xdedad2, vx: rand(-1, 1), vy: rand(0.8, 2), vz: rand(-1, 1), s0: 0.6, s1: 2.4, life: 1.4, a: 0.85 });
+        } else {
+          spawnDebris(x + 0.5, 0.05, z + 0.5, c.lerp(new THREE.Color(0x9a9080), 0.2), 8, 0.6);
+          spawnPuff(x + 0.5, 0.3, z + 0.5, { color: 0xe8e2d6, vy: 1, s0: 0.5, s1: 1.8, life: 1 });
+        }
+      }
+      if (hh > 0) {
+        S.heights[i] = 0; S.destroyed[i] = 1; changed = true;
+        var inst = L.cellToInst[i];
+        if (inst >= 0) L.terrain.setMatrixAt(inst, zero); // そのマスの行列だけ更新
+      }
+    }
+    if (changed) { L.terrain.instanceMatrix.needsUpdate = true; paintFloor(); }
+    if (withFx && cnt) {
+      cx /= cnt; cz /= cnt;
+      spawnBurst(cx, Math.max(0.3, cy * 0.5), cz, true);
+      S.boomLight.position.set(cx, cy + 1.5, cz); S.boomLight.intensity = 4;
+      // 画面ゆれ（近いほど強い）
+      var me = S.me ? S.me.tank : null;
+      var dist = me ? Math.hypot(me.x + 0.5 - cx, me.z + 0.5 - cz) : 4;
+      S.shake = Math.max(S.shake, clamp(0.55 - dist * 0.03, 0.18, 0.55));
+      sfx('boom');
+    }
+    return done;
+  }
+
+  // ---------- 自分の戦車の操作 ----------
+  function press(action, isDown) {
+    if (['fwd', 'back', 'left', 'right', 'fire'].indexOf(action) < 0) return;
+    if (!isDown) { S.held[action] = false; return; }
+    if (S.paused) return;
+    S.held[action] = true;
+    S.tapQ[action] = true;
+  }
+  function want(a) { return S.held[a] || S.tapQ[a]; }
+
+  function updateMe(dt) {
+    var me = S.me; if (!me) return;
+    var tk = me.tank;
+    me.fireCd = Math.max(0, me.fireCd - dt);
+    me.fireAnim = Math.max(0, me.fireAnim - dt);
+    me.bumpCd = Math.max(0, me.bumpCd - dt);
+
+    // 大砲（いつでも撃てる。間隔0.8秒）
+    if (want('fire')) {
+      S.tapQ.fire = false;
+      if (me.fireCd <= 0) fire();
+    }
+
+    // 進行中の動き
+    if (me.move) {
+      var mv = me.move; mv.t += dt;
+      var u = clamp(mv.t / MOVE_DUR, 0, 1), e = ease(u);
+      tk.x = mv.fx + (mv.tx - mv.fx) * u;
+      tk.z = mv.fz + (mv.tz - mv.fz) * u;
+      // 段差：前半は平らに進み、ふちで滑らかに上り下り
+      var su = clamp((u - 0.25) / 0.5, 0, 1);
+      tk.y = mv.fy + (mv.ty - mv.fy) * ease(su);
+      if (u >= 1) {
+        me.move = null; me.cx = mv.tx; me.cz = mv.tz; tk.x = mv.tx; tk.z = mv.tz; tk.y = mv.ty;
+        checkFound();
+      }
+    } else if (me.turn) {
+      var tn = me.turn; tn.t += dt;
+      var v = clamp(tn.t / TURN_DUR, 0, 1);
+      tk.heading = tn.from + (tn.to - tn.from) * ease(v);
+      if (v >= 1) { me.turn = null; tk.heading = tn.to; }
+    } else if (me.bump) {
+      var bp = me.bump; bp.t += dt;
+      var w = clamp(bp.t / BUMP_DUR, 0, 1);
+      var off = Math.sin(w * Math.PI) * 0.16 * (w < 0.5 ? 1 : 0.6);
+      tk.bump.position.set(0, 0, -off * bp.sign);
+      if (w >= 1) { me.bump = null; tk.bump.position.set(0, 0, 0); me.bumpCd = 0.18; }
+    }
+
+    // つぎの動き
+    if (!me.move && !me.turn && !me.bump) {
+      var groundY = vis(hAt(me.cx, me.cz));
+      tk.y += (groundY - tk.y) * Math.min(1, dt * 12); // 足元が壊れたら下りる
+      if (want('fwd')) { S.tapQ.fwd = false; tryMove(1); }
+      else if (want('back')) { S.tapQ.back = false; tryMove(-1); }
+      else if (want('left')) { S.tapQ.left = false; startTurn(-1); }
+      else if (want('right')) { S.tapQ.right = false; startTurn(1); }
+    }
+    tk.moving = !!me.move;
+  }
+
+  function tryMove(sign) {
+    var me = S.me, tk = me.tank;
+    var tx = me.cx + DX[me.dir] * sign, tz = me.cz + DZ[me.dir] * sign;
+    var cur = hAt(me.cx, me.cz);
+    if (!inMap(tx, tz) || Math.abs(hAt(tx, tz) - cur) > 1) {
+      if (me.bumpCd > 0) return;
+      me.bump = { t: 0, sign: sign };
+      tk.wobble = 1;
+      sfx('bump');
+      return;
+    }
+    me.move = { fx: me.cx, fz: me.cz, tx: tx, tz: tz, fy: tk.y, ty: vis(hAt(tx, tz)), t: 0 };
+    // 走るときのほこり
+    spawnPuff(tk.x + 0.5 - DX[me.dir] * 0.4 * sign, tk.y + 0.1, tk.z + 0.5 - DZ[me.dir] * 0.4 * sign, { color: 0xf3eee4, vy: 0.3, s0: 0.25, s1: 0.75, life: 0.6, a: 0.6 });
+    sfx('move');
+  }
+  function startTurn(s) {
+    var me = S.me, tk = me.tank;
+    me.dir = (me.dir + s + 4) % 4;
+    me.turn = { from: tk.heading, to: tk.heading - s * Math.PI / 2, t: 0 };
+    sfx('turn');
+  }
+  function checkFound() {
+    if (S.found || !S.treasure) return;
+    if (S.me.cx === S.treasure.x && S.me.cz === S.treasure.z) {
+      S.found = true;
+      S.treasure.celebrate = 1.5;
+      sfx('found');
+      emit('found', S.myIndex);
+    }
+  }
+
+  function fire() {
+    var me = S.me, tk = me.tank;
+    me.fireCd = FIRE_CD; me.fireAnim = 0.35;
+    tk.recoil = 1;
+    var bx = Math.round(tk.x), bz = Math.round(tk.z), d = me.dir;
+    var tx = bx + DX[d] * 2, tz = bz + DZ[d] * 2;
+    var all = [[tx, tz], [tx + DX[d], tz + DZ[d]]];
+    var cells = all.filter(function (c) { return inMap(c[0], c[1]); });
+    shootBall(tk.x, tk.z, tk.y, d, all, false);
+    sfx('fire');
+    // 発射のしらせ（通信のときは、これを相手へ1回だけ送る）
+    emit('fire', { cells: cells, from: { x: Math.round(tk.x * 100) / 100, z: Math.round(tk.z * 100) / 100, dir: d } });
+  }
+  // 弾を飛ばす。px,pz は撃つ戦車の位置（マス単位の小数）、cells の先頭が着弾のマス。
+  function shootBall(px, pz, py, d, cells, remote) {
+    if (!cells || !cells.length) return;
+    var fwdx = DX[d], fwdz = DZ[d];
+    var bx = Math.round(px), bz = Math.round(pz);
+    var tx = cells[0][0], tz = cells[0][1];
+    var from = new THREE.Vector3(px + 0.5 + fwdx * 0.5, py + 0.55, pz + 0.5 + fwdz * 0.5);
+    var to = new THREE.Vector3(tx + 0.5, groundTopAt(tx + 0.5, tz + 0.5), tz + 0.5);
+    var mid = vis(Math.max(hAt(bx + fwdx, bz + fwdz), hAt(tx, tz)));
+    var apex = Math.max(from.y, to.y, mid) + 1.3;
+    var ball = S.fx.balls.find(function (b) { return !b.visible; }) || S.fx.balls[0];
+    ball.visible = true; ball.position.copy(from);
+    S.projectiles.push({ ball: ball, from: from, to: to, arc: apex - (from.y + to.y) / 2, t: 0, cells: cells, trail: 0, remote: !!remote });
+    // 発射のけむり
+    spawnPuff(from.x, from.y, from.z, { color: 0xffffff, vx: fwdx * 1.5, vy: 0.6, vz: fwdz * 1.5, s0: 0.3, s1: 1.1, life: 0.6, a: 0.9 });
+    spawnPuff(from.x, from.y, from.z, { color: 0xffe08a, vx: fwdx * 0.5, vy: 0.2, vz: fwdz * 0.5, s0: 0.35, s1: 0.6, life: 0.18, a: 1 });
+    if (remote) sfx('fire');
+  }
+
+  function updateProjectiles(dt) {
+    for (var i = S.projectiles.length - 1; i >= 0; i--) {
+      var pr = S.projectiles[i];
+      pr.t += dt;
+      var u = clamp(pr.t / BALL_DUR, 0, 1);
+      pr.ball.position.lerpVectors(pr.from, pr.to, u);
+      pr.ball.position.y += 4 * pr.arc * u * (1 - u);
+      pr.trail -= dt;
+      if (pr.trail <= 0) { pr.trail = 0.05; spawnPuff(pr.ball.position.x, pr.ball.position.y, pr.ball.position.z, { color: 0xe6e6e6, vy: 0.1, s0: 0.12, s1: 0.4, life: 0.5, a: 0.55 }); }
+      if (u >= 1) {
+        pr.ball.visible = false;
+        S.projectiles.splice(i, 1);
+        var done = destroyCells(pr.cells, true);
+        emit('boom', done, pr.remote);
+      }
+    }
+  }
+
+  // ---------- 相手の戦車 ----------
+  function ensureRemote(i, st, snap) {
+    var r = S.remotes[i];
+    if (!r) {
+      var col = (st && st.color) || (S.players[i] && S.players[i].color) || '#1e88e5';
+      var tk = makeTank(col);
+      S.scene.add(tk.root);
+      if (S.level) S.level.objects.push(tk.root);
+      r = S.remotes[i] = { tank: tk, tx: 0, tz: 0, tdir: 0, anim: 'idle' };
+      snap = true;
+    }
+    if (st) {
+      if (st.color && st.color !== r.tank.colorStr) recolorTank(r.tank, st.color);
+      r.tx = +st.x || 0; r.tz = +st.z || 0; r.tdir = ((st.dir | 0) % 4 + 4) % 4;
+      if (st.anim === 'fire' && r.anim !== 'fire') { r.tank.recoil = 1; }
+      r.anim = st.anim || 'idle';
+      if (snap || Math.hypot(r.tank.x - r.tx, r.tank.z - r.tz) > 3) {
+        r.tank.x = r.tx; r.tank.z = r.tz; r.tank.heading = dirToHeading(r.tdir);
+        r.tank.y = vis(hAt(Math.round(r.tx), Math.round(r.tz)));
+      }
+    }
+    return r;
+  }
+  function updateRemotes(dt) {
+    var k = 1 - Math.exp(-dt * 12);
+    for (var i in S.remotes) {
+      var r = S.remotes[i], tk = r.tank;
+      var ox = tk.x, oz = tk.z;
+      tk.x += (r.tx - tk.x) * k; tk.z += (r.tz - tk.z) * k;
+      tk.heading = angLerp(tk.heading, dirToHeading(r.tdir), 1 - Math.exp(-dt * 14));
+      var gy = vis(hAt(Math.round(tk.x), Math.round(tk.z)));
+      tk.y += (gy - tk.y) * Math.min(1, dt * 10);
+      tk.moving = r.anim === 'move' || Math.hypot(tk.x - ox, tk.z - oz) > dt * 0.5;
+    }
+  }
+
+  // ---------- カメラ ----------
+  function overheadHeight() {
+    var cam = S.camera, half = THREE.MathUtils.degToRad(cam.fov / 2), tn = Math.tan(half);
+    var hz = S.h / 2 + 2, hx = S.w / 2 + 2;
+    var need = Math.max(hz / tn, hx / (tn * Math.max(0.3, cam.aspect)));
+    return Math.max(20, need) + 2; // 壁の上（1.8）からも全体が入るように
+  }
+  var CHASE_BACK = 3.4, CHASE_UP = 4.4, CHASE_AHEAD = 2.2; // おいかけ視点：戦車の後ろ・上・見る先（前）
+  var poseM = new THREE.Matrix4(), UP = new THREE.Vector3(0, 1, 0), NORTH = new THREE.Vector3(0, 0, -1);
+  function poseFor(mode) {
+    var p = new THREE.Vector3(), q = new THREE.Quaternion(), tg = new THREE.Vector3();
+    var tk = S.me ? S.me.tank : { x: S.w / 2, z: S.h / 2, y: 0, heading: 0 };
+    var px = tk.x + 0.5, pz = tk.z + 0.5, py = tk.y;
+    var fx = -Math.sin(tk.heading), fz = -Math.cos(tk.heading);
+    if (mode === 0) {
+      p.set(px + fx * 0.12, py + 0.66, pz + fz * 0.12);
+      tg.set(px + fx * 5, py + 0.2, pz + fz * 5);
+      poseM.lookAt(p, tg, UP);
+    } else if (mode === 1) {
+      // 後ろ上から見下ろす（約45度）：戦車の全身が画面の下寄りに入り、前の数マス先まで迷路が見える
+      p.set(px - fx * CHASE_BACK, py + CHASE_UP + S.chaseLift, pz - fz * CHASE_BACK);
+      tg.set(px + fx * CHASE_AHEAD, py - 0.1, pz + fz * CHASE_AHEAD);
+      poseM.lookAt(p, tg, UP);
+    } else {
+      var hh = overheadHeight();
+      p.set(S.w / 2, hh, S.h / 2 + 0.001);
+      tg.set(S.w / 2, 0, S.h / 2);
+      poseM.lookAt(p, tg, NORTH);
+    }
+    q.setFromRotationMatrix(poseM);
+    return { p: p, q: q };
+  }
+  // 斜め後ろのカメラから戦車（頭の高さ）を見る線が、後ろの壁にさえぎられないよう、必要なぶんだけカメラを持ち上げる
+  function chaseLiftTarget() {
+    var tk = S.me ? S.me.tank : null; if (!tk) return 0;
+    var fx = -Math.sin(tk.heading), fz = -Math.cos(tk.heading), lift = 0;
+    var headY = tk.y + 0.55;
+    for (var s = 0.55; s < CHASE_BACK; s += 0.3) {
+      var top = groundTopAt(tk.x + 0.5 - fx * s, tk.z + 0.5 - fz * s) + 0.12;
+      if (top <= headY) continue;
+      // カメラの高さ H のとき、後ろ s の位置での線の高さ = headY + (H - headY) * s / CHASE_BACK
+      var needH = headY + (top - headY) * CHASE_BACK / s;
+      lift = Math.max(lift, needH - (tk.y + CHASE_UP));
+    }
+    return clamp(lift, 0, 2.6);
+  }
+  function setCamera(mode) {
+    mode = ((mode | 0) % 3 + 3) % 3;
+    if (!S.camera || !S.camFrom) { S.camMode = mode; return; }
+    if (mode === S.camMode) return;
+    S.intro = null; // 自分で視点を変えたら、開始演出は終わり
+    S.camFrom.p.copy(S.camera.position).sub(S.shakeOff || tmpV.set(0, 0, 0));
+    S.camFrom.q.copy(S.camera.quaternion);
+    S.camMode = mode; S.camBlendT = 0;
+    try { sfx('tap'); } catch (e) { }
+  }
+  var shakeV = new THREE.Vector3();
+  function updateCamera(dt) {
+    if (!S.camera) return;
+    S.chaseLift += (chaseLiftTarget() - S.chaseLift) * (1 - Math.exp(-dt * 5));
+    var target = poseFor(S.camMode);
+    var top = S.camMode === 2 || !!(S.intro && S.intro.t < INTRO_HOLD + 0.5);
+    if (top !== S.topFlag) { S.topFlag = top; emit('cam', top); }
+    if (S.intro) {
+      if (!S.paused) S.intro.t += dt;
+      if (S.intro.t >= INTRO_HOLD + INTRO_MOVE) S.intro = null;
+    }
+    if (S.intro) {
+      var ov = poseFor(2), ie = ease(clamp((S.intro.t - INTRO_HOLD) / INTRO_MOVE, 0, 1));
+      S.camera.position.lerpVectors(ov.p, target.p, ie);
+      S.camera.position.y += Math.sin(ie * Math.PI) * 1.5;
+      THREE.Quaternion.slerp(ov.q, target.q, S.camera.quaternion, ie);
+    } else if (S.camBlendT < 1) {
+      S.camBlendT = Math.min(1, S.camBlendT + dt / CAM_BLEND);
+      var e = ease(S.camBlendT);
+      S.camera.position.lerpVectors(S.camFrom.p, target.p, e);
+      // 1人称⇔俯瞰で真上を通るときは少し高く弧を描く
+      S.camera.position.y += Math.sin(e * Math.PI) * 1.5;
+      THREE.Quaternion.slerp(S.camFrom.q, target.q, S.camera.quaternion, e);
+    } else {
+      S.camera.position.copy(target.p);
+      S.camera.quaternion.copy(target.q);
+    }
+    // ゆれ
+    if (S.shake > 0.001) {
+      var a = S.shake;
+      shakeV.set(rand(-a, a), rand(-a, a) * 0.7, rand(-a, a));
+      if (S.camMode === 2) shakeV.multiplyScalar(2.5);
+      S.camera.position.add(shakeV);
+      S.shakeOff = shakeV;
+      S.shake *= Math.exp(-dt * 6);
+    } else { S.shake = 0; S.shakeOff = null; }
+    // 1人称のときは自分の戦車を隠す（カメラが中に入るため）
+    if (S.me) S.me.tank.root.visible = !(S.camMode === 0 && S.camBlendT > 0.55);
+    // 俯瞰のときの目じるし
+    var camH = S.camera.position.y;
+    function mark(tk) {
+      var show = camH - tk.y > 10;
+      tk.marker.visible = show;
+      if (show) { var s = camH / 30; tk.marker.scale.setScalar(s); tk.marker.position.y = 1.2 + s * 0.8 + Math.sin(S.time * 4) * 0.15 * s; tk.marker.material.opacity = clamp((camH - tk.y - 10) / 6, 0, 0.95); }
+    }
+    if (S.me) mark(S.me.tank);
+    for (var k in S.remotes) mark(S.remotes[k].tank);
+  }
+
+  // ---------- ループ ----------
+  function stateObj() {
+    var me = S.me, tk = me.tank;
+    var anim = me.fireAnim > 0 ? 'fire' : me.move ? 'move' : me.turn ? 'turn' : 'idle';
+    return { x: Math.round(tk.x * 100) / 100, z: Math.round(tk.z * 100) / 100, dir: me.dir, color: tk.colorStr, anim: anim };
+  }
+  function update(dt) {
+    S.time += dt;
+    updateMe(dt);
+    updateProjectiles(dt);
+    updateRemotes(dt);
+    updateFx(dt);
+    updateTreasure(dt);
+    if (S.me) animateTank(S.me.tank, dt, S.time);
+    for (var k in S.remotes) animateTank(S.remotes[k].tank, dt, S.time + 1.3);
+    S.stateAcc += dt;
+    if (S.me && S.stateAcc >= 0.1) { S.stateAcc = 0; emit('state', stateObj()); }
+  }
+  function render() { if (S.renderer && S.scene) S.renderer.render(S.scene, S.camera); }
+  function loop(now) {
+    if (!S.running) return;
+    S.raf = requestAnimationFrame(loop);
+    var dt = S.last ? Math.min(0.05, Math.max(0, (now - S.last) / 1000)) : 0.016;
+    S.last = now;
+    try {
+      if (!S.paused && S.level) update(dt);
+      if (S.level) updateCamera(dt);
+      render();
+    } catch (e) {
+      console.warn('World loop error', e);
+    }
+  }
+  function start() {
+    if (!S.inited) { if (S.container) init(S.container); else return; }
+    if (S.running) return;
+    S.running = true; S.last = 0;
+    S.raf = requestAnimationFrame(loop);
+  }
+  function stop() {
+    S.running = false;
+    if (S.raf) cancelAnimationFrame(S.raf);
+    S.raf = 0;
+    clearLevel();
+    S.held = {}; S.tapQ = {}; S.paused = false;
+    if (S.ro) { S.ro.disconnect(); S.ro = null; }
+    if (S.onWinResize) { window.removeEventListener('resize', S.onWinResize); S.onWinResize = null; }
+    if (S.renderer) {
+      var fx = S.fx;
+      if (fx) {
+        fx.debris.geometry.dispose(); fx.debris.material.dispose(); fx.ballGeo.dispose(); fx.ballMat.dispose();
+        fx.puffs.forEach(function (p) { p.sp.material.dispose(); });
+        fx.bursts.forEach(function (b) { b.sp.material.dispose(); b.fl.material.dispose(); b.ring.geometry.dispose(); b.ring.material.dispose(); });
+      }
+      S.fx = null;
+      var cv = S.renderer.domElement;
+      S.renderer.dispose();
+      try { S.renderer.forceContextLoss(); } catch (e) { }
+      if (cv.parentNode) cv.parentNode.removeChild(cv);
+    }
+    S.renderer = null; S.scene = null; S.camera = null; S.inited = false;
+  }
+
+  function setPaused(b) {
+    S.paused = !!b;
+    if (S.paused) { S.held = {}; S.tapQ = {}; }
+  }
+
+  // ---------- 公開 ----------
+  var World = {
+    STEP_H: STEP_H,
+    init: init,
+    load: load,
+    start: start,
+    stop: stop,
+    setPaused: setPaused,
+    press: press,
+    setCamera: setCamera,
+    cycleCamera: function () { setCamera((S.camMode + 1) % 3); return S.camMode; },
+    on: function (ev, fn) {
+      if (!handlers[ev] || typeof fn !== 'function') return;
+      if (handlers[ev].indexOf(fn) < 0) handlers[ev].push(fn); // 同じ関数の二重登録はしない
+    },
+    off: function (ev, fn) {
+      if (!handlers[ev]) return;
+      if (!fn) handlers[ev].length = 0; else { var i = handlers[ev].indexOf(fn); if (i >= 0) handlers[ev].splice(i, 1); }
+    },
+    applyRemoteState: function (i, st) {
+      if (!S.level || !st || i === S.myIndex) return;
+      ensureRemote(i, st, false);
+    },
+    // cells: 壊れるマス。from（任意）: 撃った戦車の {x,z,dir}。あれば弾を山なりに飛ばしてから壊す。
+    applyRemoteBoom: function (cells, from) {
+      if (!S.level || !cells || !cells.length) return;
+      if (from && isFinite(from.x) && isFinite(from.z)) {
+        var d = ((from.dir | 0) % 4 + 4) % 4;
+        shootBall(+from.x, +from.z, vis(hAt(Math.round(from.x), Math.round(from.z))), d, cells.map(function (c) { return [c[0] | 0, c[1] | 0]; }), true);
+        return;
+      }
+      var done = destroyCells(cells, true);
+      emit('boom', done, true); // 弾なしで壊すとき（遠隔）。通信には送らない
+    },
+    // 相手が抜けたとき：相手の戦車を地図から消す
+    dropRemote: function (i) {
+      var r = S.remotes[i]; if (!r) return;
+      disposeTank(r.tank); delete S.remotes[i];
+    },
+    remoteFound: function (i) {
+      if (S.treasure) S.treasure.celebrate = 1.5;
+      sfx('found');
+    },
+    // 確認用（ゲームの進行には使わない）
+    _debug: function (qx, qz) {
+      var me = S.me;
+      return {
+        cam: S.camMode, blend: S.camBlendT, intro: S.intro ? S.intro.t : -1, paused: S.paused, running: S.running,
+        me: me ? { cx: me.cx, cz: me.cz, dir: me.dir, x: me.tank.x, z: me.tank.z, y: me.tank.y } : null,
+        debris: S.fx ? S.fx.parts.length : 0, projectiles: S.projectiles.length,
+        remotes: Object.keys(S.remotes).map(function (k) { var r = S.remotes[k]; return { i: +k, x: r.tank.x, z: r.tank.z }; }),
+        h: qx != null && S.level ? hAt(qx, qz) : null,
+        calls: S.renderer ? S.renderer.info.render.calls : 0,
+        tris: S.renderer ? S.renderer.info.render.triangles : 0
+      };
+    }
+  };
+  Object.defineProperty(World, 'isPaused', { get: function () { return S.paused; }, enumerable: true });
+  Object.defineProperty(World, 'camera', { get: function () { return S.camMode; }, enumerable: true });
+  window.World = World;
+})();
+
+// ===== net.js =====
+// net.js : PeerJS 通信（window.Net だけ公開）。CONTRACT.md の window.Net を参照。
+// 補足: host/join の失敗は「Promiseのreject」と「'error'イベント」の両方で知らせる（UIはどちらか一方で扱えばよい）。
+//       reject する Error には .code（'unavailable-id' など）と、子ども向けの .message が付く。
+(function () {
+  'use strict';
+  var PING_MS = 1000;       // 生存確認を送る間隔
+  var DEAD_MS = 5000;       // これだけ何も届かなければ切れたとみなす
+  var JOIN_TIMEOUT_MS = 10000;
+  var CHUNK_AT = 30000;     // これより長いJSON文字列は分割して送る
+  var CHUNK_SIZE = 16000;
+
+  var MSG = {
+    unavailable: 'この ばんごうは つかわれているよ。ほかの ばんごうで やってみてね',
+    cantConnect: 'つながらなかったよ。ばんごうを たしかめてね',
+    noRoom: 'その ばんごうの へやが みつからないよ。ばんごうを たしかめてね',
+    server: 'つうしんの じゅんびが できなかったよ。すこし まってから もういちど やってみてね',
+    lost: 'あいてと つながらなくなったよ',
+    full: 'この へやは もう いっぱいだよ'
+  };
+
+  var handlers = { open: [], data: [], close: [], error: [] };
+  var S = null;             // 現在のセッション
+  var seq = 0;
+  var api = { isHost: false, connected: false };
+
+  function emit(name, arg) {
+    var list = handlers[name].slice();
+    for (var i = 0; i < list.length; i++) {
+      try { list[i](arg); } catch (e) { try { console.error(e); } catch (_) {} }
+    }
+  }
+
+  function makeCode() {
+    var n = Math.floor(Math.random() * 10000);
+    return ('0000' + n).slice(-4);
+  }
+
+  function peerOptions() {
+    var o = { debug: 0 };
+    try {
+      var q = new URLSearchParams(location.search);
+      if (q.get('peerhost')) {
+        o.host = q.get('peerhost');
+        if (q.get('peerport')) o.port = parseInt(q.get('peerport'), 10);
+        if (q.get('peerpath')) o.path = q.get('peerpath');
+        o.secure = q.get('peersecure') === '0' ? false : (q.get('peersecure') === '1' ? true : location.protocol === 'https:');
+      }
+    } catch (e) {}
+    return o;
+  }
+
+  function newSession(isHost) {
+    teardown(false);
+    S = { id: ++seq, isHost: isHost, peer: null, conn: null, timers: [], chunks: {}, lastRx: 0,
+          finished: false, settled: false, resolve: null, reject: null, closing: false };
+    api.isHost = isHost;
+    api.connected = false;
+    return S;
+  }
+
+  // セッションを片付ける（イベントは出さない）
+  function teardown(sayBye) {
+    var s = S;
+    if (!s) return;
+    S = null;
+    s.finished = true;
+    api.connected = false;
+    s.timers.forEach(function (t) { clearInterval(t); clearTimeout(t); });
+    s.timers = [];
+    var conn = s.conn, peer = s.peer;
+    if (sayBye && conn && conn.open) { try { conn.send({ t: 'bye' }); } catch (e) {} }
+    setTimeout(function () {
+      try { if (conn) conn.close(); } catch (e) {}
+      try { if (peer && !peer.destroyed) peer.destroy(); } catch (e) {}
+    }, sayBye ? 80 : 0);
+  }
+
+  // 相手側の事情・通信の事情で終わるとき
+  function fail(s, kind, code, message) {
+    if (s.finished || S !== s) return;
+    var wasConnected = api.connected;
+    var err = new Error(message);
+    err.code = code;
+    teardown(false);
+    if (!s.settled) { s.settled = true; s.reject(err); }
+    if (kind === 'close' && wasConnected) emit('close');
+    else emit('error', message);
+  }
+
+  function startAlive(s) {
+    s.lastRx = Date.now();
+    s.timers.push(setInterval(function () {
+      if (s.finished || S !== s) return;
+      if (Date.now() - s.lastRx > DEAD_MS) { fail(s, 'close', 'timeout', MSG.lost); return; }
+      try { if (s.conn && s.conn.open) s.conn.send({ t: '_p' }); } catch (e) {}
+    }, PING_MS));
+  }
+
+  function attachConn(s, conn) {
+    s.conn = conn;
+    conn.on('data', function (d) {
+      if (s.finished || S !== s) return;
+      s.lastRx = Date.now();
+      if (!d || typeof d !== 'object') return;
+      if (d.t === '_p') return;
+      if (d.t === 'bye') { fail(s, 'close', 'bye', MSG.lost); return; }   // 相手が自分から終わった（dataには出さず close を出す）
+      if (d.t === '_w') { onOpened(s); return; }   // ホストに受け入れられた
+      if (d.t === 'full') { fail(s, 'error', 'full', MSG.full); return; }
+      if (d.t === '_c') {   // 分割されたデータ
+        var c = s.chunks[d.id] || (s.chunks[d.id] = { parts: [], n: d.n, got: 0 });
+        if (!c.parts[d.i]) { c.parts[d.i] = d.d; c.got++; }
+        if (c.got === c.n) {
+          delete s.chunks[d.id];
+          var obj = null;
+          try { obj = JSON.parse(c.parts.join('')); } catch (e) { return; }
+          emit('data', obj);
+        }
+        return;
+      }
+      emit('data', d);
+    });
+    conn.on('close', function () { fail(s, 'close', 'closed', MSG.lost); });
+    conn.on('error', function () { fail(s, 'close', 'conn-error', MSG.lost); });
+  }
+
+  function onOpened(s) {
+    if (s.finished || S !== s) return;
+    api.connected = true;
+    startAlive(s);
+    if (!s.settled) { s.settled = true; s.resolve(); }
+    emit('open');
+  }
+
+  function peerErrorMessage(err) {
+    var type = err && err.type;
+    if (type === 'unavailable-id') return [type, MSG.unavailable];
+    if (type === 'peer-unavailable') return [type, MSG.noRoom];
+    if (type === 'server-error' || type === 'socket-error' || type === 'socket-closed' || type === 'network') return [type, MSG.server];
+    return [type || 'error', MSG.cantConnect];
+  }
+
+  function makePeer(s, code) {
+    var peer;
+    try {
+      peer = new Peer('seecar-hoshi-' + code, peerOptions());
+    } catch (e) {
+      setTimeout(function () { fail(s, 'error', 'no-peerjs', MSG.server); }, 0);
+      return null;
+    }
+    s.peer = peer;
+    peer.on('error', function (err) {
+      var m = peerErrorMessage(err);
+      // つながったあとに出る小さなエラーは接続の close で扱う
+      if (api.connected && m[0] !== 'unavailable-id') return;
+      fail(s, 'error', m[0], m[1]);
+    });
+    peer.on('disconnected', function () {
+      // 部屋づくり中に中継サーバーから切れたら失敗。つながったあとは生存確認に任せる
+      if (!api.connected && !s.finished) fail(s, 'error', 'disconnected', MSG.server);
+    });
+    return peer;
+  }
+
+  function host(code) {
+    var s = newSession(true);
+    return new Promise(function (resolve, reject) {
+      s.resolve = resolve; s.reject = reject;
+      var peer = makePeer(s, String(code));
+      if (!peer) return;
+      peer.on('open', function () { if (!s.settled && !s.finished) { s.settled = true; s.resolve(); } });  // 部屋ができた
+      peer.on('disconnected', function () {   // ゲストが来る前に中継サーバーから切れたら つなぎ直す
+        if (!s.conn && !s.finished && peer.open === false && !peer.destroyed) { try { peer.reconnect(); } catch (e) {} }
+      });
+      peer.on('connection', function (conn) {
+        if (s.finished || S !== s) { try { conn.close(); } catch (e) {} return; }
+        if (s.conn) {   // 2人目は断る
+          conn.on('open', function () {
+            try { conn.send({ t: 'full', message: MSG.full }); } catch (e) {}
+            setTimeout(function () { try { conn.close(); } catch (e) {} }, 100);
+          });
+          return;
+        }
+        attachConn(s, conn);
+        var accept = function () { try { conn.send({ t: '_w' }); } catch (e) {} onOpened(s); };
+        if (conn.open) accept(); else conn.on('open', accept);
+      });
+    });
+  }
+
+  function join(code) {
+    var s = newSession(false);
+    return new Promise(function (resolve, reject) {
+      s.resolve = resolve; s.reject = reject;
+      var p;
+      try { p = new Peer(peerOptions()); } catch (e) { fail(s, 'error', 'no-peerjs', MSG.server); return; }
+      s.peer = p;
+      p.on('error', function (err) {
+        var m = peerErrorMessage(err);
+        if (api.connected) return;
+        fail(s, 'error', m[0], m[1]);
+      });
+      p.on('disconnected', function () { if (!api.connected && !s.finished) fail(s, 'error', 'disconnected', MSG.server); });
+      // 部屋に入れたあと（settled）は時間切れにしない
+      s.timers.push(setTimeout(function () { if (!s.settled) fail(s, 'error', 'timeout', MSG.cantConnect); }, JOIN_TIMEOUT_MS));
+      p.on('open', function () {
+        if (s.finished || S !== s) return;
+        var conn = p.connect('seecar-hoshi-' + code, { serialization: 'json', reliable: true });
+        attachConn(s, conn);
+      });
+    });
+  }
+
+  var chunkId = 0;
+  function send(obj) {
+    var s = S;
+    if (!s || !api.connected || !s.conn || !s.conn.open) return false;
+    try {
+      var str = JSON.stringify(obj);
+      if (str.length <= CHUNK_AT) { s.conn.send(obj); return true; }
+      var id = ++chunkId, n = Math.ceil(str.length / CHUNK_SIZE);
+      for (var i = 0; i < n; i++) {
+        s.conn.send({ t: '_c', id: id, i: i, n: n, d: str.substr(i * CHUNK_SIZE, CHUNK_SIZE) });
+      }
+      return true;
+    } catch (e) { return false; }
+  }
+
+  function close() {
+    teardown(true);
+  }
+
+  function on(name, fn) {
+    if (handlers[name] && typeof fn === 'function') handlers[name].push(fn);
+  }
+
+  api.makeCode = makeCode;
+  api.host = host;
+  api.join = join;
+  api.send = send;
+  api.on = on;
+  api.close = function () { close(); };
+  try { window.addEventListener('pagehide', function () { teardown(true); }); } catch (e) {}
+  window.Net = api;
+})();
+
+// ===== ui.js =====
+// ui.js : 6ステート、ボタン、モーダル、操作ボタン、全体の配線。公開するのは window.App だけ。
+// World / MapGen / Net / Sfx が無くても落ちないよう、すべて call() 経由で呼ぶ。
+(function () {
+  'use strict';
+  var PLAYERS = [{ color: '#e53935' }, { color: '#1e88e5' }];
+  var CAM_LABEL = ['め', 'おいかけ', 'そら']; // 視点の名前
+  var CAM_GO = ['めへ', 'おいかけへ', 'そらへ'];  // カメラボタンの文字：おすと つぎに なる視点（絵と同じ） // 移動の「うしろ」とかぶらない名前
+  var DEFAULT_ERR = 'つながらなかったよ。ばんごうを たしかめてね';
+  var doc = document;
+
+  function $(id) { return doc.getElementById(id); }
+  function call(obj, name) {
+    var o = window[obj];
+    if (o && typeof o[name] === 'function') {
+      try { return o[name].apply(o, Array.prototype.slice.call(arguments, 2)); }
+      catch (e) { try { console.warn(obj + '.' + name + ' failed', e); } catch (_) {} }
+    }
+    return undefined;
+  }
+  function prop(obj, name) { var o = window[obj]; return o ? o[name] : undefined; }
+  function sfx(name) { call('Sfx', 'play', name); }
+  function unlock() { call('Sfx', 'unlock'); }
+
+  var ICON = {
+    play: '<svg viewBox="0 0 24 24"><path d="M6 3.500l15 8.500-15 8.500z"/></svg>',
+    go: '<svg viewBox="0 0 24 24"><path d="M3 4l9 8-9 8zM12 4l9 8-9 8z"/></svg>',
+    net: '<svg viewBox="0 0 24 24"><circle cx="5.500" cy="12" r="4"/><circle cx="18.500" cy="12" r="4"/><rect x="8" y="10.500" width="8" height="3"/></svg>',
+    again: '<svg viewBox="0 0 24 24"><path d="M12 4V1L7 5.500 12 10V7a5.500 5.500 0 1 1-5.500 5.500H3.500A8.500 8.500 0 1 0 12 4z"/></svg>',
+    stop: '<svg viewBox="0 0 24 24"><rect x="5" y="5" width="14" height="14" rx="3"/></svg>',
+    home: '<svg viewBox="0 0 24 24"><path d="M12 3 1.500 12.500H5V21h5.500v-6h3v6H19v-8.500h3.500z"/></svg>',
+    link: '<svg viewBox="0 0 24 24"><circle cx="5.500" cy="12" r="4"/><circle cx="18.500" cy="12" r="4"/><rect x="8" y="10.500" width="8" height="3"/></svg>',
+    pic: '<svg viewBox="0 0 24 24"><rect x="2" y="4" width="20" height="16" rx="3" fill="#ffd23f"/><circle cx="8" cy="10" r="2.400" fill="#ff5d8f"/><path d="M3 19l6-6 4 4 3-3 5 5z" fill="#3b8df0"/></svg>'
+  };
+  // カメラの絵。戦車の色は自分の色（ゲストは青）
+  var LIGHT = { '#e53935': '#ff7a6e', '#1e88e5': '#7ab8f5' };
+  function camIcon(m, color) {
+    var c = color || PLAYERS[0].color, l = LIGHT[c] || '#ffffff';
+    if (m === 0) // め（目）：自分の目で見る
+      return '<svg viewBox="0 0 48 48"><path d="M3 24C10 12 38 12 45 24 38 36 10 36 3 24z" fill="#fff" stroke="#1f5fd9" stroke-width="3"/><circle cx="24" cy="24" r="8.500" fill="#1f5fd9"/><circle cx="21" cy="21" r="2.800" fill="#fff"/></svg>';
+    if (m === 1) // おいかけ：戦車を後ろから追いかけて見る
+      return '<svg viewBox="0 0 48 48"><rect x="12" y="26" width="24" height="9" rx="3" fill="' + c + '"/><rect x="16" y="19" width="16" height="9" rx="3" fill="' + l + '"/><rect x="29" y="13" width="14" height="4" rx="2" fill="#555" transform="rotate(-20 29 15)"/><rect x="9" y="33" width="30" height="7" rx="3.500" fill="#444"/><path d="M4 8h10l-3-4M14 8l-3 4" stroke="#1f5fd9" stroke-width="2.600" fill="none" stroke-linecap="round"/></svg>';
+    // そら：真上から地図ぜんぶを見る
+    return '<svg viewBox="0 0 48 48"><rect x="4" y="6" width="40" height="36" rx="4" fill="#fff" stroke="#1f5fd9" stroke-width="3"/><path d="M4 18h24v10h14M18 6v12M30 28v14" stroke="#222" stroke-width="3.500" fill="none"/><rect x="9" y="30" width="9" height="9" rx="2" fill="' + c + '"/><path d="M34 11l3 5 3-5-3 1z" fill="#ff4fb0"/><circle cx="37" cy="14" r="3.500" fill="#ff4fb0"/></svg>';
+  }
+  var SAD = '<svg viewBox="0 0 64 64"><circle cx="32" cy="32" r="28" fill="#ffd23f" stroke="#fff" stroke-width="4"/><circle cx="22" cy="26" r="3.500" fill="#12327a"/><circle cx="42" cy="26" r="3.500" fill="#12327a"/><path d="M20 46q12-12 24 0" stroke="#12327a" stroke-width="4" fill="none" stroke-linecap="round"/></svg>';
+  var HAPPY = '<svg viewBox="0 0 64 64"><circle cx="32" cy="32" r="28" fill="#8ee0a5" stroke="#fff" stroke-width="4"/><circle cx="22" cy="26" r="3.500" fill="#12327a"/><circle cx="42" cy="26" r="3.500" fill="#12327a"/><path d="M20 38q12 12 24 0" stroke="#12327a" stroke-width="4" fill="none" stroke-linecap="round"/></svg>';
+
+  // ---------------- 状態 ----------------
+  var state = 'boot', sub = 'pick';
+  var mode = 'solo';              // 'solo' | 'net'
+  var netRole = '', netOn = false, netTok = 0, netConnected = false, joined = false;
+  var code = '';
+  var sel = null, loading = false;
+  var map = null, myIndex = 0, camMode = 1, running = false, modalOpen = false;
+  var pressed = {}, guard = false, hostRetry = 0;
+  var navKey = '', noticeTimer = 0, boomTimer = 0;
+  var els = {};
+
+  // ---------------- 共通のボタン登録 ----------------
+  function stopEv(e) { e.stopPropagation(); e.preventDefault(); }
+  function tap(el, fn) {
+    var armed = false;
+    el.addEventListener('pointerdown', function (e) { stopEv(e); armed = true; el.classList.add('down'); unlock(); });
+    el.addEventListener('pointerup', function (e) {
+      stopEv(e); var was = armed; armed = false; el.classList.remove('down');
+      if (was) { sfx('tap'); fn(e); }
+    });
+    function off(e) { stopEv(e); armed = false; el.classList.remove('down'); }
+    el.addEventListener('pointercancel', off);
+    el.addEventListener('pointerleave', off);
+    el.addEventListener('click', stopEv);
+    el.addEventListener('contextmenu', stopEv);
+  }
+  function setBtnDown(act, on) {
+    var list = doc.querySelectorAll('[data-act="' + act + '"]');
+    for (var i = 0; i < list.length; i++) list[i].classList.toggle('down', on);
+  }
+  function press(act, on) {
+    if (!!pressed[act] === on) return;
+    pressed[act] = on;
+    setBtnDown(act, on);
+    call('World', 'press', act, on);
+  }
+  function releaseAll() { Object.keys(pressed).forEach(function (a) { if (pressed[a]) press(a, false); }); }
+  function hold(el, act) {
+    el.addEventListener('pointerdown', function (e) { stopEv(e); unlock(); if (!modalOpen) press(act, true); });
+    function up(e) { stopEv(e); press(act, false); }
+    el.addEventListener('pointerup', up);
+    el.addEventListener('pointercancel', up);
+    el.addEventListener('pointerleave', up);
+    el.addEventListener('click', stopEv);
+    el.addEventListener('contextmenu', stopEv);
+  }
+
+  // ---------------- ロゴ ----------------
+  function logoHTML() {
+    return '<div class="logo"><div class="logo-top">見つめて見つけて</div><div class="logo-main">' +
+      '<div class="star"><i class="s1"></i><i class="s2"></i><i class="s3"></i><b>ほ</b></div>' +
+      '<div class="logo-name">シーカー</div></div><div class="logo-en">SEE-CAR</div></div>';
+  }
+  function buildLogos() {
+    var list = doc.querySelectorAll('[data-logo]');
+    for (var i = 0; i < list.length; i++) {
+      list[i].innerHTML = logoHTML();
+      list[i].firstChild.style.setProperty('--k', list[i].getAttribute('data-logo'));
+    }
+  }
+
+  // ---------------- 進行ボタン #nav ----------------
+  function navItems() {
+    if (state === 'title') return [
+      { label: 'はじめる', icon: 'play', kind: 'primary', fn: startSolo },
+      { label: 'つうしんであそぶ', icon: 'net', kind: 'secondary', fn: startOnline }];
+    if (state === 'setting') {
+      if (sub === 'pick' && sel && !loading) return [{ label: 'しゅっぱつ！', icon: 'go', kind: 'primary', fn: depart }];
+      if (sub === 'keypad' && code.length === 4) return [{ label: 'つなぐ！', icon: 'link', kind: 'primary', fn: doJoin }];
+      if (sub === 'error') return [{ label: 'もういちど', icon: 'again', kind: 'primary', fn: retry }];
+      return [];
+    }
+    if (state === 'ending') return [
+      { label: 'もういちど', icon: 'again', kind: 'primary', fn: function () { go('title'); } },
+      { label: 'おわる', icon: 'stop', kind: 'secondary', fn: function () { go('quit'); } }];
+    if (state === 'quit') return [{ label: 'はじめから', icon: 'home', kind: 'primary', fn: function () { go('title'); } }];
+    return [];
+  }
+  function renderNav() {
+    var items = navItems();
+    var key = state + '|' + sub + '|' + items.map(function (i) { return i.label; }).join('/');
+    if (key === navKey) return;
+    navKey = key;
+    els.nav.innerHTML = '';
+    items.forEach(function (it) {
+      var b = doc.createElement('button');
+      b.type = 'button'; b.tabIndex = -1; b.className = 'nbtn ' + it.kind;
+      b.innerHTML = '<i>' + ICON[it.icon] + '</i><span>' + it.label + '</span>';
+      b.setAttribute('data-nav', it.label);
+      tap(b, it.fn);
+      els.nav.appendChild(b);
+    });
+  }
+
+  // ---------------- 画面遷移 ----------------
+  function go(name) {
+    var from = state;
+    if (from === 'play' && name !== 'play') releaseAll();
+    if (name === 'title' || name === 'quit') { stopGame(); closeNet(); mode = 'solo'; sel = null; loading = false; hideNotice(); }
+    if (name === 'ending') stopGame();
+    state = name;
+    doc.body.setAttribute('data-state', name);
+    if (name !== 'setting') sub = 'pick';
+    if (name === 'ending') fillEnding.apply(null, [].slice.call(arguments, 1));
+    renderNav();
+  }
+
+  function setSub(s, headText) {
+    sub = s;
+    els.setting.setAttribute('data-sub', s);
+    var heads = { choice: 'どちらに する？', code: 'この ばんごうを ともだちに おしえてね', keypad: 'ばんごうを いれてね', msg: 'ちょっと まってね', error: 'あれれ？', pick: 'ちずを えらんでね' };
+    els.sethead.textContent = headText || heads[s] || '';
+    renderNav();
+  }
+  function enterSetting(s, head) { go('setting'); setSub(s, head); }
+
+  function startSolo() { mode = 'solo'; sel = null; loading = false; renderCards(); renderPreview(); enterSetting('pick'); }
+  function startOnline() { mode = 'net'; sel = null; netRole = ''; enterSetting('choice'); }
+  function backFromSetting() {
+    if (mode === 'net' && sub !== 'choice') { closeNet(); sel = null; loading = false; setSub('choice'); return; }
+    go('title');
+  }
+
+  // ---------------- 地図えらび ----------------
+  function renderCards() {
+    var presets = prop('MapGen', 'presets') || [];
+    var grid = els.cards;
+    grid.innerHTML = '';
+    var total = presets.length + 1;
+    grid.style.setProperty('--cols', total > 4 ? 3 : 2);
+    grid.className = 'pickgrid' + (total > 4 ? ' c3' : '');
+    presets.forEach(function (p) {
+      var c = doc.createElement('button');
+      c.type = 'button'; c.tabIndex = -1; c.className = 'card'; c.setAttribute('data-id', p.id);
+      c.innerHTML = '<span class="kan"></span><span class="yomi"></span>';
+      c.firstChild.textContent = p.title; c.lastChild.textContent = p.reading || '';
+      tap(c, function () { choosePreset(p); });
+      grid.appendChild(c);
+    });
+    var f = doc.createElement('div');
+    f.className = 'card file'; f.setAttribute('data-id', 'file');
+    f.innerHTML = ICON.pic + '<span class="kan">えを よみこむ</span><input type="file" accept="image/*" aria-label="えを よみこむ">';
+    var inp = f.querySelector('input');
+    // ファイル選択欄だけは既定動作を止めない（止めると選択画面が開かない）。ただし他へ伝わらないよう止める。
+    ['pointerdown', 'pointerup'].forEach(function (n) { inp.addEventListener(n, function (e) { e.stopPropagation(); unlock(); }); });
+    inp.addEventListener('change', function () {
+      var file = inp.files && inp.files[0];
+      inp.value = '';
+      if (file) chooseFile(file);
+    });
+    grid.appendChild(f);
+    markCards();
+  }
+  function markCards() {
+    var list = els.cards.children;
+    for (var i = 0; i < list.length; i++) {
+      list[i].classList.toggle('on', !!(sel && sel.id === list[i].getAttribute('data-id')));
+    }
+  }
+  function renderPreview(msg) {
+    var p = els.preview, h = '';
+    if (loading) h = '<div class="spin"></div><div class="hint">つくっているよ…</div>';
+    else if (msg) h = '<div class="hint">' + msg + '</div>';
+    else if (sel && sel.map) {
+      h = (sel.map.picture ? '<img alt="">' : '') + '<div class="pt"></div><div class="py"></div>';
+    } else h = '<div class="hint">すきな ちずを<br>えらんでね</div>';
+    p.innerHTML = h;
+    if (!loading && sel && sel.map && !msg) {
+      var img = p.querySelector('img'); if (img) img.src = sel.map.picture;
+      p.querySelector('.pt').textContent = sel.map.title || '';
+      p.querySelector('.py').textContent = sel.map.reading || '';
+    }
+  }
+  function choosePreset(p) {
+    if (loading) return;
+    loading = true; sel = null; markCards(); renderPreview(); renderNav();
+    setTimeout(function () {
+      var m = null;
+      try { m = call('MapGen', 'fromPreset', p.id); } catch (e) {}
+      loading = false;
+      if (m) sel = { id: p.id, map: m };
+      markCards(); renderPreview(m ? '' : 'うまく つくれなかったよ'); renderNav();
+    }, 40);
+  }
+  function chooseFile(file) {
+    if (loading) return;
+    loading = true; sel = null; markCards(); renderPreview(); renderNav();
+    var pr = call('MapGen', 'fromFile', file);
+    function done(m) {
+      loading = false;
+      if (m) sel = { id: 'file', map: m };
+      markCards(); renderPreview(m ? '' : 'えを よみこめなかったよ<br>ほかの えを ためしてね'); renderNav();
+    }
+    if (pr && pr.then) pr.then(done, function () { done(null); }); else done(null);
+  }
+
+  // ---------------- 出発 ----------------
+  function depart() {
+    if (!sel || !sel.map) return;
+    if (mode === 'net') {
+      if (!netConnected) return;
+      var enc = call('MapGen', 'encode', sel.map);
+      call('Net', 'send', { t: 'map', map: enc });
+      startGame(sel.map, 0, true);
+    } else startGame(sel.map, 0, false);
+  }
+
+  // ---------------- 通信：へや ----------------
+  function rand4() { return ('0000' + Math.floor(Math.random() * 10000)).slice(-4); }
+  function errText(e) {
+    var m = typeof e === 'string' ? e : (e && e.message);
+    return (m && /[ぁ-ん]/.test(m)) ? m : DEFAULT_ERR;
+  }
+  function showDigits(el, str, n) {
+    var h = '';
+    for (var i = 0; i < n; i++) h += '<b>' + (str.charAt(i) || '') + '</b>';
+    el.innerHTML = h;
+  }
+  function failNet(msg) {
+    netTok++; closeNet();
+    els.msgface.innerHTML = SAD;
+    els.msgtext.textContent = msg || DEFAULT_ERR;
+    setSub('error');
+  }
+  function infoNet(text, face) {
+    els.msgface.innerHTML = face || '<div class="spin"></div>';
+    els.msgtext.textContent = text;
+    setSub('msg');
+  }
+  function closeNet() {
+    netTok++;
+    var was = netConnected || netOn || netRole;
+    netOn = false; netConnected = false; joined = false;
+    if (was) call('Net', 'close');
+  }
+
+  function startHost() {
+    closeNet();
+    netRole = 'host';
+    var tok = ++netTok;
+    code = call('Net', 'makeCode') || rand4();
+    showDigits(els.codeshow, code, 4);
+    setSub('code');
+    var p = call('Net', 'host', code);
+    if (!p || !p.then) { failNet('つうしんが つかえないよ'); return; }
+    p.then(function () {
+      if (tok !== netTok) return;
+      if (prop('Net', 'connected')) hostConnected();
+    }, function (e) {
+      if (tok !== netTok) return;
+      if (e && e.code === 'unavailable-id' && hostRetry < 4) { hostRetry++; startHost(); return; }
+      failNet(errText(e));
+    });
+  }
+  function hostConnected() {
+    if (netConnected) return;
+    netConnected = true; hostRetry = 0; sel = null; loading = false;
+    call('Net', 'send', { t: 'hello', color: PLAYERS[0].color });
+    renderCards(); renderPreview();
+    setSub('pick', 'つながったよ！ ちずを えらんでね');
+  }
+
+  function startJoin() {
+    closeNet();
+    netRole = 'join'; code = '';
+    updateKeypad(); setSub('keypad');
+  }
+  function updateKeypad() { showDigits(els.codein, code, 4); renderNav(); }
+  function doJoin() {
+    if (code.length !== 4) return;
+    var tok = ++netTok; joined = false;
+    infoNet('さがしているよ…');
+    var p = call('Net', 'join', code);
+    if (!p || !p.then) { failNet('つうしんが つかえないよ'); return; }
+    p.then(function () {
+      if (tok !== netTok) return;
+      joined = true; netConnected = true;
+      call('Net', 'send', { t: 'hello', color: PLAYERS[1].color });
+      if (state === 'setting') infoNet('つながったよ！ ちずが くるのを まっているよ…', HAPPY);
+    }, function (e) {
+      if (tok !== netTok) return;
+      failNet(errText(e));
+    });
+  }
+  function retry() { if (netRole === 'host') startHost(); else startJoin(); }
+
+  function buildKeypad() {
+    var kp = els.keypad;
+    ['1', '2', '3', '4', '5', '6', '7', '8', '9', 'del', '0', 'nul'].forEach(function (k) {
+      var b = doc.createElement('button');
+      b.type = 'button'; b.tabIndex = -1;
+      if (k === 'nul') { b.className = 'key nul'; kp.appendChild(b); return; }
+      b.className = 'key' + (k === 'del' ? ' del' : '');
+      b.textContent = k === 'del' ? 'けす' : k;
+      tap(b, function () { keyIn(k); });
+      kp.appendChild(b);
+    });
+  }
+  function keyIn(k) {
+    if (sub !== 'keypad') return;
+    if (k === 'del') code = code.slice(0, -1);
+    else if (code.length < 4) code += k;
+    updateKeypad();
+  }
+
+  // ---------------- Net の受け口（1回だけ登録） ----------------
+  function onNetOpen() {
+    if (state === 'setting' && netRole === 'host' && sub === 'code') hostConnected();
+  }
+  function onNetData(d) {
+    if (!d || typeof d !== 'object') return;
+    if (d.t === 'map') {
+      if (state === 'setting' && netRole === 'join') {
+        var m = call('MapGen', 'decode', d.map);
+        if (m) { netTok++; netOn = true; startGame(m, 1, true); }
+        else failNet('ちずが うけとれなかったよ');
+      }
+      return;
+    }
+    if (state !== 'play') return;
+    var other = 1 - myIndex;
+    if (d.t === 'st') call('World', 'applyRemoteState', other, d.s);
+    else if (d.t === 'boom') {
+      // 発射のときに1回だけ届く。弾が山なりに飛んでから壊れる（「ドゴォーン！」は着弾のとき World の boom で出す）
+      guard = true; try { call('World', 'applyRemoteBoom', d.cells, d.from); } finally { guard = false; }
+    } else if (d.t === 'found') {
+      guard = true; try { call('World', 'remoteFound', d.idx); } finally { guard = false; }
+      go('ending', d.idx);
+    }
+  }
+  function onNetClose() {
+    netConnected = false;
+    if (state === 'play' && netOn) {
+      netOn = false;
+      call('World', 'dropRemote', 1 - myIndex); // 相手の戦車を地図から消す
+      showNotice('あいてが いなくなったよ　ひとりで つづけよう', true);
+    } else if (state === 'setting' && mode === 'net') {
+      failNet('あいてと つながらなくなったよ');
+    }
+    netOn = false;
+  }
+  // 'error' は Promise の reject と二重になるので、ここでは何も表示しない
+
+  // ---------------- Play ----------------
+  function startGame(m, idx, net) {
+    map = m; myIndex = idx; netOn = !!net;
+    hideNotice();
+    call('World', 'load', m, { myIndex: idx, players: PLAYERS, net: netOn });
+    els.ptTitle.textContent = m.title || '';
+    els.ptYomi.textContent = m.reading || '';
+    camMode = 1; updateCam();
+    doc.body.classList.add('camtop'); // 開始演出は真上から
+    go('play');
+    call('World', 'setCamera', camMode);
+    call('World', 'start');
+    running = true;
+    applyPortraitPause();
+  }
+  function stopGame() {
+    if (running) { running = false; call('World', 'stop'); }
+  }
+  function updateCam() {
+    var col = PLAYERS[myIndex] ? PLAYERS[myIndex].color : PLAYERS[0].color, nx = (camMode + 1) % 3;
+    // 押したら次になる視点だけを、絵と文字の両方で見せる（絵＝次の視点、文字＝「〜へ」）
+    els.camIco.innerHTML = camIcon(nx, col);
+    els.camLabel.textContent = CAM_GO[nx];
+    els.cam.setAttribute('aria-label', 'おすと ' + CAM_LABEL[nx] + 'に なる');
+  }
+  function cycleCam() {
+    var m = call('World', 'cycleCamera');
+    camMode = (typeof m === 'number') ? m : (camMode + 1) % 3;
+    updateCam();
+  }
+  function showBoom() {
+    var b = els.boom;
+    b.classList.remove('on'); void b.offsetWidth; b.classList.add('on');
+    clearTimeout(boomTimer);
+    boomTimer = setTimeout(function () { b.classList.remove('on'); }, 800);
+  }
+  // 知らせ：big なら大きく出して、4.5秒あとに小さくする。プレイが終わるまで出しつづける
+  function showNotice(t, big) {
+    clearTimeout(noticeTimer);
+    els.notice.textContent = t; els.notice.classList.add('on');
+    els.notice.classList.toggle('big', !!big);
+    if (big) noticeTimer = setTimeout(function () { els.notice.classList.remove('big'); }, 4500);
+  }
+  function hideNotice() { clearTimeout(noticeTimer); els.notice.classList.remove('on'); els.notice.classList.remove('big'); }
+
+  function onFound(idx) {
+    if (state !== 'play' || guard) return;
+    if (netOn) call('Net', 'send', { t: 'found', idx: idx });
+    go('ending', idx);
+  }
+  function onBoom(cells, remote) {
+    showBoom(); // 着弾（自分の弾も、相手の弾も）。通信へは送らない
+  }
+  function onFire(info) {
+    if (guard || !netOn || state !== 'play' || !info) return;
+    call('Net', 'send', { t: 'boom', cells: info.cells, from: info.from }); // 発射時の1回だけ
+  }
+  function onState(s) {
+    if (guard || !netOn || state !== 'play') return;
+    call('Net', 'send', { t: 'st', s: s });
+  }
+
+  // ---------------- Ending ----------------
+  function fillEnding(idx) {
+    idx = (idx === 1) ? 1 : 0;
+    var m = map || {};
+    els.endDisc.style.background = PLAYERS[idx].color;
+    els.endWho.textContent = (mode === 'net' && idx !== myIndex) ? 'あいてが みつけたよ！' : 'きみが みつけたよ！';
+    els.endTitle.textContent = m.title || '';
+    els.endTitle.style.display = m.title ? '' : 'none';
+    els.endYomi.textContent = m.reading || '';
+    if (m.picture) { els.endPic.src = m.picture; els.endPic.style.display = ''; } else els.endPic.style.display = 'none';
+    var c = els.confetti; c.innerHTML = '';
+    var cols = ['#ff5d8f', '#ffd23f', '#4d9bff', '#59d27c', '#b388ff', '#ff9f1c'];
+    for (var i = 0; i < 26; i++) {
+      var s = doc.createElement('i');
+      s.style.left = (i * 3.9 + Math.random() * 3) + '%';
+      s.style.background = cols[i % cols.length];
+      s.style.animationDuration = (3 + Math.random() * 3) + 's';
+      s.style.animationDelay = (-Math.random() * 5) + 's';
+      c.appendChild(s);
+    }
+  }
+
+  // ---------------- ホームとモーダル ----------------
+  function openModal() {
+    if (modalOpen) return;
+    modalOpen = true; els.modal.classList.add('on');
+    releaseAll();
+    if (state === 'play') call('World', 'setPaused', true);
+  }
+  function closeModal() {
+    if (!modalOpen) return;
+    modalOpen = false; els.modal.classList.remove('on');
+    if (state === 'play') applyPortraitPause();
+  }
+  function quitYes() {
+    modalOpen = false; els.modal.classList.remove('on');
+    stopGame(); closeNet();
+    go('quit');
+  }
+  function applyPortraitPause() {
+    if (state !== 'play') return;
+    var portrait = !!(window.matchMedia && window.matchMedia('(orientation: portrait)').matches);
+    call('World', 'setPaused', modalOpen || portrait);
+  }
+
+  // ---------------- キーボード（確認用） ----------------
+  var KEYS = { ArrowUp: 'fwd', w: 'fwd', W: 'fwd', ArrowDown: 'back', s: 'back', S: 'back',
+    ArrowLeft: 'left', a: 'left', A: 'left', ArrowRight: 'right', d: 'right', D: 'right', ' ': 'fire' };
+  function onKeyDown(e) {
+    if (e.ctrlKey || e.metaKey || e.altKey) return;
+    if (state === 'boot') { e.preventDefault(); if (!e.repeat) leaveBoot(); return; }
+    if (modalOpen) {
+      if (e.key === 'Escape') { e.preventDefault(); closeModal(); }
+      return;
+    }
+    if (state === 'play') {
+      var act = KEYS[e.key];
+      if (act) { e.preventDefault(); if (!e.repeat) press(act, true); return; }
+      if (e.key === 'c' || e.key === 'C') { e.preventDefault(); if (!e.repeat) cycleCam(); return; }
+      if (e.key === 'Escape') { e.preventDefault(); openModal(); }
+      return;
+    }
+    if (state === 'setting' && sub === 'keypad') {
+      if (/^[0-9]$/.test(e.key)) { e.preventDefault(); keyIn(e.key); return; }
+      if (e.key === 'Backspace') { e.preventDefault(); keyIn('del'); return; }
+    }
+    if (e.key === 'Enter') {
+      var b = els.nav.querySelector('.nbtn');
+      if (b) { e.preventDefault(); sfx('tap'); var it = navItems()[0]; if (it) it.fn(); }
+    }
+  }
+  function onKeyUp(e) {
+    var act = KEYS[e.key];
+    if (act && state === 'play') { e.preventDefault(); press(act, false); }
+  }
+
+  function leaveBoot() {
+    if (state !== 'boot') return;
+    unlock(); sfx('tap');
+    go('title');
+  }
+
+  // ---------------- 初期化 ----------------
+  function init() {
+    ['stage', 'nav', 'home', 'modal', 'setting', 'sethead', 'cards', 'preview', 'keypad', 'codein', 'codeshow', 'msgface', 'msgtext',
+      'cam', 'notice', 'boom', 'confetti'].forEach(function (id) { els[id] = $(id); });
+    els.ptTitle = $('pt-title'); els.ptYomi = $('pt-yomi');
+    els.camIco = $('cam-ico'); els.camLabel = $('cam-label');
+    els.endDisc = $('end-disc'); els.endWho = $('end-who'); els.endTitle = $('end-title'); els.endYomi = $('end-yomi'); els.endPic = $('end-pic');
+
+    doc.addEventListener('contextmenu', function (e) { e.preventDefault(); });
+    ['gesturestart', 'gesturechange', 'gestureend', 'dblclick'].forEach(function (n) { doc.addEventListener(n, function (e) { e.preventDefault(); }); });
+    doc.addEventListener('keydown', onKeyDown);
+    doc.addEventListener('keyup', onKeyUp);
+    window.addEventListener('blur', releaseAll);
+    if (window.matchMedia) {
+      var mq = window.matchMedia('(orientation: portrait)');
+      var h = function () { applyPortraitPause(); };
+      if (mq.addEventListener) mq.addEventListener('change', h); else if (mq.addListener) mq.addListener(h);
+    }
+
+    buildLogos();
+    buildKeypad();
+    renderCards(); renderPreview();
+    updateCam();
+
+    // Boot：画面のどこでも
+    tap($('boot'), leaveBoot);
+    tap(els.home, openModal);
+    tap($('m-no'), closeModal);
+    tap($('m-yes'), quitYes);
+    els.modal.addEventListener('pointerdown', stopEv);
+    els.modal.addEventListener('pointerup', stopEv);
+    els.modal.addEventListener('click', stopEv);
+    tap($('back'), backFromSetting);
+    tap($('c-host'), startHost);
+    tap($('c-join'), startJoin);
+    tap(els.cam, cycleCam);
+    var ctls = doc.querySelectorAll('.ctl[data-act]');
+    for (var i = 0; i < ctls.length; i++) hold(ctls[i], ctls[i].getAttribute('data-act'));
+
+    call('World', 'init', $('worldbox'));
+    call('World', 'on', 'found', onFound);
+    call('World', 'on', 'boom', onBoom);
+    call('World', 'on', 'fire', onFire);
+    call('World', 'on', 'cam', function (top) { doc.body.classList.toggle('camtop', !!top); });
+    call('World', 'on', 'state', onState);
+    call('Net', 'on', 'open', onNetOpen);
+    call('Net', 'on', 'data', onNetData);
+    call('Net', 'on', 'close', onNetClose);
+
+    state = 'boot'; doc.body.setAttribute('data-state', 'boot');
+    renderNav();
+  }
+
+  window.App = {
+    go: function (name) { if (['boot', 'title', 'setting', 'play', 'ending', 'quit'].indexOf(name) >= 0) go(name); },
+    get state() { return state; }
+  };
+
+  if (doc.readyState === 'loading') doc.addEventListener('DOMContentLoaded', init); else init();
+})();
+
+</script>
+</body>
+</html>

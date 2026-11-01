@@ -99,7 +99,7 @@ body[data-state=quit] #quit .center{padding-bottom:14cqmin}
 #home{position:absolute;z-index:100;top:max(2cqmin,env(safe-area-inset-top));right:max(2.4cqmin,env(safe-area-inset-right));
   width:12cqmin;height:12cqmin;border-radius:50%;background:#fff;box-shadow:0 .8cqmin 0 rgba(20,40,100,.3);border:.5cqmin solid #d7e3f7;display:none;align-items:center;justify-content:center}
 #home svg{width:7.4cqmin;height:7.4cqmin;fill:#1f5fd9}
-body:not([data-state=boot]) #home{display:flex}
+#home{display:flex}
 
 /* ---------- モーダル ---------- */
 #modal{position:absolute;inset:0;z-index:200;display:none;align-items:center;justify-content:center;background:rgba(10,30,70,.6)}
@@ -178,7 +178,10 @@ body:not([data-state=boot]) #home{display:flex}
 #maptag{position:absolute;top:2cqmin;left:max(2cqmin,env(safe-area-inset-left));display:flex;align-items:baseline;gap:1.4cqmin;background:rgba(255,255,255,.88);border-radius:4cqmin;padding:.5cqmin 3cqmin;border:.4cqmin solid #fff;box-shadow:0 .5cqmin 0 rgba(20,40,100,.25);white-space:nowrap;pointer-events:none;transition:opacity .4s}
 #maptag b{font-size:4.4cqmin;color:#12327a;font-weight:900}#maptag small{font-size:2.4cqmin;color:#4a6aa8}
 body.camtop #maptag{opacity:0} /* 真上のときは地図の上はしと戦車をかくさない */
-#notice{position:absolute;top:10.5cqmin;left:max(2cqmin,env(safe-area-inset-left));display:none;font-size:3.6cqmin;background:#fff5d6;color:#7a3b00;border:.5cqmin solid #ffb703;border-radius:4cqmin;padding:.7cqmin 3cqmin;white-space:nowrap;pointer-events:none}
+#notice{position:absolute;top:10.5cqmin;left:max(2cqmin,env(safe-area-inset-left));display:none;font-size:3.6cqmin;background:#fff5d6;color:#7a3b00;border:.5cqmin solid #ffb703;border-radius:4cqmin;padding:.7cqmin 3cqmin;white-space:nowrap;pointer-events:none;transition:all .5s}
+/* 大きく出して次にすることを伝え、数秒あとに小さくして出しつづける */
+#notice.big{top:34cqmin;left:50%;transform:translateX(-50%);font-size:6.4cqmin;font-weight:900;padding:2cqmin 5cqmin;border-width:.8cqmin;border-radius:6cqmin;box-shadow:0 1cqmin 0 rgba(122,59,0,.25);text-align:center;line-height:1.35;white-space:normal;width:max-content;max-width:84cqmin}
+#notice.big.on{animation:pop2 .35s ease-out}
 #notice.on{display:block;animation:pop2 .35s ease-out}
 .ctl{display:flex;flex-direction:column;align-items:center;justify-content:center;gap:.2cqmin;color:#12327a}
 #dpad{position:absolute;left:max(3cqmin,env(safe-area-inset-left));bottom:3cqmin;display:grid;grid-template-columns:repeat(3,15cqmin);grid-template-rows:repeat(3,15cqmin);gap:1cqmin;pointer-events:none}
@@ -194,11 +197,11 @@ body.camtop #maptag{opacity:0} /* 真上のときは地図の上はしと戦車�
 #fire.down{background:radial-gradient(circle at 35% 30%,#ffc09a,#ff6b3d 70%)}
 #cam{position:absolute;right:max(3cqmin,env(safe-area-inset-right));top:23cqmin;width:30cqmin;height:20cqmin;border-radius:4cqmin;background:rgba(255,255,255,.92);border:.6cqmin solid #fff;box-shadow:0 .9cqmin 0 rgba(20,40,100,.35);display:flex;flex-direction:column;align-items:center;justify-content:center;gap:.4cqmin;color:#12327a}
 #cam .camrow{display:flex;align-items:center;justify-content:center;gap:1cqmin}
-#cam i{display:block;width:10.6cqmin;height:10.6cqmin;flex:none}
+#cam i{display:block;width:12.4cqmin;height:12.4cqmin;flex:none}
 #cam i svg{width:100%;height:100%}
 #cam i.next{width:8cqmin;height:8cqmin;opacity:.8;border:.45cqmin dashed #8fb4e8;border-radius:2cqmin;padding:.3cqmin}
 #cam .arr{display:block;width:0;height:0;border-top:2cqmin solid transparent;border-bottom:2cqmin solid transparent;border-left:3cqmin solid #ff9f1c;flex:none}
-#cam span#cam-label{font-size:4.2cqmin;line-height:1;font-weight:900}
+#cam span#cam-label{font-size:4.4cqmin;line-height:1;font-weight:900}
 #boom{position:absolute;left:50%;top:30%;z-index:60;pointer-events:none;display:none;font-size:20cqmin;font-weight:900;color:#ffd23f;white-space:nowrap;--e:.5cqmin;
   text-shadow:calc(var(--e)*-1) 0 #7a1c00,var(--e) 0 #7a1c00,0 calc(var(--e)*-1) #7a1c00,0 var(--e) #7a1c00,calc(var(--e)*2) calc(var(--e)*2) #7a1c00,calc(var(--e)*-2) calc(var(--e)*-2) #7a1c00,calc(var(--e)*-2) calc(var(--e)*2) #7a1c00,calc(var(--e)*2) calc(var(--e)*-2) #7a1c00,0 1.6cqmin 0 #7a1c00,0 0 3cqmin #ff6a00}
 #boom.on{display:block;animation:boom .75s ease-out forwards}

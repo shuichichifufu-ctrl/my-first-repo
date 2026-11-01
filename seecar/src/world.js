@@ -3,10 +3,12 @@
 (function () {
   'use strict';
 
-  var STEP_H = 0.5;
-  // 見た目の高さ：高さ0と1は「紙に塗った色」（平ら）、2〜10が積み木。壁（10）は 5.0 の高さ。
-  var VSTEP = 5 / 9;
-  function vis(h) { return h <= 1 ? 0 : (h - 1) * VSTEP; }
+  // 見た目の高さ：1段 = STEP_H。高さ0と1は「紙に塗った色」（平ら）、2〜10が積み木。壁（10）は 9段 = 1.8 の高さ（約2マス分）。
+  // 戦車が段差を上り下りする高さも、同じ vis() を使うので同じ尺度。
+  var STEP_H = 0.2;
+  function vis(h) { return h <= 1 ? 0 : (h - 1) * STEP_H; }
+  var FLOOR_SAT = 1.9; // 床の色の鮮やかさ（1で元の色）
+  var TANK_SCALE = 1.12; // 戦車の見た目の大きさ（1マスの中におさまる範囲で、少し大きく）
   var DX = [0, 1, 0, -1];
   var DZ = [-1, 0, 1, 0];
   var MOVE_DUR = 0.22, TURN_DUR = 0.2, BUMP_DUR = 0.28;
@@ -249,6 +251,7 @@
     var r = tk.root;
     r.position.set(tk.x + 0.5, tk.y, tk.z + 0.5);
     r.rotation.y = tk.heading;
+    r.scale.setScalar(TANK_SCALE);
     var bob = tk.moving ? Math.sin(time * 34) * 0.018 : Math.sin(time * 2.2) * 0.006;
     tk.hull.position.y = bob;
     tk.hull.rotation.x = (tk.moving ? Math.sin(time * 17) * 0.035 : 0) + tk.recoil * 0.22;
@@ -310,7 +313,7 @@
     S.camera.position.set(0, 10, 10);
 
     // 明かり：やわらかい環境光＋左上からの日ざし
-    sc.add(new THREE.HemisphereLight(0xffffff, 0xf0f0f2, 0.72)); // 色をつけない（壁は黒く、紙は白く見せる）
+    sc.add(new THREE.HemisphereLight(0xffffff, 0xf0f0f2, 0.88)); // 色をつけない（壁は黒く、紙は白く見せる）
     var sun = new THREE.DirectionalLight(0xffffff, 0.5);
     sun.position.set(-0.55, 1, -0.4);
     sc.add(sun);
@@ -407,7 +410,7 @@
     p.sp.scale.setScalar(p.s0); p.sp.material.opacity = p.a0; p.sp.visible = true;
   }
 
-  var tmpM = new THREE.Matrix4(), tmpQ = new THREE.Quaternion(), tmpE = new THREE.Euler(), tmpV = new THREE.Vector3(), tmpS = new THREE.Vector3(), tmpC = new THREE.Color();
+  var tmpM = new THREE.Matrix4(), tmpQ = new THREE.Quaternion(), tmpE = new THREE.Euler(), tmpV = new THREE.Vector3(), tmpS = new THREE.Vector3(), tmpC = new THREE.Color(), tmpE2 = new THREE.Color();
   function spawnDebris(x, y, z, color, n, power) {
     var fx = S.fx;
     for (var k = 0; k < n; k++) {
@@ -423,7 +426,9 @@
         s: rand(0.1, 0.3), life: rand(1.6, 2.6), max: 0, rest: false
       };
       part.max = part.life;
-      tmpC.copy(color).offsetHSL(0, 0, rand(-0.07, 0.07));
+      tmpC.copy(color);
+      if (tmpC.r + tmpC.g + tmpC.b < 0.4) tmpC.lerp(tmpE2.set(0.3, 0.29, 0.3), 0.55); // 黒い壁の破片も、紙の上で見える濃い灰色に
+      tmpC.offsetHSL(0, 0, rand(-0.07, 0.07));
       if (Math.random() < 0.12) tmpC.set(0xffd23f); // 少しだけ黄色い火花
       fx.debris.setColorAt(i, tmpC);
       fx.parts.push(part);
@@ -566,6 +571,15 @@
     if (!S.running) render();
   }
 
+  // 積み木の色：地図の色を少し鮮やかに。明るさが低い（黒に近い）色だけ、ほぼ真っ黒にする。
+  var hsl = { h: 0, s: 0, l: 0 };
+  function blockColor(c) {
+    var lum = 0.299 * c.r + 0.587 * c.g + 0.114 * c.b;
+    if (lum < 0.16) { c.setRGB(0.1, 0.1, 0.11); return c; }
+    c.getHSL(hsl);
+    c.setHSL(hsl.h, clamp(hsl.s * 1.6, 0, 1), clamp(hsl.l * 0.92, 0.22, 0.68));
+    return c;
+  }
   function buildTerrain(L, add) {
     var w = S.w, h = S.h, n = 0, i;
     for (i = 0; i < w * h; i++) if (S.heights[i] > 1) n++; // 高さ0・1は紙の色（床に塗る）
@@ -590,9 +604,8 @@
       m.makeScale(1, vis(hh), 1); m.setPosition(x + 0.5, 0, z + 0.5);
       mesh.setMatrixAt(k, m);
       cellColor(i, c);
-      // 高い段（濃い色）ほど黒に近づける。壁（10）はほぼ真っ黒（上の面だけ少し明るく見える）
-      var wl = clamp((hh - 5) / 4, 0, 1);
-      c.r += (0.12 - c.r) * wl; c.g += (0.12 - c.g) * wl; c.b += (0.125 - c.b) * wl;
+      // 積み木は側面も含めて地図の色で塗る。黒に近い色（壁など）だけ黒にする
+      blockColor(c);
       mesh.setColorAt(k, c);
       cellToInst[i] = k++;
     }
@@ -639,12 +652,17 @@
       var i = z * w + x, hh = S.heights[i], r, g, b;
       if (S.destroyed[i]) { r = 236; g = 230; b = 218; }
       else if (hh > 1) { r = 40; g = 40; b = 42; } // 積み木の下：にじんで足元の影になる
-      else { r = S.colors[i * 3]; g = S.colors[i * 3 + 1]; b = S.colors[i * 3 + 2]; }
+      else {
+        r = S.colors[i * 3]; g = S.colors[i * 3 + 1]; b = S.colors[i * 3 + 2];
+        // 塗った色をはっきり見せる（白は紙の白のまま。色のついたところだけ少し濃く）
+        var lum = 0.299 * r + 0.587 * g + 0.114 * b, sat = FLOOR_SAT;
+        r = clamp(lum + (r - lum) * sat, 0, 255); g = clamp(lum + (g - lum) * sat, 0, 255); b = clamp(lum + (b - lum) * sat, 0, 255);
+      }
       // 柔らかい影：左上（北西）の高い物が、右下へ影を落とす
       var sh = 1;
       for (var k = 1; k <= 4; k++) {
         var hx = vis(hAt(x - k, z - k)) - vis(hh);
-        if (hx > k * 0.75) { sh = Math.min(sh, 0.7 + k * 0.04); break; }
+        if (hx > k * 0.35) { sh = Math.min(sh, 0.7 + k * 0.04); break; }
       }
       // まわりが高いとほんのり暗く（すみっこの影）
       var ao = 0;
@@ -735,10 +753,11 @@
       if (withFx) {
         cellColor(i, c);
         if (hh > 0) {
+          blockColor(c); // 積み木と同じ色の破片
           spawnDebris(x + 0.5, vis(hh) * 0.5, z + 0.5, c, Math.min(90, 26 + hh * 7), 1);
           for (var p = 0; p < 3; p++) spawnPuff(x + 0.5 + rand(-0.4, 0.4), vis(hh) * rand(0.2, 0.9) + 0.1, z + 0.5 + rand(-0.4, 0.4), { color: 0xdedad2, vx: rand(-1, 1), vy: rand(0.8, 2), vz: rand(-1, 1), s0: 0.6, s1: 2.4, life: 1.4, a: 0.85 });
         } else {
-          spawnDebris(x + 0.5, 0.05, z + 0.5, c.lerp(new THREE.Color(0x9a9080), 0.5), 8, 0.6);
+          spawnDebris(x + 0.5, 0.05, z + 0.5, c.lerp(new THREE.Color(0x9a9080), 0.2), 8, 0.6);
           spawnPuff(x + 0.5, 0.3, z + 0.5, { color: 0xe8e2d6, vy: 1, s0: 0.5, s1: 1.8, life: 1 });
         }
       }
@@ -946,8 +965,9 @@
     var cam = S.camera, half = THREE.MathUtils.degToRad(cam.fov / 2), tn = Math.tan(half);
     var hz = S.h / 2 + 2, hx = S.w / 2 + 2;
     var need = Math.max(hz / tn, hx / (tn * Math.max(0.3, cam.aspect)));
-    return Math.max(20, need) + 5.5; // 壁の上（5）からも全体が入るように
+    return Math.max(20, need) + 2; // 壁の上（1.8）からも全体が入るように
   }
+  var CHASE_BACK = 3.4, CHASE_UP = 4.4, CHASE_AHEAD = 2.2; // おいかけ視点：戦車の後ろ・上・見る先（前）
   var poseM = new THREE.Matrix4(), UP = new THREE.Vector3(0, 1, 0), NORTH = new THREE.Vector3(0, 0, -1);
   function poseFor(mode) {
     var p = new THREE.Vector3(), q = new THREE.Quaternion(), tg = new THREE.Vector3();
@@ -959,9 +979,9 @@
       tg.set(px + fx * 5, py + 0.2, pz + fz * 5);
       poseM.lookAt(p, tg, UP);
     } else if (mode === 1) {
-      // 少し平らに見下ろす：前の遠くの宝の光の柱が、壁の上に見える
-      p.set(px - fx * 3.8, py + 3.0 + S.chaseLift, pz - fz * 3.8);
-      tg.set(px + fx * 5.5, py + 0.7, pz + fz * 5.5);
+      // 後ろ上から見下ろす（約45度）：戦車の全身が画面の下寄りに入り、前の数マス先まで迷路が見える
+      p.set(px - fx * CHASE_BACK, py + CHASE_UP + S.chaseLift, pz - fz * CHASE_BACK);
+      tg.set(px + fx * CHASE_AHEAD, py - 0.1, pz + fz * CHASE_AHEAD);
       poseM.lookAt(p, tg, UP);
     } else {
       var hh = overheadHeight();
@@ -972,17 +992,19 @@
     q.setFromRotationMatrix(poseM);
     return { p: p, q: q };
   }
-  // 斜め後ろのカメラが壁にかくれないよう、後ろの壁の高さぶん持ち上げる
+  // 斜め後ろのカメラから戦車（頭の高さ）を見る線が、後ろの壁にさえぎられないよう、必要なぶんだけカメラを持ち上げる
   function chaseLiftTarget() {
     var tk = S.me ? S.me.tank : null; if (!tk) return 0;
     var fx = -Math.sin(tk.heading), fz = -Math.cos(tk.heading), lift = 0;
-    for (var s = 0.6; s <= 3.8; s += 0.4) {
-      var wx = tk.x + 0.5 - fx * s, wz = tk.z + 0.5 - fz * s;
-      var top = groundTopAt(wx, wz);
-      var lineY = tk.y + 0.4 + 2.6 * (s / 3.8);
-      if (top + 0.4 > lineY) lift = Math.max(lift, top + 0.4 - lineY + 0.6);
+    var headY = tk.y + 0.55;
+    for (var s = 0.55; s < CHASE_BACK; s += 0.3) {
+      var top = groundTopAt(tk.x + 0.5 - fx * s, tk.z + 0.5 - fz * s) + 0.12;
+      if (top <= headY) continue;
+      // カメラの高さ H のとき、後ろ s の位置での線の高さ = headY + (H - headY) * s / CHASE_BACK
+      var needH = headY + (top - headY) * CHASE_BACK / s;
+      lift = Math.max(lift, needH - (tk.y + CHASE_UP));
     }
-    return Math.min(lift, 6);
+    return clamp(lift, 0, 2.6);
   }
   function setCamera(mode) {
     mode = ((mode | 0) % 3 + 3) % 3;
@@ -1143,6 +1165,11 @@
       }
       var done = destroyCells(cells, true);
       emit('boom', done, true); // 弾なしで壊すとき（遠隔）。通信には送らない
+    },
+    // 相手が抜けたとき：相手の戦車を地図から消す
+    dropRemote: function (i) {
+      var r = S.remotes[i]; if (!r) return;
+      disposeTank(r.tank); delete S.remotes[i];
     },
     remoteFound: function (i) {
       if (S.treasure) S.treasure.celebrate = 1.5;
