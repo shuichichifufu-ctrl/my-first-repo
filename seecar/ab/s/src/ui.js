@@ -451,6 +451,20 @@
   }
 
   // ---------------- Ending ----------------
+  // v4：小さい画像（32×18など）が豆粒のまま出ないよう、枠いっぱいまで拡大して出す（小さい絵はくっきりしたマス目のまま）
+  function fitEndPic() {
+    var img = els.endPic; if (!img) return;
+    var go = function () {
+      var box = img.parentNode, bw = box.clientWidth, bh = box.clientHeight, nw = img.naturalWidth, nh = img.naturalHeight;
+      if (!(bw > 0 && bh > 0 && nw > 0 && nh > 0)) return;
+      var pad = 2 * (bh / 68) * 2.2; // 内側のふち（余白＋線）のぶん
+      var k = Math.min((bw - pad) / nw, (bh - pad) / nh);
+      img.style.width = Math.floor(nw * k + pad) + 'px'; img.style.height = Math.floor(nh * k + pad) + 'px';
+      img.style.imageRendering = nw < 256 ? 'pixelated' : 'auto';
+    };
+    img.onload = go; if (img.complete) go();
+    setTimeout(go, 60); setTimeout(go, 400); // 画面が出たあとの大きさでもう一度
+  }
   function fillEnding(idx) {
     idx = (idx === 1) ? 1 : 0;
     var m = map || {};
@@ -459,7 +473,7 @@
     els.endTitle.textContent = m.title || '';
     els.endTitle.style.display = m.title ? '' : 'none';
     els.endYomi.textContent = m.reading || '';
-    if (m.picture) { els.endPic.src = m.picture; els.endPic.style.display = ''; } else els.endPic.style.display = 'none';
+    if (m.picture) { els.endPic.src = m.picture; els.endPic.style.display = ''; fitEndPic(); } else els.endPic.style.display = 'none';
     var c = els.confetti; c.innerHTML = '';
     var cols = ['#ff5d8f', '#ffd23f', '#4d9bff', '#59d27c', '#b388ff', '#ff9f1c'];
     for (var i = 0; i < 26; i++) {

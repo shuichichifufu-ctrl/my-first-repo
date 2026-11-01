@@ -3,9 +3,9 @@
 (function () {
   'use strict';
 
-  // 見た目の高さ：1段 = STEP_H。高さ0と1は「紙に塗った色」（平ら）、2〜10が積み木。壁（10）は 9段 = 1.8 の高さ（約2マス分）。
+  // 見た目の高さ：1段 = STEP_H。高さ0と1は「紙に塗った色」（平ら）、2〜10が積み木。壁（10）は 9段 = 2.5 の高さ（約2マス分）。
   // 戦車が段差を上り下りする高さも、同じ vis() を使うので同じ尺度。
-  var STEP_H = 0.2;
+  var STEP_H = 0.28; // v4：0.2から高く（壁10＝2.5。おいかけ視点で、遠くの壁も黒い帯としてはっきり見える）
   function vis(h) { return h <= 1 ? 0 : (h - 1) * STEP_H; }
   var FLOOR_SAT = 1.9; // 床の色の鮮やかさ（1で元の色）
   var TANK_SCALE = 1.12; // 戦車の見た目の大きさ（1マスの中におさまる範囲で、少し大きく）
@@ -155,7 +155,8 @@
       knob: new THREE.SphereGeometry(0.03, 8, 6),
       shadow: new THREE.PlaneGeometry(1.05, 1.15),
       marker: new THREE.ConeGeometry(0.5, 0.9, 16),
-      lamp: new THREE.SphereGeometry(0.035, 8, 6)
+      lamp: new THREE.SphereGeometry(0.035, 8, 6),
+      smile: new THREE.TorusGeometry(0.05, 0.011, 6, 14, Math.PI)
     };
     tankGeo.shadow.rotateX(-Math.PI / 2);
     tankGeo.marker.rotateX(Math.PI); // 下向きの矢印
@@ -206,6 +207,15 @@
       var s = M(G.shine, mats.white, side * 0.085, 0.022, -0.06); eyes.add(s);
       var ck = M(G.cheek, mats.cheek, side * 0.19, -0.065, 0.005); ck.rotation.y = Math.PI; eyes.add(ck);
     });
+    // v4：うしろの顔（おいかけ視点では戦車の後ろ姿が見えるので、後ろにも目・ほっぺ・にっこり口をつけて、顔が見えるようにする）
+    var eyes2 = new THREE.Group(); eyes2.position.set(0, 0.29, 0.372); eyes2.rotation.y = Math.PI; eyes2.scale.setScalar(1.25); hull.add(eyes2);
+    [-1, 1].forEach(function (side) {
+      var e = M(G.eye, mats.white, side * 0.1, 0, 0); e.scale.set(1, 1.15, 0.6); eyes2.add(e);
+      var p = M(G.pupil, mats.black, side * 0.095, -0.005, -0.04); p.scale.set(1, 1.2, 0.6); eyes2.add(p);
+      var s = M(G.shine, mats.white, side * 0.085, 0.022, -0.06); eyes2.add(s);
+      var ck = M(G.cheek, mats.cheek, side * 0.19, -0.065, 0.005); ck.rotation.y = Math.PI; eyes2.add(ck);
+    });
+    var smile = M(G.smile, mats.black, 0, -0.075, -0.02); smile.rotation.z = Math.PI; eyes2.add(smile);
     // 前のライト
     hull.add(M(G.lamp, mats.yellow, -0.2, 0.36, -0.36));
     hull.add(M(G.lamp, mats.yellow, 0.2, 0.36, -0.36));
@@ -227,7 +237,7 @@
     var marker = new THREE.Mesh(G.marker, mats.marker); marker.renderOrder = 10; marker.visible = false; root.add(marker);
 
     return {
-      root: root, bump: bump, hull: hull, turret: turret, barrel: barrelPivot, wheels: wheels, eyes: eyes, marker: marker, mats: mats,
+      root: root, bump: bump, hull: hull, turret: turret, barrel: barrelPivot, wheels: wheels, eyes: eyes, eyes2: eyes2, marker: marker, mats: mats,
       colorStr: colorStr,
       x: 0, z: 0, y: 0, heading: 0, // 表示の位置（マス単位）
       wobble: 0, recoil: 0, blink: rand(1, 4), wheelRot: 0, moving: false
@@ -266,6 +276,7 @@
     if (tk.blink < 0.12) ey = 0.15;
     if (tk.blink < 0) tk.blink = rand(2, 5);
     tk.eyes.scale.y = ey;
+    tk.eyes2.scale.y = 1.25 * ey;
   }
 
   // ---------- 状態 ----------
@@ -325,6 +336,7 @@
     sc.add(S.gemLight);
 
     S.camFrom = { p: new THREE.Vector3(), q: new THREE.Quaternion() };
+    buildTreasureMark();
     buildFx();
     watchResize();
     resize();
@@ -573,9 +585,11 @@
 
   // 積み木の色：地図の色を少し鮮やかに。明るさが低い（黒に近い）色だけ、ほぼ真っ黒にする。
   var hsl = { h: 0, s: 0, l: 0 };
-  function blockColor(c) {
+  // v4：壁（高さ10）は、地図の色が縮小の平均でカーキや灰色になっていても、必ず真っ黒に塗る（高さは「いちばん濃い色」、色は「平均」で決まるため、縁のマスが黒く塗られなかった）。高さ9もほぼ黒。
+  function blockColor(c, hh) {
     var lum = 0.299 * c.r + 0.587 * c.g + 0.114 * c.b;
-    if (lum < 0.16) { c.setRGB(0.1, 0.1, 0.11); return c; }
+    if (hh >= 10 || lum < 0.16) { c.setRGB(0.17, 0.17, 0.19); return c; }
+    if (hh === 9) { c.setRGB(c.r * 0.25 + 0.03, c.g * 0.25 + 0.03, c.b * 0.25 + 0.03); return c; }
     c.getHSL(hsl);
     c.setHSL(hsl.h, clamp(hsl.s * 1.6, 0, 1), clamp(hsl.l * 0.92, 0.22, 0.68));
     return c;
@@ -589,7 +603,7 @@
     var pos = geo.attributes.position, nor = geo.attributes.normal, cols = new Float32Array(pos.count * 3);
     for (i = 0; i < pos.count; i++) {
       var ny = nor.getY(i), nx = nor.getX(i), v;
-      if (ny > 0.5) v = 1; else if (ny < -0.5) v = 0.5; else v = nx !== 0 ? 0.86 : 0.93;
+      if (ny > 0.5) v = 1; else if (ny < -0.5) v = 0.4; else v = nx !== 0 ? 0.62 : 0.8;
       cols[i * 3] = cols[i * 3 + 1] = cols[i * 3 + 2] = v;
     }
     geo.setAttribute('color', new THREE.BufferAttribute(cols, 3));
@@ -605,7 +619,7 @@
       mesh.setMatrixAt(k, m);
       cellColor(i, c);
       // 積み木は側面も含めて地図の色で塗る。黒に近い色（壁など）だけ黒にする
-      blockColor(c);
+      blockColor(c, hh);
       mesh.setColorAt(k, c);
       cellToInst[i] = k++;
     }
@@ -696,11 +710,11 @@
     var glow = new THREE.Sprite(glowMat); glow.scale.set(4, 4, 1); glow.position.y = GEM_Y; g.add(glow);
     // 光の柱
     var bh = 90;
-    var beamGeo = new THREE.CylinderGeometry(1.0, 1.0, bh, 24, 1, true); beamGeo.translate(0, bh / 2, 0);
-    var beamMat = new THREE.MeshBasicMaterial({ map: T.beam, color: 0xff4fb0, opacity: 0.5, transparent: true, depthWrite: false, side: THREE.DoubleSide }); // 空が明るいので、足し算でなく ふつうの重ね（ピンクのまま見える）
+    var beamGeo = new THREE.CylinderGeometry(1.7, 1.7, bh, 24, 1, true); beamGeo.translate(0, bh / 2, 0);
+    var beamMat = new THREE.MeshBasicMaterial({ map: T.beam, color: 0xff2fa0, opacity: 0.62, transparent: true, depthWrite: false, side: THREE.DoubleSide }); // 空が明るいので、足し算でなく ふつうの重ね（ピンクのまま見える）
     var beam = new THREE.Mesh(beamGeo, beamMat); g.add(beam);
-    var beam2Geo = new THREE.CylinderGeometry(0.3, 0.3, bh, 14, 1, true); beam2Geo.translate(0, bh / 2, 0);
-    var beam2Mat = new THREE.MeshBasicMaterial({ map: T.beam, color: 0xff8fd0, opacity: 0.7, transparent: true, depthWrite: false, side: THREE.DoubleSide });
+    var beam2Geo = new THREE.CylinderGeometry(0.55, 0.55, bh, 14, 1, true); beam2Geo.translate(0, bh / 2, 0);
+    var beam2Mat = new THREE.MeshBasicMaterial({ map: T.beam, color: 0xffd0ec, opacity: 0.9, transparent: true, depthWrite: false, side: THREE.DoubleSide });
     var beam2 = new THREE.Mesh(beam2Geo, beam2Mat); g.add(beam2);
     // きらきら
     var sparks = [];
@@ -714,6 +728,51 @@
     S.gemLight.position.set(t.x + 0.5, g.position.y + 1.4, t.z + 0.5);
     S.gemLight.intensity = 2.2;
     L.dispose.push(gemGeo, gemMat, glowMat, beamGeo, beamMat, beam2Geo, beam2Mat, starMat, far.material);
+  }
+
+  // v4：宝のしるし。宝の方向を、画面の中（見えているところ）か、画面のふち（見えないとき）に、ピンクの星で出す。
+  // 出発地点は宝から遠いので、3Dの光の柱だけでは画面に入らないことがあるため。
+  function buildTreasureMark() {
+    var d = document.createElement('div');
+    d.setAttribute('aria-hidden', 'true');
+    d.style.cssText = 'position:absolute;left:0;top:0;width:0;height:0;pointer-events:none;display:none;z-index:2';
+    d.innerHTML = '<div class="tm-in" style="position:absolute;left:0;top:0;transform:translate(-50%,-50%);display:flex;flex-direction:column;align-items:center">' +
+      '<svg class="tm-star" viewBox="-12 -12 24 24" style="width:var(--tm);height:var(--tm);filter:drop-shadow(0 0 6px #fff) drop-shadow(0 0 10px #ff2fa0)"><polygon points="0,-10 3,-3.5 10,-3.2 4.6,1.6 6.2,8.6 0,5 -6.2,8.6 -4.6,1.6 -10,-3.2 -3,-3.5" fill="#ff2fa0" stroke="#fff" stroke-width="1.6" stroke-linejoin="round"/></svg>' +
+      '<b class="tm-t" style="margin-top:2px;font:900 calc(var(--tm)*0.34)/1 sans-serif;color:#fff;background:#ff2fa0;border-radius:99px;padding:.15em .6em;white-space:nowrap">たから</b></div>' +
+      '<i class="tm-ar" style="position:absolute;left:0;top:0;width:0;height:0"></i>';
+    S.container.appendChild(d);
+    S.tmark = d;
+    S.tmIn = d.querySelector('.tm-in'); S.tmAr = d.querySelector('.tm-ar');
+  }
+  var tmV = new THREE.Vector3();
+  function updateTreasureMark() {
+    var d = S.tmark, tr = S.treasure; if (!d) return;
+    var cw = S.container.clientWidth, ch = S.container.clientHeight;
+    if (!tr || S.found || !S.me || !(cw > 0) || S.camera.position.y > 12 || S.camMode === 2 || (S.intro && S.intro.t < INTRO_HOLD + 0.5)) { d.style.display = 'none'; return; }
+    var u = ch / 100; // 1cqmin
+    d.style.display = 'block'; d.style.setProperty('--tm', (11 * u) + 'px');
+    S.camera.updateMatrixWorld();
+    tmV.set(tr.x + 0.5, tr.group.position.y + 2.2, tr.z + 0.5).project(S.camera);
+    var sx = tmV.x, sy = tmV.y;
+    if (tmV.z > 1) { sx = -sx; sy = -sy; } // 後ろにあるとき
+    var px = (sx * 0.5 + 0.5) * cw, py = (-sy * 0.5 + 0.5) * ch;
+    // 画面のふちの内側に。左上の地図の名前・右上のホームとカメラボタンをよける
+    var x0 = 13 * u, x1 = cw - 13 * u, y0 = 20 * u, y1 = ch - 22 * u;
+    var inside = tmV.z <= 1 && px >= x0 && px <= x1 && py >= y0 && py <= y1;
+    var cx = Math.min(x1, Math.max(x0, px)), cy = Math.min(y1, Math.max(y0, py));
+    // 右上（ホーム・カメラボタンのあたり）に入らない
+    if (cx > cw - 36 * u && cy < 52 * u) cy = 52 * u;
+    if (cx < 70 * u && cy < 13 * u) cy = 13 * u;
+    d.style.transform = 'translate(' + cx + 'px,' + cy + 'px)';
+    var pulse = 1 + 0.1 * Math.sin(S.time * 6);
+    S.tmIn.style.transform = 'translate(-50%,-50%) scale(' + pulse + ')';
+    // 見えている（画面の中）ときは小さめ、ふちに出ているときは矢じるしも
+    S.tmAr.style.display = inside ? 'none' : 'block';
+    if (!inside) {
+      var a = Math.atan2(py - cy, px - cx);
+      var r = 7.5 * u;
+      S.tmAr.style.cssText = 'position:absolute;left:0;top:0;width:0;height:0;border-top:' + 2.2 * u + 'px solid transparent;border-bottom:' + 2.2 * u + 'px solid transparent;border-left:' + 3.4 * u + 'px solid #ff2fa0;filter:drop-shadow(0 0 3px #fff);transform:translate(' + (Math.cos(a) * r) + 'px,' + (Math.sin(a) * r) + 'px) translate(-30%,-50%) rotate(' + a + 'rad)';
+    }
   }
 
   function updateTreasure(dt) {
@@ -753,7 +812,7 @@
       if (withFx) {
         cellColor(i, c);
         if (hh > 0) {
-          blockColor(c); // 積み木と同じ色の破片
+          blockColor(c, hh); // 積み木と同じ色の破片
           spawnDebris(x + 0.5, vis(hh) * 0.5, z + 0.5, c, Math.min(90, 26 + hh * 7), 1);
           for (var p = 0; p < 3; p++) spawnPuff(x + 0.5 + rand(-0.4, 0.4), vis(hh) * rand(0.2, 0.9) + 0.1, z + 0.5 + rand(-0.4, 0.4), { color: 0xdedad2, vx: rand(-1, 1), vy: rand(0.8, 2), vz: rand(-1, 1), s0: 0.6, s1: 2.4, life: 1.4, a: 0.85 });
         } else {
@@ -836,8 +895,9 @@
       tk.y += (groundY - tk.y) * Math.min(1, dt * 12); // 足元が壊れたら下りる
       if (want('fwd')) { S.tapQ.fwd = false; tryMove(1); }
       else if (want('back')) { S.tapQ.back = false; tryMove(-1); }
-      else if (want('left')) { S.tapQ.left = false; startTurn(-1); }
-      else if (want('right')) { S.tapQ.right = false; startTurn(1); }
+      // v4：回転は「押した1回につき90度だけ」。押しっぱなしでは回り続けない（tapQ＝押した合図だけを見る）
+      else if (S.tapQ.left) { S.tapQ.left = false; startTurn(-1); }
+      else if (S.tapQ.right) { S.tapQ.right = false; startTurn(1); }
     }
     tk.moving = !!me.move;
   }
@@ -963,11 +1023,17 @@
   // ---------- カメラ ----------
   function overheadHeight() {
     var cam = S.camera, half = THREE.MathUtils.degToRad(cam.fov / 2), tn = Math.tan(half);
-    var hz = S.h / 2 + 2, hx = S.w / 2 + 2;
-    var need = Math.max(hz / tn, hx / (tn * Math.max(0.3, cam.aspect)));
-    return Math.max(20, need) + 2; // 壁の上（1.8）からも全体が入るように
+    // v4：地図が画面の高さの約90％、幅の約90cqmin（十字ボタンの右〜カメラボタンの左のあいだ）に入る高さにする。
+    // 画面の縦の見える範囲 V = 2*H*tn。地図の縦 h+2 が V の0.9、横 w+2 が V*0.9 に入る。
+    var V = Math.max((S.h + 2) / 0.9, (S.w + 2) / 0.9);
+    var need = V / (2 * tn);
+    return Math.max(20, need) + 2; // 壁の上からも全体が入るように
   }
-  var CHASE_BACK = 3.4, CHASE_UP = 4.4, CHASE_AHEAD = 2.2; // おいかけ視点：戦車の後ろ・上・見る先（前）
+  function overheadShift() { // 地図を右へ寄せる量（ワールド座標）。十字ボタン(左50cqmin)とカメラボタン(右33cqmin)のまんなかは、画面中心より約8.5cqmin 右
+    var tn = Math.tan(THREE.MathUtils.degToRad(S.camera.fov / 2));
+    return 0.085 * 2 * overheadHeight() * tn;
+  }
+  var CHASE_BACK = 4.2, CHASE_UP = 4.8, CHASE_AHEAD = 4.2; // おいかけ視点：戦車の後ろ・上・見る先（前）
   var poseM = new THREE.Matrix4(), UP = new THREE.Vector3(0, 1, 0), NORTH = new THREE.Vector3(0, 0, -1);
   function poseFor(mode) {
     var p = new THREE.Vector3(), q = new THREE.Quaternion(), tg = new THREE.Vector3();
@@ -985,8 +1051,9 @@
       poseM.lookAt(p, tg, UP);
     } else {
       var hh = overheadHeight();
-      p.set(S.w / 2, hh, S.h / 2 + 0.001);
-      tg.set(S.w / 2, 0, S.h / 2);
+      var sh = overheadShift();
+      p.set(S.w / 2 - sh, hh, S.h / 2 + 0.001);
+      tg.set(S.w / 2 - sh, 0, S.h / 2);
       poseM.lookAt(p, tg, NORTH);
     }
     q.setFromRotationMatrix(poseM);
@@ -1063,6 +1130,7 @@
     }
     if (S.me) mark(S.me.tank);
     for (var k in S.remotes) mark(S.remotes[k].tank);
+    updateTreasureMark();
   }
 
   // ---------- ループ ----------
@@ -1104,6 +1172,7 @@
     S.raf = requestAnimationFrame(loop);
   }
   function stop() {
+    if (S.tmark) S.tmark.style.display = 'none';
     S.running = false;
     if (S.raf) cancelAnimationFrame(S.raf);
     S.raf = 0;

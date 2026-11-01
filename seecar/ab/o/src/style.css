@@ -218,7 +218,8 @@ body.camtop #maptag{opacity:0} /* 真上のときは地図の上はしと戦車�
 .endtitle{font-size:11cqmin;font-weight:900;color:#12327a;line-height:1.1;margin-top:2cqmin;background:rgba(255,255,255,.9);padding:1cqmin 4cqmin;border-radius:4cqmin}
 .endyomi{font-size:4.6cqmin;color:#4a6aa8}
 .endpic{position:absolute;left:82cqmin;right:6cqmin;top:7cqmin;bottom:25cqmin;display:flex;align-items:center;justify-content:center}
-.endpic img{max-width:100%;max-height:100%;object-fit:contain;background:#fff;padding:1.6cqmin;border-radius:2cqmin;border:.6cqmin solid #e4d9bf;box-shadow:0 1.4cqmin 0 rgba(20,40,100,.3);transform:rotate(1.2deg)}
+.endpic img{max-width:100%;max-height:100%;object-fit:contain;box-sizing:border-box;background:#fff;padding:1.6cqmin;border-radius:2cqmin;border:.6cqmin solid #e4d9bf;box-shadow:0 1.4cqmin 0 rgba(20,40,100,.3);transform:rotate(1.2deg)}
 #confetti{position:absolute;inset:0;overflow:hidden;pointer-events:none}
 #confetti i{position:absolute;top:-6cqmin;width:2cqmin;height:3.2cqmin;opacity:.9;animation:fall linear infinite}
 @keyframes fall{to{transform:translateY(112cqmin) rotate(540deg)}}
+.endpic img.pix{image-rendering:crisp-edges;image-rendering:pixelated} /* 小さい絵は拡大しても画素をくっきり */
