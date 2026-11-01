@@ -1,0 +1,57 @@
+<!doctype html>
+<html lang="ja"><head><meta charset="utf-8"><title>ほシーカー 作成メモ</title>
+<style>
+@page { size: A4; margin: 9mm 11mm; }
+body { font-family: "Hiragino Kaku Gothic ProN","Noto Sans JP","IPAGothic","WenQuanYi Zen Hei",sans-serif; font-size: 7.9pt; line-height: 1.38; color: #222; margin: 0; }
+h1 { font-size: 14pt; margin: 0 0 1mm; }
+.sub { color: #555; margin: 0 0 3mm; }
+h2 { font-size: 9.5pt; margin: 2.2mm 0 1mm; border-left: 3px solid #f5a623; padding-left: 2mm; }
+table { width: 100%; border-collapse: collapse; }
+th, td { border: 1px solid #ccc; padding: 0.8mm 1.6mm; vertical-align: top; text-align: left; }
+th { background: #f4f4f4; font-weight: bold; white-space: nowrap; }
+td.k { width: 21%; }
+ul { margin: 0; padding-left: 4.5mm; }
+li { margin: 0.3mm 0; }
+.note { color: #a33; }
+</style></head><body>
+<h1>見つめて見つけて ほシーカー（SEE-CAR）作成メモ</h1>
+<p class="sub">ファイル：seecar.html（1ファイル）　対象：iPadを横にして使う想定　必要なもの：インターネット接続（Three.jsとPeerJSをCDNから読み込むため）</p>
+
+<h2>仕様書の「■1 ツールキッチンの基本ルール」をどう作ったか</h2>
+<table>
+<tr><th>仕様</th><th>作り方</th></tr>
+<tr><td class="k">1 画面レイアウト</td><td>100dvh・position:fixed; inset:0 で固定。16:9の枠を中央に置き背景は黒。中の寸法はすべて cqmin などで指定し、はみ出さないようにした。</td></tr>
+<tr><td class="k">2 縦持ち警告</td><td>縦向きのときは全体を覆う警告を出し、プレイ中なら一時停止。文言は表記ルールに合わせて「スマホを よこに してね！」とひらがなにした。</td></tr>
+<tr><td class="k">3 誤操作防止</td><td>すべてのボタンを共通の関数で登録し、押した瞬間に stopPropagation と preventDefault を実行。<span class="note">例外：画像を選ぶ入力欄だけは止めると選択画面が開かなくなるため、ボタンの上に透明に重ねて既定の動作を残した。</span></td></tr>
+<tr><td class="k">4 ズーム・メニュー防止</td><td>* { user-select:none; touch-action:none; } と contextmenu の無効化。拡大も禁止。</td></tr>
+<tr><td class="k">5 6ステート</td><td>起動 → タイトル → せってい（地図選び・通信の待ち合わせ）→ プレイ → みつけた！ → おしまい の6画面で切り替え。</td></tr>
+<tr><td class="k">6 ホームボタン</td><td>右上に白い丸の家のボタンを常に最前面で表示（safe-area対応）。押すと「おわりにしますか？」を出し、その間はゲームを止める。誤って終わらないよう「いいえ」を大きく目立たせた。</td></tr>
+<tr><td class="k">7 進行ボタン</td><td>画面を進めるボタンはすべて共通の置き場に集め、同じ大きさ・同じぴょんと跳ねる動きにそろえた。</td></tr>
+<tr><td class="k">8 日本語表記</td><td>はじめる／しゅっぱつ！／みつけた！／もういちど／おわる など。漢字は四字熟語の地図名だけで、読みのひらがなを添えた。</td></tr>
+</table>
+
+<h2>仕様書の「■2 コアロジック」をどう作ったか</h2>
+<table>
+<tr><th>仕様</th><th>作り方</th></tr>
+<tr><td class="k">A タイトル</td><td>CSSで黄色い☆を描き、その中に「ほ」、横に「シーカー」「SEE-CAR」を配置したロゴ。</td></tr>
+<tr><td class="k">B 画像→地図</td><td>明るさを0〜10の11段階の高さにする（白＝0の道、黒＝10の壁）。画像1画素＝2×2マス。<span class="note">そのままだと写真1枚で数十万ブロックになりiPadで動かないため、画像を長い辺64画素に縮めてから地図にした（最大128×128マス）。縮めると塗り絵の細い線が消えるので、各画素の範囲で一番濃い色を高さに使い、線が途切れないようにした。</span></td></tr>
+<tr><td class="k">C 宝の場所</td><td>壁（高さ9以上）以外のマスをつないで領域に分け、地図の端に触れていない領域を「囲まれた領域」とする。その中で一番小さい領域の、中心に最も近いマスに宝石を置く。<span class="note">塗り絵の線のすき間や汚れを拾わないよう、16マス（画像で4画素）未満の領域は除外。中心が領域の外に出る形でも、必ず領域の中に置く。</span></td></tr>
+<tr><td class="k">D シーカー</td><td>丸い車体・キャタピラ・砲塔・目のある戦車を基本の立体の組み合わせで作成（赤と青）。1マスずつ進み、90度ずつ向きを変える。高さの差が1段以内なら滑らかに上り下りし、それ以上は「ぶつかる」動きで止まる。ジャンプなし。</td></tr>
+<tr><td class="k">E 視点切り替え</td><td>め（1人称）／うしろ（斜め後ろ）／そら（俯瞰）をボタンで順に切り替え、カメラは滑らかに移動。<span class="note">俯瞰は高さ20だと大きな地図が入りきらないため、地図全体と宝が見える高さまで上げる。</span></td></tr>
+<tr><td class="k">F 大砲</td><td>黒い玉が山なりに飛び、向いている方向の2マス先と3マス先の高さを0にする。破片・煙・閃光・画面のゆれと「ドゴォーン！」の文字を出す。弾は戦車をすり抜ける。</td></tr>
+<tr><td class="k">G 通信対戦</td><td>ホストが4桁の番号を表示し、ゲストは数字ボタンで入力してつなぐ。<span class="note">地図は接続時に1回だけ送る（これが無いとゲストに地図が無いため）。</span>以後は戦車の位置・向き・色・動き（1秒に10回）と、壊したマスだけを送る。相手が抜けたら「あいてが いなくなったよ」と出し、ひとりで続けられる。</td></tr>
+</table>
+
+<h2>仕様書以外に足したこと</h2>
+<ul>
+<li>画像を読み込まなくても遊べるよう、最初から四字熟語の地図を5つ入れた（自由自在・四方八方・品行方正・一石二鳥・一日千秋）。字の中の閉じた部分に宝が入る。</li>
+<li>「みつけた！」の画面で、探し回った元の絵を大きく見せる（絵を見せる教材という狙いに合わせた）。</li>
+<li>パソコンでの確認用にキーボード操作（矢印キー・スペース・C）。</li>
+</ul>
+
+<h2>作り方と、まだ確かめられていないこと</h2>
+<ul>
+<li>Claude Code で、3D・地図づくり・画面・通信を別々の担当に作らせて1ファイルに結合し、別の担当が採点表で採点して直す、を繰り返した。<!--ROUNDS--></li>
+<li class="note">実際のiPadでの速さ、学校のネットワークでPeerJSの公開サーバーにつながるか、効果音の聞こえ方は未確認です。試していただけると助かります。</li>
+</ul>
+</body></html>
