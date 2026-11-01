@@ -261,15 +261,12 @@
   }
 
   // ---------- 既定地図（四字熟語） ----------
-  var PRESETS = [
+  var PRESETS = [ // 字の中に閉じた部分（口・日・田など）があり、小さい字でもつぶれにくい熟語
     { id: 'jiyu', title: '自由自在', reading: 'じゆうじざい' },
     { id: 'shiho', title: '四方八方', reading: 'しほうはっぽう' },
     { id: 'hinkou', title: '品行方正', reading: 'ひんこうほうせい' },
-    { id: 'nisshin', title: '日進月歩', reading: 'にっしんげっぽ' },
-    { id: 'ikudoon', title: '異口同音', reading: 'いくどうおん' },
     { id: 'isseki', title: '一石二鳥', reading: 'いっせきにちょう' },
-    { id: 'ichinichi', title: '一日千秋', reading: 'いちじつせんしゅう' },
-    { id: 'roujaku', title: '老若男女', reading: 'ろうにゃくなんにょ' }
+    { id: 'ichinichi', title: '一日千秋', reading: 'いちじつせんしゅう' }
   ];
   var STROKE = 10;
   var FONT = "'Hiragino Kaku Gothic ProN','Hiragino Sans','Noto Sans JP','Yu Gothic',sans-serif";

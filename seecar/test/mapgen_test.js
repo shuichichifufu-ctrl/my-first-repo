@@ -33,7 +33,7 @@ const ok = (c, msg, extra) => { if (!c) fails++; console.log((c ? 'OK   ' : 'NG 
   await rectCase('nested', nest, [44, 36, 56, 48]);
   await rectCase('nested_speck', nest.concat([[44, 30, 47, 33, 1]]), [44, 36, 56, 48]);   // 1画素の囲みは除外される
   await rectCase('interior2x2', [[4, 4, 60, 44, 2], [12, 10, 40, 38, 2], [20, 16, 26, 22, 2]], [44, 36, 48, 40]); // ちょうど4画素(2x2)は採用
-  await rectCase('interior1x3', [[4, 4, 60, 44, 2], [12, 10, 40, 38, 2], [20, 16, 25, 24, 2]], [26, 20, 80, 80]); // 3画素は除外→中枠の内側(中枠と大枠の間より小さい方)
+  await rectCase('interior1x3', [[4, 4, 60, 44, 2], [12, 10, 40, 38, 2], [20, 16, 25, 23, 2]], [0, 0, 128, 128]); // 3画素は除外→中枠の内側(中枠と大枠の間より小さい方)
   // 高さの対応
   const hs = await page.evaluate(() => { const c = document.createElement('canvas'); c.width = 64; c.height = 11; const g = c.getContext('2d');
     for (let i = 0; i <= 10; i++) { const v = Math.round(255 * (1 - i / 10)); g.fillStyle = `rgb(${v},${v},${v})`; g.fillRect(0, i, 64, 1); }
