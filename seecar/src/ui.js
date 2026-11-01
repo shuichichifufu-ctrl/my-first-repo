@@ -599,7 +599,7 @@
     go('ending', idx);
   }
   function onBoom(cells, remote) {
-    showBoom(); // 着弾（自分の弾も、相手の弾も）。通信へは送らない
+    if (cells && cells.length) showBoom(); // 何か壊れたときだけ（自分の弾も、相手の弾も）。通信へは送らない
   }
   function onFire(info) {
     if (guard || !netOn || state !== 'play' || !info) return;

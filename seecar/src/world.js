@@ -1053,7 +1053,7 @@
         if (!done.length) {
           // 何も壊さなかった：床に落ちて小さな土ぼこり
           spawnPuff(pr.to.x, pr.to.y + 0.15, pr.to.z, { color: 0xe8e2d6, vy: 0.8, s0: 0.4, s1: 1.4, life: 0.8, a: 0.8 });
-          spawnDebris(pr.to.x, pr.to.y + 0.05, pr.to.z, tmpC.set(0x9a9080), 6, 0.4);
+          spawnPuff(pr.to.x, pr.to.y + 0.1, pr.to.z, { color: 0xd8d2c6, vx: 0.6, vy: 0.3, s0: 0.3, s1: 1.0, life: 0.6, a: 0.6 });
           sfx('bump');
         }
         emit('boom', done, pr.remote);

@@ -182,7 +182,7 @@ async function cpu(browser) {
   ok('CPU: まけの文言', await page.evaluate(() => /コンピューター/.test(document.getElementById('end-who').textContent)));
   await page.screenshot({ path: SH + '34lose.png' });
   await nav(page, 'おわる'); await nav(page, 'はじめから'); await sleep(300);
-  ok('CPU: タイトルに記録が出る', await page.evaluate(() => /やさしい/.test(document.getElementById('recchip').textContent) && /1かち 1まけ/.test(document.getElementById('recchip').textContent)), await page.evaluate(() => document.getElementById('recchip').textContent));
+  ok('CPU: タイトルに記録が出る（実際の記録と一致）', await page.evaluate((r) => /やさしい/.test(document.getElementById('recchip').textContent) && document.getElementById('recchip').textContent.indexOf(r.easy.win + 'かち ' + r.easy.lose + 'まけ') >= 0, r2), await page.evaluate(() => document.getElementById('recchip').textContent));
   ok('CPU: コンソールエラー0', errors.length === 0, errors.slice(0, 5));
   await page.context().close();
 }
