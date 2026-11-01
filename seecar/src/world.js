@@ -14,7 +14,11 @@
   var MOVE_DUR = 0.22, TURN_DUR = 0.2, BUMP_DUR = 0.28;
   var FIRE_CD = 0.8, BALL_DUR = 0.6;
   var CAM_BLEND = 0.9;
-  var LOOK_BACK = 2.2; // 止まったときに頭をふりむく角度（約146度。砲身がカメラに重ならないよう真後ろから少しずらす）
+  // 第2期：止まっても砲塔はふりむかない（撃つ向きがいつも分かるように）。顔はCPUの戦車やねらいの印などで別に見せる
+  var CPU_GAP = { easy: 1.1, normal: 0.6, hard: 0.35 }; // CPUの1手の間隔（秒）
+  var CPU_WAIT0 = 0.4;   // 開始演出のあと、CPUが動き出すまでの間
+  var BREAK_COST = 2;    // 道さがし：壁を壊して進む手間（撃つ1手＋弾が飛ぶ間）。進む1手は1
+  var PITCH_MAX = 1;     // 視点の上下（-1〜+1）
   var INTRO_HOLD = 2.0, INTRO_MOVE = 1.8; // 開始演出：真上から2秒見せて、斜め後ろへ寄せる
   var DEBRIS_MAX = 900, PUFF_MAX = 48;
   var GEM_R = 0.55, GEM_Y = 1.15; // 宝石の大きさと高さ（遠くからでも目立つように大きく）
@@ -137,6 +141,12 @@
 
   // ---------- 戦車 ----------
   var tankGeo = null;
+  function starGeometry(r0, r1, depth) {
+    var s = new THREE.Shape();
+    for (var i = 0; i < 10; i++) { var r = i % 2 ? r1 : r0, a = i / 10 * Math.PI * 2 + Math.PI / 2; if (i) s.lineTo(Math.cos(a) * r, Math.sin(a) * r); else s.moveTo(Math.cos(a) * r, Math.sin(a) * r); }
+    var g = new THREE.ExtrudeGeometry(s, { depth: depth, bevelEnabled: true, bevelThickness: 0.006, bevelSize: 0.006, bevelSegments: 1 });
+    g.center(); return g;
+  }
   function buildTankGeometry() {
     tankGeo = {
       body: roundedBox(0.5, 0.26, 0.74, 0.07),
@@ -156,7 +166,9 @@
       knob: new THREE.SphereGeometry(0.03, 8, 6),
       shadow: new THREE.PlaneGeometry(1.05, 1.15),
       marker: new THREE.ConeGeometry(0.5, 0.9, 16),
-      lamp: new THREE.SphereGeometry(0.035, 8, 6)
+      lamp: new THREE.SphereGeometry(0.035, 8, 6),
+      star: starGeometry(0.075, 0.032, 0.02),
+      fender: roundedBox(0.2, 0.05, 0.9, 0.022)
     };
     tankGeo.shadow.rotateX(-Math.PI / 2);
     tankGeo.marker.rotateX(Math.PI); // 下向きの矢印
@@ -197,8 +209,12 @@
         var hb = M(G.hub, mats.dark, side * 0.41, 0.11, wz); hb.rotation.z = Math.PI / 2; hull.add(hb);
       }
     });
+    // 泥よけ（キャタピラの上の丸い板）
+    hull.add(M(G.fender, mats.light, -0.31, 0.225, 0)); hull.add(M(G.fender, mats.light, 0.31, 0.225, 0));
     // 車体
     var body = M(G.body, mats.main, 0, 0.28, 0); body.rotation.y = 0; hull.add(body);
+    // 後ろの黄色い星（おいかけ視点で見える。顔ではないので向きを取りちがえない）
+    var backStar = M(G.star, mats.yellow, 0, 0.3, 0.375); hull.add(backStar);
     // 前のライト
     hull.add(M(G.lamp, mats.yellow, -0.2, 0.36, -0.36));
     hull.add(M(G.lamp, mats.yellow, 0.2, 0.36, -0.36));
@@ -209,7 +225,7 @@
     turret.add(M(G.hatch, mats.light, 0, 0.21, 0.03));
     var ant = M(G.antenna, mats.track, 0.11, 0.24, 0.12); turret.add(ant);
     turret.add(M(G.knob, mats.yellow, 0.11, 0.35, 0.12));
-    // 顔（目とほっぺ）は砲塔＝頭の前に付ける。止まっているときは頭ごと ふりむいて、おいかけ視点のカメラに顔を見せる
+    // 顔（目とほっぺ）は砲塔＝頭の前に付ける（砲塔は ふりむかない）
     var eyes = new THREE.Group(); eyes.position.set(0, 0.155, -0.165); eyes.rotation.x = -0.35; turret.add(eyes);
     [-1, 1].forEach(function (side) {
       var e = M(G.eye, mats.white, side * 0.085, 0, 0); e.scale.set(0.9, 1.05, 0.55); eyes.add(e);
@@ -231,7 +247,7 @@
       root: root, bump: bump, hull: hull, turret: turret, barrel: barrelPivot, wheels: wheels, eyes: eyes, marker: marker, mats: mats,
       colorStr: colorStr,
       x: 0, z: 0, y: 0, heading: 0, // 表示の位置（マス単位）
-      wobble: 0, recoil: 0, blink: rand(1, 4), wheelRot: 0, moving: false, look: 0, lookTo: 0
+      wobble: 0, recoil: 0, blink: rand(1, 4), wheelRot: 0, moving: false, tilt: 0, hop: 0
     };
   }
   function disposeTank(tk) {
@@ -255,7 +271,9 @@
     r.scale.setScalar(TANK_SCALE);
     var bob = tk.moving ? Math.sin(time * 34) * 0.018 : Math.sin(time * 2.2) * 0.006;
     tk.hull.position.y = bob;
-    tk.hull.rotation.x = (tk.moving ? Math.sin(time * 17) * 0.035 : 0) + tk.recoil * 0.22;
+    tk.hull.rotation.x = (tk.moving ? Math.sin(time * 17) * 0.035 : 0) + tk.recoil * 0.22 + tk.tilt;
+    // 宝を見つけたときなどの小さなジャンプ
+    if (tk.hop > 0) { tk.hop = Math.max(0, tk.hop - dt); tk.hull.position.y += Math.abs(Math.sin((1.6 - tk.hop) * 7)) * 0.25 * Math.min(1, tk.hop); }
     tk.wobble *= Math.exp(-dt * 6);
     tk.hull.rotation.z = Math.sin(time * 25) * tk.wobble * 0.15;
     if (tk.moving) tk.wheelRot += dt * 14;
@@ -267,10 +285,7 @@
     if (tk.blink < 0.12) ey = 0.15;
     if (tk.blink < 0) tk.blink = rand(2, 5);
     tk.eyes.scale.y = ey;
-    // 頭（砲塔）のふりむき。lookTo へ なめらかに（もどるときは速く）
-    var spd = Math.abs(tk.lookTo) < Math.abs(tk.look) ? 16 : 3.2;
-    tk.look += (tk.lookTo - tk.look) * (1 - Math.exp(-dt * spd));
-    tk.turret.rotation.y = tk.look;
+    tk.turret.rotation.y = 0; // 砲塔はいつも車体と同じ前を向く（撃つ向き）
   }
 
   // ---------- 状態 ----------
@@ -283,7 +298,8 @@
     me: null, remotes: {}, held: {}, tapQ: {},
     camMode: 1, camBlendT: 1, camFrom: null, chaseLift: 0, intro: null, topFlag: null,
     shake: 0, stateAcc: 0, found: false, treasure: null,
-    projectiles: [], fx: null
+    projectiles: [], fx: null,
+    cpu: null, mapVer: 0, pitch: 0, pitchV: 0, aim: null
   };
   var handlers = { found: [], boom: [], state: [], fire: [], cam: [] };
   function emit(ev, a, b) {
@@ -384,6 +400,14 @@
       fx.bursts.push({ sp: bs, fl: fl, ring: rg, life: 0, max: 0.9, pos: new THREE.Vector3() });
     }
     fx.burstNext = 0;
+    // 爆発で飛びちる黄色い星（完成予想図の「ドゴォーン！」のきらきら）
+    fx.stars = [];
+    for (i = 0; i < 24; i++) {
+      var st = new THREE.Sprite(new THREE.SpriteMaterial({ map: T.star, color: 0xffd23f, transparent: true, depthWrite: false }));
+      st.visible = false; st.renderOrder = 18; S.scene.add(st);
+      fx.stars.push({ sp: st, life: 0, max: 1, v: new THREE.Vector3(), s: 0.4 });
+    }
+    fx.starNext = 0;
     // 弾
     fx.ballGeo = new THREE.SphereGeometry(0.12, 16, 12);
     fx.ballMat = new THREE.MeshStandardMaterial({ color: 0x1a1a1f, roughness: 0.25, metalness: 0.4 });
@@ -399,6 +423,7 @@
     fx.puffs.forEach(function (p) { p.life = 0; p.sp.visible = false; });
     fx.bursts.forEach(function (b) { b.life = 0; b.sp.visible = b.fl.visible = b.ring.visible = false; });
     fx.balls.forEach(function (b) { b.visible = false; });
+    fx.stars.forEach(function (p) { p.life = 0; p.sp.visible = false; });
     S.projectiles.length = 0;
     S.shake = 0;
     if (S.boomLight) S.boomLight.intensity = 0;
@@ -442,6 +467,17 @@
     fx.debris.count = DEBRIS_MAX;
   }
 
+  function spawnStars(x, y, z, n) {
+    var fx = S.fx;
+    for (var k = 0; k < n; k++) {
+      var p = fx.stars[fx.starNext]; fx.starNext = (fx.starNext + 1) % fx.stars.length;
+      var a = Math.random() * Math.PI * 2, sp = rand(1.5, 3.5);
+      p.sp.position.set(x, y + 0.3, z); p.v.set(Math.cos(a) * sp, rand(3, 6), Math.sin(a) * sp);
+      p.life = p.max = rand(0.7, 1.1); p.s = rand(0.3, 0.55);
+      p.sp.material.color.set(Math.random() < 0.3 ? 0xffffff : 0xffd23f);
+      p.sp.visible = true;
+    }
+  }
   function spawnBurst(x, y, z, big) {
     var fx = S.fx;
     var b = fx.bursts[fx.burstNext]; fx.burstNext = (fx.burstNext + 1) % fx.bursts.length;
@@ -508,6 +544,15 @@
       b.ring.scale.set(rs, rs, rs);
       b.ring.material.opacity = 0.85 * (1 - u);
     }
+    for (i = 0; i < fx.stars.length; i++) {
+      var sr = fx.stars[i]; if (sr.life <= 0) continue;
+      sr.life -= dt;
+      if (sr.life <= 0) { sr.sp.visible = false; continue; }
+      sr.v.y -= 9 * dt; sr.sp.position.addScaledVector(sr.v, dt);
+      var sk = sr.s * (0.6 + 0.4 * Math.abs(Math.sin(sr.life * 14)));
+      sr.sp.scale.set(sk, sk, 1); sr.sp.material.opacity = Math.min(1, sr.life / sr.max * 2);
+      sr.sp.material.rotation += dt * 5;
+    }
     if (S.boomLight.intensity > 0) S.boomLight.intensity = Math.max(0, S.boomLight.intensity - dt * 9);
   }
 
@@ -524,8 +569,9 @@
     L.objects.forEach(function (o) { if (o.parent) o.parent.remove(o); });
     L.dispose.forEach(function (d) { try { d.dispose(); } catch (e) { } });
     if (S.me) disposeTank(S.me.tank);
+    if (S.cpu) disposeTank(S.cpu.tank);
     for (var k in S.remotes) disposeTank(S.remotes[k].tank);
-    S.level = null; S.me = null; S.remotes = {}; S.map = null; S.treasure = null;
+    S.level = null; S.me = null; S.cpu = null; S.remotes = {}; S.map = null; S.treasure = null; S.aim = null;
     if (S.gemLight) S.gemLight.intensity = 0;
   }
 
@@ -540,7 +586,8 @@
     S.myIndex = opts.myIndex || 0;
     S.players = opts.players || [{ color: '#e53935' }, { color: '#1e88e5' }];
     S.net = !!opts.net;
-    S.found = false; S.held = {}; S.tapQ = {}; S.stateAcc = 0; S.shake = 0;
+    S.found = false; S.held = {}; S.tapQ = {}; S.stateAcc = 0; S.shake = 0; S.mapVer = 0;
+    S.pitch = 0; S.pitchV = 0;
     var L = S.level = { objects: [], dispose: [] };
     function add(o) { S.scene.add(o); L.objects.push(o); return o; }
 
@@ -552,11 +599,19 @@
     var st = (map.starts && map.starts[S.myIndex]) || { x: 1, z: 1, dir: 0 };
     var tk = makeTank(S.players[S.myIndex] ? S.players[S.myIndex].color : '#e53935');
     add(tk.root);
-    S.me = {
-      tank: tk, cx: st.x, cz: st.z, dir: st.dir || 0,
-      move: null, turn: null, bump: null, bumpCd: 0, fireCd: 0, fireAnim: 0
-    };
-    tk.x = st.x; tk.z = st.z; tk.y = vis(hAt(st.x, st.z)); tk.heading = dirToHeading(S.me.dir);
+    S.me = makeActor(tk, st, S.myIndex);
+    buildAim(L, add, tk.colorStr);
+    // CPUの戦車（プレイヤー1・青）。通信とは一緒に使わない
+    var cpuOpt = opts.cpu && !S.net ? opts.cpu : null;
+    if (cpuOpt) {
+      var ci = S.myIndex === 1 ? 0 : 1;
+      var cs = (map.starts && map.starts[ci]) || { x: Math.min(S.w - 1, st.x + 2), z: st.z, dir: st.dir || 0 };
+      var ctk = makeTank(S.players[ci] ? S.players[ci].color : '#1e88e5');
+      add(ctk.root);
+      S.cpu = makeActor(ctk, cs, ci);
+      var lv = CPU_GAP[cpuOpt.level] ? cpuOpt.level : 'normal';
+      S.cpu.ai = { level: lv, gap: CPU_GAP[lv], wait: CPU_WAIT0, plan: null, ver: -1, bumps: 0, started: false, steps: 0, time: 0 };
+    }
     // 相手の戦車（通信のときは最初からスタート位置に置く）
     if (S.net) {
       for (var p = 0; p < S.players.length; p++) {
@@ -581,10 +636,18 @@
   // 高さは「その画素でいちばん濃い色」で決めているので、壁の縁のマスは平均色が明るく出てしまうため。
   var hsl = { h: 0, s: 0, l: 0 };
   var WALL_RGB = [0.18, 0.18, 0.2]; // 上の面＝こい灰色、側面（下の陰影で約0.6倍）＝ほぼ黒
+  // 第2期：高さ9以下でも、高い（8以上）か暗い色のマスは黒系に。くすんだ色（カーキ・灰色）は高さに応じて黒へ寄せ、
+  // 「壁と同じくらい高いカーキ色の積み木」を残さない（高さは画素のいちばん濃い色で決まるので、平均色が明るく出ることがある）
   function blockColor(c, hh) {
     var lum = 0.299 * c.r + 0.587 * c.g + 0.114 * c.b;
-    if (hh >= 10 || lum < 0.16) { c.setRGB(WALL_RGB[0], WALL_RGB[1], WALL_RGB[2]); return c; }
+    if (hh >= 8 || lum < 0.3) { c.setRGB(WALL_RGB[0], WALL_RGB[1], WALL_RGB[2]); return c; }
     c.getHSL(hsl);
+    if (hsl.s < 0.42 && hh >= 4) {
+      // くすんだ色：高さ4で半分、6以上はほぼ壁の黒
+      var k = clamp((hh - 3) / 3, 0, 1) * 0.9 + 0.1;
+      c.setRGB(c.r + (WALL_RGB[0] - c.r) * k, c.g + (WALL_RGB[1] - c.g) * k, c.b + (WALL_RGB[2] - c.b) * k);
+      return c;
+    }
     // くすんだ色（カーキ・灰色）は鮮やかにしない。はっきりした色の積み木だけ鮮やかに
     var sat = hsl.s < 0.3 ? hsl.s * 0.6 : clamp(hsl.s * 1.6, 0, 1);
     c.setHSL(hsl.h, sat, clamp(hsl.l * 0.92, 0.22, 0.68));
@@ -774,13 +837,14 @@
       var x = cells[k][0] | 0, z = cells[k][1] | 0;
       if (!inMap(x, z)) continue;
       var i = idx(x, z), hh = S.heights[i];
-      done.push([x, z]);
+      if (hh > 0) done.push([x, z]); // 実際に壊したマスだけ
       cx += x + 0.5; cz += z + 0.5; cy = Math.max(cy, vis(hh)); cnt++;
       if (withFx) {
         cellColor(i, c);
         if (hh > 0) {
           blockColor(c, hh); // 積み木と同じ色の破片
-          spawnDebris(x + 0.5, vis(hh) * 0.5, z + 0.5, c, Math.min(90, 26 + hh * 7), 1);
+          spawnDebris(x + 0.5, vis(hh) * 0.5, z + 0.5, c, Math.min(110, 34 + hh * 8), 1);
+          spawnStars(x + 0.5, Math.max(0.4, vis(hh)), z + 0.5, 8);
           for (var p = 0; p < 3; p++) spawnPuff(x + 0.5 + rand(-0.4, 0.4), vis(hh) * rand(0.2, 0.9) + 0.1, z + 0.5 + rand(-0.4, 0.4), { color: 0xdedad2, vx: rand(-1, 1), vy: rand(0.8, 2), vz: rand(-1, 1), s0: 0.6, s1: 2.4, life: 1.4, a: 0.85 });
         } else {
           spawnDebris(x + 0.5, 0.05, z + 0.5, c.lerp(new THREE.Color(0x9a9080), 0.2), 8, 0.6);
@@ -793,7 +857,7 @@
         if (inst >= 0) L.terrain.setMatrixAt(inst, zero); // そのマスの行列だけ更新
       }
     }
-    if (changed) { L.terrain.instanceMatrix.needsUpdate = true; paintFloor(); }
+    if (changed) { L.terrain.instanceMatrix.needsUpdate = true; paintFloor(); S.mapVer++; }
     if (withFx && cnt) {
       cx /= cnt; cz /= cnt;
       spawnBurst(cx, Math.max(0.3, cy * 0.5), cz, true);
@@ -1163,6 +1227,7 @@
       if (fx) {
         fx.debris.geometry.dispose(); fx.debris.material.dispose(); fx.ballGeo.dispose(); fx.ballMat.dispose();
         fx.puffs.forEach(function (p) { p.sp.material.dispose(); });
+        fx.stars.forEach(function (p) { p.sp.material.dispose(); });
         fx.bursts.forEach(function (b) { b.sp.material.dispose(); b.fl.material.dispose(); b.ring.geometry.dispose(); b.ring.material.dispose(); });
       }
       S.fx = null;

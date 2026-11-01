@@ -428,19 +428,17 @@
   function line(g, x0, z0, x1, z1) { g.beginPath(); g.moveTo(x0, z0); g.lineTo(x1, z1); g.strokeStyle = '#000'; g.lineWidth = LW; g.lineCap = 'round'; g.stroke(); }
 
   var ILLUST = {
-    ie: function (g) { // いえ：やね・けむりだし・かべ・ドア・まど
-      shape(g, poly([[372, 150], [452, 150], [452, 260], [372, 260]]));     // えんとつ
-      shape(g, poly([[170, 300], [470, 300], [470, 530], [170, 530]]));     // かべ
-      shape(g, poly([[135, 305], [320, 140], [505, 305]]));                 // やね
-      shape(g, poly([[215, 400], [315, 400], [315, 530], [215, 530]]));     // ドア
-      shape(g, poly([[372, 360], [446, 360], [446, 434], [372, 434]]));     // まど
+    ie: function (g) { // いえ：やね・かべ・ドア・まど
+      shape(g, poly([[160, 305], [500, 305], [500, 535], [160, 535]]));     // かべ
+      shape(g, poly([[125, 310], [330, 140], [535, 310]]));                 // やね
+      shape(g, poly([[215, 405], [305, 405], [305, 535], [215, 535]]));     // ドア
+      shape(g, poly([[360, 380], [440, 380], [440, 460], [360, 460]]));     // まど
     },
     sakana: function (g) { // さかな：しっぽ・ひれ・からだ・め
-      shape(g, poly([[420, 320], [545, 215], [545, 425]]));                 // しっぽ
-      shape(g, poly([[250, 235], [320, 150], [385, 240]]));                 // せびれ
-      shape(g, poly([[300, 380], [350, 470], [405, 380]]));                 // はらびれ
-      shape(g, ellipse(290, 320, 175, 112));                                // からだ
-      shape(g, circle(205, 290, 36));                                       // め
+      shape(g, poly([[420, 330], [550, 220], [550, 440]]));                 // しっぽ
+      shape(g, poly([[250, 235], [320, 140], [390, 235]]));                 // せびれ
+      shape(g, ellipse(290, 330, 175, 135));                                // からだ
+      shape(g, circle(215, 305, 34));                                       // め
     },
     kuruma: function (g) { // くるま：からだ・うえの へや・まど2つ・タイヤ2つ
       shape(g, poly([[185, 300], [245, 190], [405, 190], [465, 300]]));     // うえの へや
@@ -467,11 +465,13 @@
       g.closePath(); g.strokeStyle = '#000'; g.lineWidth = LW; g.lineJoin = 'round'; g.lineCap = 'round'; g.stroke();
     },
     roketto: function (g) { // ロケット：ほのお・はね2つ・からだ・まど
-      shape(g, poly([[265, 450], [375, 450], [320, 560]]));                 // ほのお
-      shape(g, poly([[240, 300], [130, 450], [250, 430]]));                 // はね
-      shape(g, poly([[400, 300], [510, 450], [390, 430]]));
-      shape(g, function (g) { g.moveTo(320, 70); g.quadraticCurveTo(460, 200, 420, 450); g.lineTo(220, 450); g.quadraticCurveTo(180, 200, 320, 70); }); // からだ
-      shape(g, circle(320, 250, 52));                                       // まど
+      g.save(); g.translate(32, 24); g.scale(0.9, 0.9);
+      shape(g, poly([[255, 455], [385, 455], [320, 585]]));                 // ほのお
+      shape(g, poly([[245, 285], [100, 480], [245, 445]]));                 // はね
+      shape(g, poly([[395, 285], [540, 480], [395, 445]]));
+      shape(g, function (g) { g.moveTo(320, 70); g.quadraticCurveTo(460, 200, 420, 455); g.lineTo(220, 455); g.quadraticCurveTo(180, 200, 320, 70); }); // からだ
+      shape(g, circle(320, 255, 50));                                       // まど
+      g.restore();
     }
   };
   function drawIllust(def) {

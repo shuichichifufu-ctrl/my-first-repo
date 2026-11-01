@@ -5,6 +5,8 @@
   var PLAYERS = [{ color: '#e53935' }, { color: '#1e88e5' }];
   var CAM_LABEL = ['め', 'おいかけ', 'そら']; // 視点の名前
   var CAM_GO = ['めへ', 'おいかけへ', 'そらへ'];  // カメラボタンの文字：おすと つぎに なる視点（絵と同じ） // 移動の「うしろ」とかぶらない名前
+  var LEVELS = ['easy', 'normal', 'hard'];
+  var LEVEL_NAME = { easy: 'やさしい', normal: 'ふつう', hard: 'むずかしい', net: 'つうしん' };
   var DEFAULT_ERR = 'つながらなかったよ。ばんごうを たしかめてね';
   var doc = document;
 
@@ -21,6 +23,44 @@
   function sfx(name) { call('Sfx', 'play', name); }
   function unlock() { call('Sfx', 'unlock'); }
 
+  // ---------------- 設定と記録（localStorage。読めなくても既定値で動く） ----------------
+  var KEY_SET = 'seecar.settings', KEY_REC = 'seecar.record';
+  function lsGet(k) { try { return window.localStorage.getItem(k); } catch (e) { return null; } }
+  function lsSet(k, v) { try { window.localStorage.setItem(k, v); } catch (e) {} }
+  function readJSON(k) { try { var t = lsGet(k); return t ? JSON.parse(t) : null; } catch (e) { return null; } }
+  function defaultSettings() { return { arrows: true, swipeRev: false, binary: false, level: 'normal' }; }
+  function defaultRecord() {
+    return { easy: { win: 0, lose: 0 }, normal: { win: 0, lose: 0 }, hard: { win: 0, lose: 0 }, net: { win: 0, lose: 0 } };
+  }
+  function loadSettings() {
+    var d = defaultSettings(), o = readJSON(KEY_SET);
+    if (o && typeof o === 'object') {
+      if (typeof o.arrows === 'boolean') d.arrows = o.arrows;
+      if (typeof o.swipeRev === 'boolean') d.swipeRev = o.swipeRev;
+      if (typeof o.binary === 'boolean') d.binary = o.binary;
+      if (LEVELS.indexOf(o.level) >= 0) d.level = o.level;
+    }
+    return d;
+  }
+  function loadRecord() {
+    var d = defaultRecord(), o = readJSON(KEY_REC);
+    if (o && typeof o === 'object') Object.keys(d).forEach(function (k) {
+      var r = o[k];
+      if (r && typeof r === 'object') {
+        d[k].win = Math.max(0, Math.floor(+r.win) || 0);
+        d[k].lose = Math.max(0, Math.floor(+r.lose) || 0);
+      }
+    });
+    return d;
+  }
+  var settings = defaultSettings(), record = defaultRecord();
+  function saveSettings() { lsSet(KEY_SET, JSON.stringify(settings)); }
+  function saveRecord() { lsSet(KEY_REC, JSON.stringify(record)); }
+  function recText(k) { var r = record[k] || { win: 0, lose: 0 }; return r.win + 'かち ' + r.lose + 'まけ'; }
+  function applySettings() {
+    doc.body.classList.toggle('noarrows', !settings.arrows);
+  }
+
   var ICON = {
     play: '<svg viewBox="0 0 24 24"><path d="M6 3.500l15 8.500-15 8.500z"/></svg>',
     go: '<svg viewBox="0 0 24 24"><path d="M3 4l9 8-9 8zM12 4l9 8-9 8z"/></svg>',
@@ -29,7 +69,30 @@
     stop: '<svg viewBox="0 0 24 24"><rect x="5" y="5" width="14" height="14" rx="3"/></svg>',
     home: '<svg viewBox="0 0 24 24"><path d="M12 3 1.500 12.500H5V21h5.500v-6h3v6H19v-8.500h3.500z"/></svg>',
     link: '<svg viewBox="0 0 24 24"><circle cx="5.500" cy="12" r="4"/><circle cx="18.500" cy="12" r="4"/><rect x="8" y="10.500" width="8" height="3"/></svg>',
-    pic: '<svg viewBox="0 0 24 24"><rect x="2" y="4" width="20" height="16" rx="3" fill="#ffd23f"/><circle cx="8" cy="10" r="2.400" fill="#ff5d8f"/><path d="M3 19l6-6 4 4 3-3 5 5z" fill="#3b8df0"/></svg>'
+    pic: '<svg viewBox="0 0 24 24"><rect x="2" y="4" width="20" height="16" rx="3" fill="#ffd23f"/><circle cx="8" cy="10" r="2.400" fill="#ff5d8f"/><path d="M3 19l6-6 4 4 3-3 5 5z" fill="#3b8df0"/></svg>',
+    gear: '<svg viewBox="0 0 24 24"><path d="M19.400 13a7.500 7.500 0 0 0 0-2l2.100-1.600-2-3.500-2.500 1a7.500 7.500 0 0 0-1.700-1L14.900 3h-4l-.4 2.900a7.500 7.500 0 0 0-1.700 1l-2.500-1-2 3.500L6.400 11a7.500 7.500 0 0 0 0 2l-2.100 1.600 2 3.500 2.500-1a7.500 7.500 0 0 0 1.700 1l.4 2.900h4l.4-2.900a7.500 7.500 0 0 0 1.700-1l2.500 1 2-3.500zM12.900 15.500a3.500 3.500 0 1 1 0-7 3.500 3.500 0 0 1 0 7z"/></svg>',
+    solo: '<svg viewBox="0 0 24 24"><circle cx="12" cy="7" r="4"/><path d="M4 21c0-5 3.500-8 8-8s8 3 8 8z"/></svg>'
+  };
+  // 設定の絵
+  var SETICO = {
+    arrows: '<svg viewBox="0 0 48 48"><rect x="16" y="3" width="16" height="16" rx="4" fill="#ffd23f"/><rect x="16" y="29" width="16" height="16" rx="4" fill="#ffd23f"/><rect x="3" y="16" width="16" height="16" rx="4" fill="#ffd23f"/><rect x="29" y="16" width="16" height="16" rx="4" fill="#ffd23f"/><path d="M24 7l5 8h-10zM24 41l5-8h-10zM7 24l8-5v10zM41 24l-8-5v10z" fill="#1f5fd9"/></svg>',
+    swipe: '<svg viewBox="0 0 48 48"><path d="M4 24h40M12 15 4 24l8 9M36 15l8 9-8 9" fill="none" stroke="#1f5fd9" stroke-width="5" stroke-linecap="round" stroke-linejoin="round"/><circle cx="24" cy="24" r="7" fill="#ff5d8f" stroke="#fff" stroke-width="3"/></svg>',
+    bw: '<svg viewBox="0 0 48 48"><rect x="3" y="6" width="42" height="36" rx="5" fill="#fff" stroke="#1f5fd9" stroke-width="3"/><path d="M24 6h16a5 5 0 0 1 5 5v26a5 5 0 0 1-5 5H24z" fill="#222"/><circle cx="14" cy="18" r="4" fill="#222"/><path d="M8 36l8-8 5 5" fill="none" stroke="#222" stroke-width="3.500" stroke-linecap="round"/></svg>',
+    trophy: '<svg viewBox="0 0 48 48"><path d="M14 5h20v14a10 10 0 0 1-20 0z" fill="#ffd23f" stroke="#e59a00" stroke-width="2.500"/><path d="M14 9H6c0 8 3 12 9 13M34 9h8c0 8-3 12-9 13" fill="none" stroke="#e59a00" stroke-width="3"/><rect x="21" y="29" width="6" height="8" fill="#e59a00"/><rect x="14" y="37" width="20" height="6" rx="2" fill="#1f5fd9"/></svg>'
+  };
+  // 難しさの絵：かめ・うさぎ・ロケット
+  var LVPIC = {
+    easy: '<svg viewBox="0 0 64 64"><ellipse cx="30" cy="38" rx="20" ry="15" fill="#4cc26b" stroke="#fff" stroke-width="3"/><path d="M18 36h24M30 24v26M22 28l-4 16M38 28l4 16" stroke="#2a8a48" stroke-width="2.500" fill="none"/><circle cx="54" cy="36" r="8" fill="#8ee0a5" stroke="#fff" stroke-width="3"/><circle cx="56" cy="34" r="2" fill="#12327a"/><rect x="16" y="48" width="8" height="8" rx="3" fill="#8ee0a5"/><rect x="36" y="48" width="8" height="8" rx="3" fill="#8ee0a5"/></svg>',
+    normal: '<svg viewBox="0 0 64 64"><ellipse cx="26" cy="22" rx="5" ry="14" fill="#fff" stroke="#ff8fb8" stroke-width="3"/><ellipse cx="40" cy="22" rx="5" ry="14" fill="#fff" stroke="#ff8fb8" stroke-width="3"/><circle cx="33" cy="44" r="16" fill="#fff" stroke="#ff8fb8" stroke-width="3"/><circle cx="27" cy="41" r="2.500" fill="#12327a"/><circle cx="39" cy="41" r="2.500" fill="#12327a"/><circle cx="33" cy="47" r="2.500" fill="#ff5d8f"/></svg>',
+    hard: '<svg viewBox="0 0 64 64"><path d="M32 4c9 8 12 20 10 36H22C20 24 23 12 32 4z" fill="#fff" stroke="#1f5fd9" stroke-width="3"/><circle cx="32" cy="26" r="6" fill="#7ab8f5" stroke="#1f5fd9" stroke-width="3"/><path d="M22 34 12 46l10-2zM42 34l10 12-10-2z" fill="#ff5d5d" stroke="#fff" stroke-width="2"/><path d="M26 42h12l-6 18z" fill="#ffb703" stroke="#ff6a00" stroke-width="2.500"/></svg>'
+  };
+  // 見本（イラスト）の小さな絵。名前が分かるものだけ
+  var ILLUST = {
+    'いえ': '<svg viewBox="0 0 48 48"><path d="M24 6 5 24h6v18h26V24h6z" fill="none" stroke="#222" stroke-width="4" stroke-linejoin="round"/><rect x="20" y="28" width="8" height="14" fill="#222"/></svg>',
+    'さかな': '<svg viewBox="0 0 48 48"><path d="M5 24c8-12 22-12 30 0-8 12-22 12-30 0zM35 24l9-9v18z" fill="none" stroke="#222" stroke-width="4" stroke-linejoin="round"/><circle cx="14" cy="22" r="2.500" fill="#222"/></svg>',
+    'くるま': '<svg viewBox="0 0 48 48"><path d="M4 32v-8l6-2 6-8h16l6 8 6 2v8z" fill="none" stroke="#222" stroke-width="4" stroke-linejoin="round"/><circle cx="14" cy="34" r="5" fill="#fff" stroke="#222" stroke-width="4"/><circle cx="34" cy="34" r="5" fill="#fff" stroke="#222" stroke-width="4"/></svg>',
+    'はな': '<svg viewBox="0 0 48 48"><circle cx="24" cy="14" r="7" fill="none" stroke="#222" stroke-width="3.500"/><circle cx="14" cy="22" r="7" fill="none" stroke="#222" stroke-width="3.500"/><circle cx="34" cy="22" r="7" fill="none" stroke="#222" stroke-width="3.500"/><circle cx="24" cy="24" r="4" fill="#222"/><path d="M24 30v14" stroke="#222" stroke-width="4"/></svg>',
+    'ほし': '<svg viewBox="0 0 48 48"><path d="M24 4l6 14 14 1-11 9 4 14-13-8-13 8 4-14L4 19l14-1z" fill="none" stroke="#222" stroke-width="4" stroke-linejoin="round"/></svg>'
   };
   // カメラの絵。戦車の色は自分の色（ゲストは青）
   var LIGHT = { '#e53935': '#ff7a6e', '#1e88e5': '#7ab8f5' };
@@ -47,12 +110,12 @@
 
   // ---------------- 状態 ----------------
   var state = 'boot', sub = 'pick';
-  var mode = 'solo';              // 'solo' | 'net'
+  var mode = 'solo';              // 'cpu'（CPUと対戦）| 'solo'（ひとりで れんしゅう）| 'net'（つうしん）
   var netRole = '', netOn = false, netTok = 0, netConnected = false, joined = false;
   var code = '';
   var sel = null, loading = false;
   var map = null, myIndex = 0, camMode = 1, running = false, modalOpen = false;
-  var pressed = {}, guard = false, hostRetry = 0;
+  var pressed = {}, guard = false, hostRetry = 0, recorded = false, modalKind = 'quit', sw = null, tipTimer = 0, flashTimer = 0;
   var navKey = '', noticeTimer = 0, boomTimer = 0;
   var els = {};
 
@@ -109,8 +172,11 @@
   // ---------------- 進行ボタン #nav ----------------
   function navItems() {
     if (state === 'title') return [
-      { label: 'はじめる', icon: 'play', kind: 'primary', fn: startSolo },
-      { label: 'つうしんであそぶ', icon: 'net', kind: 'secondary', fn: startOnline }];
+      { label: 'はじめる', icon: 'play', kind: 'primary hero', cap: 'コンピューターと たいけつ', fn: startCpu },
+      { brk: true },
+      { label: 'ひとりで れんしゅう', icon: 'solo', kind: 'secondary sub', fn: startSolo },
+      { label: 'つうしんで あそぶ', icon: 'net', kind: 'secondary sub', fn: startOnline },
+      { label: 'せってい', icon: 'gear', kind: 'secondary sub', fn: openSettings }];
     if (state === 'setting') {
       if (sub === 'pick' && sel && !loading) return [{ label: 'しゅっぱつ！', icon: 'go', kind: 'primary', fn: depart }];
       if (sub === 'keypad' && code.length === 4) return [{ label: 'つなぐ！', icon: 'link', kind: 'primary', fn: doJoin }];
@@ -118,21 +184,22 @@
       return [];
     }
     if (state === 'ending') return [
-      { label: 'もういちど', icon: 'again', kind: 'primary', fn: function () { go('title'); } },
+      { label: 'もういちど', icon: 'again', kind: 'primary', fn: again },
       { label: 'おわる', icon: 'stop', kind: 'secondary', fn: function () { go('quit'); } }];
     if (state === 'quit') return [{ label: 'はじめから', icon: 'home', kind: 'primary', fn: function () { go('title'); } }];
     return [];
   }
   function renderNav() {
     var items = navItems();
-    var key = state + '|' + sub + '|' + items.map(function (i) { return i.label; }).join('/');
+    var key = state + '|' + sub + '|' + items.map(function (i) { return i.label || '-'; }).join('/');
     if (key === navKey) return;
     navKey = key;
     els.nav.innerHTML = '';
     items.forEach(function (it) {
+      if (it.brk) { var br = doc.createElement('div'); br.className = 'brk'; els.nav.appendChild(br); return; }
       var b = doc.createElement('button');
       b.type = 'button'; b.tabIndex = -1; b.className = 'nbtn ' + it.kind;
-      b.innerHTML = '<i>' + ICON[it.icon] + '</i><span>' + it.label + '</span>';
+      b.innerHTML = '<i>' + ICON[it.icon] + '</i><span>' + it.label + '</span>' + (it.cap ? '<small>' + it.cap + '</small>' : '');
       b.setAttribute('data-nav', it.label);
       tap(b, it.fn);
       els.nav.appendChild(b);
@@ -148,6 +215,8 @@
     state = name;
     doc.body.setAttribute('data-state', name);
     if (name !== 'setting') sub = 'pick';
+    if (from === 'play' && name !== 'play') { sw = null; hideTip(); }
+    if (name === 'title') renderRecChip();
     if (name === 'ending') fillEnding.apply(null, [].slice.call(arguments, 1));
     renderNav();
   }
@@ -155,17 +224,76 @@
   function setSub(s, headText) {
     sub = s;
     els.setting.setAttribute('data-sub', s);
-    var heads = { choice: 'どちらに する？', code: 'この ばんごうを ともだちに おしえてね', keypad: 'ばんごうを いれてね', msg: 'ちょっと まってね', error: 'あれれ？', pick: 'ちずを えらんでね' };
+    var heads = { choice: 'どちらに する？', code: 'この ばんごうを ともだちに おしえてね', keypad: 'ばんごうを いれてね', msg: 'ちょっと まってね', error: 'あれれ？', pick: 'ちずを えらんでね', level: 'むずかしさを えらんでね', opts: 'せってい' };
     els.sethead.textContent = headText || heads[s] || '';
     renderNav();
   }
   function enterSetting(s, head) { go('setting'); setSub(s, head); }
 
+  function startCpu() { mode = 'cpu'; sel = null; loading = false; renderLevels(); enterSetting('level'); }
   function startSolo() { mode = 'solo'; sel = null; loading = false; renderCards(); renderPreview(); enterSetting('pick'); }
   function startOnline() { mode = 'net'; sel = null; netRole = ''; enterSetting('choice'); }
+  function openSettings() { renderSettings(); enterSetting('opts'); }
   function backFromSetting() {
+    if (sub === 'opts') { go('title'); return; }
+    if (mode === 'cpu' && sub === 'pick') { sel = null; loading = false; renderLevels(); setSub('level'); return; }
     if (mode === 'net' && sub !== 'choice') { closeNet(); sel = null; loading = false; setSub('choice'); return; }
     go('title');
+  }
+  // 結果のあと「もういちど」：CPU戦なら おなじ むずかしさで ちずえらびへ。ひとり練習も ちずえらびへ。通信はタイトルへ
+  function again() {
+    if (mode === 'cpu' || mode === 'solo') { sel = null; loading = false; renderCards(); renderPreview(); enterSetting('pick'); }
+    else go('title');
+  }
+
+  // ---------------- 難しさえらび ----------------
+  function renderLevels() {
+    var list = doc.querySelectorAll('.lvcard');
+    for (var i = 0; i < list.length; i++) {
+      var lv = list[i].getAttribute('data-level');
+      list[i].querySelector('.lvpic').innerHTML = LVPIC[lv];
+      list[i].querySelector('em').textContent = recText(lv);
+      list[i].classList.toggle('on', settings.level === lv);
+    }
+  }
+  function chooseLevel(lv) {
+    if (LEVELS.indexOf(lv) < 0) return;
+    settings.level = lv; saveSettings(); renderLevels();
+    sel = null; loading = false; renderCards(); renderPreview();
+    setSub('pick');
+  }
+
+  // ---------------- せってい ----------------
+  function renderSettings() {
+    var segs = doc.querySelectorAll('.seg button[data-set]');
+    for (var i = 0; i < segs.length; i++) {
+      var k = segs[i].getAttribute('data-set'), v = segs[i].getAttribute('data-val') === '1';
+      var on = (settings[k] === v);
+      segs[i].classList.toggle('on', on);
+      segs[i].setAttribute('aria-pressed', on ? 'true' : 'false');
+    }
+    var h = function (id, t) { $(id).textContent = t; };
+    h('hint-arrows', settings.arrows ? 'うえしたひだりみぎの ボタンを だすよ' : '「まえ」だけ のこるよ。むきは ゆびで かえるよ');
+    h('hint-swipeRev', settings.swipeRev ? 'みぎへ なぞると ひだりを むくよ' : 'みぎへ なぞると みぎを むくよ');
+    h('hint-binary', settings.binary ? 'よみこんだ えは しろと くろだけに なるよ' : 'よみこんだ えの いろの こさで ちずに なるよ');
+    var t = { win: 0, lose: 0 }; Object.keys(record).forEach(function (k) { t.win += record[k].win; t.lose += record[k].lose; });
+    h('hint-record', 'ぜんぶで ' + t.win + 'かち ' + t.lose + 'まけ');
+  }
+  function setOpt(k, v) {
+    settings[k] = v; saveSettings(); applySettings(); renderSettings();
+  }
+  function renderRecChip() {
+    els.recchip.innerHTML = '<span class="rc-ico">' + SETICO.trophy + '</span><b></b><span class="rc-n"></span>';
+    els.recchip.querySelector('b').textContent = LEVEL_NAME[settings.level];
+    els.recchip.querySelector('.rc-n').textContent = recText(settings.level);
+  }
+  function addRecord(key, win) {
+    if (!record[key]) record[key] = { win: 0, lose: 0 };
+    record[key][win ? 'win' : 'lose']++;
+    saveRecord();
+  }
+  function resetRecord() {
+    record = defaultRecord(); saveRecord(); renderSettings(); renderRecChip(); renderLevels();
   }
 
   // ---------------- 地図えらび ----------------
@@ -173,20 +301,31 @@
     var presets = prop('MapGen', 'presets') || [];
     var grid = els.cards;
     grid.innerHTML = '';
-    var total = presets.length + 1;
-    grid.style.setProperty('--cols', total > 4 ? 3 : 2);
-    grid.className = 'pickgrid' + (total > 4 ? ' c3' : '');
-    presets.forEach(function (p) {
-      var c = doc.createElement('button');
-      c.type = 'button'; c.tabIndex = -1; c.className = 'card'; c.setAttribute('data-id', p.id);
-      c.innerHTML = '<span class="kan"></span><span class="yomi"></span>';
-      c.firstChild.textContent = p.title; c.lastChild.textContent = p.reading || '';
-      tap(c, function () { choosePreset(p); });
-      grid.appendChild(c);
-    });
+    var yoji = [], illust = [];
+    presets.forEach(function (p) { (p.kind === 'illust' ? illust : yoji).push(p); });
+    var n = Math.min(6, Math.max(3, yoji.length, illust.length));
+    grid.style.setProperty('--n', n);
+    grid.className = 'maps' + (n >= 5 ? ' dense' : '');
+    function group(title, cls, list) {
+      var g = doc.createElement('div'); g.className = 'grp ' + cls;
+      var l = doc.createElement('div'); l.className = 'gl'; l.textContent = title; g.appendChild(l);
+      var row = doc.createElement('div'); row.className = 'row'; g.appendChild(row);
+      list.forEach(function (p) {
+        var c = doc.createElement('button');
+        c.type = 'button'; c.tabIndex = -1; c.className = 'card ' + cls; c.setAttribute('data-id', p.id);
+        c.innerHTML = (cls === 'illust' && ILLUST[p.title] ? '<i class="ic">' + ILLUST[p.title] + '</i>' : '') + '<span class="kan"></span><span class="yomi"></span>';
+        c.querySelector('.kan').textContent = p.title;
+        c.querySelector('.yomi').textContent = cls === 'illust' ? '' : (p.reading || '');
+        tap(c, function () { choosePreset(p); });
+        row.appendChild(c);
+      });
+      grid.appendChild(g);
+    }
+    group('よじじゅくご', 'yoji', yoji);
+    group('イラスト', 'illust', illust);
     var f = doc.createElement('div');
     f.className = 'card file'; f.setAttribute('data-id', 'file');
-    f.innerHTML = ICON.pic + '<span class="kan">えを よみこむ</span><input type="file" accept="image/*" aria-label="えを よみこむ">';
+    f.innerHTML = '<i class="ic">' + ICON.pic + '</i><span class="kan">えを よみこむ</span>' + (settings.binary ? '<span class="bw">しろくろ</span>' : '') + '<input type="file" accept="image/*" aria-label="えを よみこむ">';
     var inp = f.querySelector('input');
     // ファイル選択欄だけは既定動作を止めない（止めると選択画面が開かない）。ただし他へ伝わらないよう止める。
     ['pointerdown', 'pointerup'].forEach(function (n) { inp.addEventListener(n, function (e) { e.stopPropagation(); unlock(); }); });
@@ -199,7 +338,7 @@
     markCards();
   }
   function markCards() {
-    var list = els.cards.children;
+    var list = els.cards.querySelectorAll('.card');
     for (var i = 0; i < list.length; i++) {
       list[i].classList.toggle('on', !!(sel && sel.id === list[i].getAttribute('data-id')));
     }
@@ -232,7 +371,8 @@
   function chooseFile(file) {
     if (loading) return;
     loading = true; sel = null; markCards(); renderPreview(); renderNav();
-    var pr = call('MapGen', 'fromFile', file);
+    // 白黒モード：設定で「する」のとき、明るさ0.5で白（高さ0）と黒（高さ10）の2つに分ける
+    var pr = settings.binary ? call('MapGen', 'fromFile', file, { binary: true }) : call('MapGen', 'fromFile', file);
     function done(m) {
       loading = false;
       if (m) sel = { id: 'file', map: m };
@@ -249,7 +389,8 @@
       var enc = call('MapGen', 'encode', sel.map);
       call('Net', 'send', { t: 'map', map: enc });
       startGame(sel.map, 0, true);
-    } else startGame(sel.map, 0, false);
+    } else if (mode === 'cpu') startGame(sel.map, 0, false, { level: settings.level });
+    else startGame(sel.map, 0, false, null);
   }
 
   // ---------------- 通信：へや ----------------
@@ -389,10 +530,11 @@
   // 'error' は Promise の reject と二重になるので、ここでは何も表示しない
 
   // ---------------- Play ----------------
-  function startGame(m, idx, net) {
-    map = m; myIndex = idx; netOn = !!net;
+  function startGame(m, idx, net, cpu) {
+    map = m; myIndex = idx; netOn = !!net; recorded = false; sw = null;
     hideNotice();
-    call('World', 'load', m, { myIndex: idx, players: PLAYERS, net: netOn });
+    call('World', 'load', m, { myIndex: idx, players: PLAYERS, net: netOn, cpu: cpu || null });
+    call('World', 'resetPitch');
     els.ptTitle.textContent = m.title || '';
     els.ptYomi.textContent = m.reading || '';
     camMode = 1; updateCam();
@@ -402,6 +544,7 @@
     call('World', 'start');
     running = true;
     applyPortraitPause();
+    showTip();
   }
   function stopGame() {
     if (running) { running = false; call('World', 'stop'); }
@@ -466,8 +609,25 @@
   function fillEnding(idx) {
     idx = (idx === 1) ? 1 : 0;
     var m = map || {};
+    // CPU戦・通信：先に宝を見つけたほうが かち。ひとり練習は勝ち負けなし
+    var res = '';
+    if (mode === 'cpu') res = (idx === 0) ? 'win' : 'lose';
+    else if (mode === 'net') res = (idx === myIndex) ? 'win' : 'lose';
+    var key = (mode === 'cpu') ? settings.level : 'net';
+    if (res && !recorded) { recorded = true; addRecord(key, res === 'win'); }
+    els.ending.setAttribute('data-res', res || 'solo');
+    els.endFound.textContent = res === 'win' ? 'かち！' : (res === 'lose' ? 'まけ…' : 'みつけた！');
     els.endDisc.style.background = PLAYERS[idx].color;
-    els.endWho.textContent = (mode === 'net' && idx !== myIndex) ? 'あいてが みつけたよ！' : 'きみが みつけたよ！';
+    var who = 'きみが みつけたよ！';
+    if (mode === 'cpu') who = res === 'win' ? 'きみが さきに みつけたよ！' : 'コンピューターが さきに みつけたよ';
+    else if (mode === 'net') who = res === 'win' ? 'きみが さきに みつけたよ！' : 'あいてが さきに みつけたよ';
+    els.endWho.textContent = who;
+    if (res) {
+      els.endRec.style.display = '';
+      els.endRec.innerHTML = '<span class="rc-ico">' + SETICO.trophy + '</span><b></b><span class="rc-n"></span>';
+      els.endRec.querySelector('b').textContent = LEVEL_NAME[key];
+      els.endRec.querySelector('.rc-n').textContent = recText(key);
+    } else els.endRec.style.display = 'none';
     els.endTitle.textContent = m.title || '';
     els.endTitle.style.display = m.title ? '' : 'none';
     els.endYomi.textContent = m.reading || '';
@@ -484,10 +644,65 @@
     }
   }
 
+  // ---------------- スワイプ（プレイ中の画面なぞり） ----------------
+  // 左右：90度まわる（1回のなぞりで1回）。上下：視点を少し上下。ボタンの上から始めた操作は #swipe に届かない。
+  function hasFn(obj, name) { var o = window[obj]; return !!(o && typeof o[name] === 'function'); }
+  function turnBy(d) { // d: -1=ひだり +1=みぎ（設定で反対にできる）
+    if (settings.swipeRev) d = -d;
+    flashTurn(d);
+    if (hasFn('World', 'swipeTurn')) { call('World', 'swipeTurn', d); return; }
+    var act = d < 0 ? 'left' : 'right'; // World.swipeTurn がまだ無いときは ボタンと同じ動きで代用
+    call('World', 'press', act, true);
+    setTimeout(function () { call('World', 'press', act, false); }, 40);
+  }
+  function flashTurn(d) {
+    var f = els.flash;
+    f.classList.remove('on', 'l', 'r'); void f.offsetWidth;
+    f.classList.add('on', d < 0 ? 'l' : 'r');
+    clearTimeout(flashTimer);
+    flashTimer = setTimeout(function () { f.classList.remove('on'); }, 500);
+  }
+  function unitPx() { var r = els.stage.getBoundingClientRect(); return Math.max(1, Math.min(r.width, r.height) / 100); }
+  function swipeDown(e) {
+    stopEv(e); unlock();
+    if (state !== 'play' || modalOpen || sw) return;
+    sw = { id: e.pointerId, x: e.clientX, y: e.clientY, ly: e.clientY, axis: '', done: false };
+    try { els.swipe.setPointerCapture(e.pointerId); } catch (_) {}
+  }
+  function swipeMove(e) {
+    if (!sw || e.pointerId !== sw.id) return;
+    stopEv(e);
+    var u = unitPx(), dx = e.clientX - sw.x, dy = e.clientY - sw.y;
+    if (!sw.axis) {
+      if (Math.hypot(dx, dy) < 2.2 * u) return;
+      sw.axis = Math.abs(dx) >= Math.abs(dy) ? 'h' : 'v'; sw.ly = e.clientY;
+      if (sw.axis === 'v') return;
+    }
+    if (sw.axis === 'h') {
+      if (!sw.done && Math.abs(dx) >= 7 * u) { sw.done = true; hideTip(); turnBy(dx > 0 ? 1 : -1); }
+    } else {
+      var d = e.clientY - sw.ly; sw.ly = e.clientY;
+      if (d) { hideTip(); call('World', 'nudgePitch', Math.max(-1, Math.min(1, -d / (30 * u)))); } // 指を上へ＝視点が上へ
+    }
+  }
+  function swipeUp(e) {
+    if (!sw || e.pointerId !== sw.id) return;
+    stopEv(e); sw = null;
+  }
+  function showTip() {
+    clearTimeout(tipTimer); els.tip.classList.add('on');
+    tipTimer = setTimeout(hideTip, 6500);
+  }
+  function hideTip() { clearTimeout(tipTimer); if (els.tip) els.tip.classList.remove('on'); }
+
   // ---------------- ホームとモーダル ----------------
-  function openModal() {
+  function openModal(kind) {
     if (modalOpen) return;
-    modalOpen = true; els.modal.classList.add('on');
+    modalKind = kind === 'reset' ? 'reset' : 'quit';
+    $('m-title').textContent = modalKind === 'reset' ? 'きろくを ぜんぶ けしますか？' : 'おわりにしますか？';
+    $('m-no-t').textContent = modalKind === 'reset' ? 'やめる' : 'いいえ';
+    $('m-yes-t').textContent = modalKind === 'reset' ? 'けす' : 'はい';
+    modalOpen = true; els.modal.classList.add('on'); sw = null;
     releaseAll();
     if (state === 'play') call('World', 'setPaused', true);
   }
@@ -498,6 +713,7 @@
   }
   function quitYes() {
     modalOpen = false; els.modal.classList.remove('on');
+    if (modalKind === 'reset') { resetRecord(); return; }
     stopGame(); closeNet();
     go('quit');
   }
@@ -547,7 +763,8 @@
   // ---------------- 初期化 ----------------
   function init() {
     ['stage', 'nav', 'home', 'modal', 'setting', 'sethead', 'cards', 'preview', 'keypad', 'codein', 'codeshow', 'msgface', 'msgtext',
-      'cam', 'notice', 'boom', 'confetti'].forEach(function (id) { els[id] = $(id); });
+      'cam', 'notice', 'boom', 'confetti', 'swipe', 'tip', 'flash', 'recchip', 'ending'].forEach(function (id) { els[id] = $(id); });
+    els.endFound = $('end-found'); els.endRec = $('end-rec');
     els.ptTitle = $('pt-title'); els.ptYomi = $('pt-yomi');
     els.camIco = $('cam-ico'); els.camLabel = $('cam-label');
     els.endDisc = $('end-disc'); els.endWho = $('end-who'); els.endTitle = $('end-title'); els.endYomi = $('end-yomi'); els.endPic = $('end-pic');
@@ -563,14 +780,16 @@
       if (mq.addEventListener) mq.addEventListener('change', h); else if (mq.addListener) mq.addListener(h);
     }
 
+    settings = loadSettings(); record = loadRecord(); applySettings();
     buildLogos();
     buildKeypad();
     renderCards(); renderPreview();
+    renderLevels(); renderSettings(); renderRecChip();
     updateCam();
 
     // Boot：画面のどこでも
     tap($('boot'), leaveBoot);
-    tap(els.home, openModal);
+    tap(els.home, function () { openModal('quit'); });
     tap($('m-no'), closeModal);
     tap($('m-yes'), quitYes);
     els.modal.addEventListener('pointerdown', stopEv);
@@ -580,6 +799,22 @@
     tap($('c-host'), startHost);
     tap($('c-join'), startJoin);
     tap(els.cam, cycleCam);
+    tap($('reset-rec'), function () { openModal('reset'); });
+    var segs = doc.querySelectorAll('.seg button[data-set]');
+    for (var j = 0; j < segs.length; j++) (function (b) {
+      tap(b, function () { setOpt(b.getAttribute('data-set'), b.getAttribute('data-val') === '1'); });
+    })(segs[j]);
+    var lvs = doc.querySelectorAll('.lvcard');
+    for (var q = 0; q < lvs.length; q++) (function (b) { tap(b, function () { chooseLevel(b.getAttribute('data-level')); }); })(lvs[q]);
+    // スワイプ受け口（ボタンより下の層。ボタンの上から始めた操作はここへ来ない）
+    ['pointerdown'].forEach(function (n) { els.swipe.addEventListener(n, swipeDown); });
+    els.swipe.addEventListener('pointermove', swipeMove);
+    els.swipe.addEventListener('pointerup', swipeUp);
+    els.swipe.addEventListener('pointercancel', swipeUp);
+    els.swipe.addEventListener('lostpointercapture', function (e) { if (sw && e.pointerId === sw.id) sw = null; });
+    els.swipe.addEventListener('click', stopEv);
+    els.swipe.addEventListener('contextmenu', stopEv);
+    ['touchstart', 'touchmove'].forEach(function (n) { els.swipe.addEventListener(n, function (e) { e.preventDefault(); }, { passive: false }); });
     var ctls = doc.querySelectorAll('.ctl[data-act]');
     for (var i = 0; i < ctls.length; i++) hold(ctls[i], ctls[i].getAttribute('data-act'));
 
@@ -598,6 +833,7 @@
   }
 
   window.App = {
+    _found: function (idx) { onFound(idx); },
     go: function (name) { if (['boot', 'title', 'setting', 'play', 'ending', 'quit'].indexOf(name) >= 0) go(name); },
     get state() { return state; }
   };
