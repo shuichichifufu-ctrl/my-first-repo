@@ -3,7 +3,8 @@
 // 2) つうしん: 手元の中継サーバーでホストとゲストをつなぎ、同期と破壊の一致、切断表示を確認
 const { openPage, startPeerServer, stopStatic } = require('./harness.js');
 const ver = process.argv[2] || 'v1';
-const FILE = `/home/user/my-first-repo/seecar/dist/seecar_${ver}.html`;
+const FILE = process.env.E2E_FILE || `/home/user/my-first-repo/seecar/dist/seecar_${ver}.html`;
+const PEER_PORT = +(process.env.PEER_PORT || 9000);
 const SH = `/home/user/my-first-repo/seecar/test/shots/e2e_${ver}_`;
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 const results = [];
@@ -130,7 +131,7 @@ async function solo(browser) {
 }
 
 async function online(browser) {
-  const q = '?peerhost=127.0.0.1&peerport=9000&peerpath=/myapp&peersecure=0';
+  const q = '?peerhost=127.0.0.1&peerport=' + PEER_PORT + '&peerpath=/myapp&peersecure=0';
   const A = await openPage(FILE, { browser, query: q }), B = await openPage(FILE, { browser, query: q });
   for (const P of [A.page, B.page]) { await sleep(300); await P.click('#boot', { force: true }); await sleep(300); await nav(P, 'つうしんであそぶ'); }
   await A.page.click('#c-host', { force: true }); await sleep(1500);
@@ -204,7 +205,7 @@ async function online(browser) {
 }
 
 (async () => {
-  const ps = startPeerServer(9000);
+  const ps = startPeerServer(PEER_PORT);
   const { chromium } = require('playwright');
   const browser = await chromium.launch({ args: ['--use-gl=swiftshader', '--enable-webgl', '--ignore-gpu-blocklist'] });
   try { await solo(browser); } catch (e) { ok('ひとり: 例外なし', false, String(e).slice(0, 300)); }

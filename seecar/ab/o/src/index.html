@@ -1,0 +1,132 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,minimum-scale=1,maximum-scale=1,user-scalable=no,viewport-fit=cover">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="format-detection" content="telephone=no">
+<title>見つめて見つけてほシーカー（SEE-CAR）</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+<script src="https://unpkg.com/peerjs@1.5.4/dist/peerjs.min.js"></script>
+<!--STYLE-->
+</head>
+<body data-state="boot">
+<div id="app">
+  <div id="stage">
+    <div id="bg" aria-hidden="true">
+      <i class="blk b1"></i><i class="blk b2"></i><i class="blk b3"></i>
+      <i class="tw t1"></i><i class="tw t2"></i><i class="tw t3"></i><i class="tw t4"></i><i class="tw t5"></i>
+    </div>
+    <div id="worldbox"></div>
+
+    <!-- 1 Boot -->
+    <section id="boot" class="screen">
+      <div class="center">
+        <div data-logo="0.55"></div>
+        <div class="touchme"><span class="ring"></span>がめんを さわってね</div>
+      </div>
+    </section>
+
+    <!-- 2 Title -->
+    <section id="title" class="screen">
+      <div class="titlelogo" data-logo="1"></div>
+    </section>
+
+    <!-- 3 Setting -->
+    <section id="setting" class="screen" data-sub="pick">
+      <button type="button" id="back" class="backbtn" tabindex="-1"><i></i><span>もどる</span></button>
+      <div id="sethead" class="head">ちずを えらんでね</div>
+
+      <div class="pane sub-choice">
+        <button type="button" class="bigcard" id="c-host" tabindex="-1">
+          <svg viewBox="0 0 64 64"><path d="M32 6 6 30h8v26h36V30h8z" fill="#ffd23f" stroke="#fff" stroke-width="3" stroke-linejoin="round"/><path d="M32 22l3.5 7.5 8 1-6 5.5 1.7 8L32 39.800 24.800 44l1.700-8-6-5.500 8-1z" fill="#ff5d8f"/></svg>
+          <span>へやを つくる</span>
+        </button>
+        <button type="button" class="bigcard" id="c-join" tabindex="-1">
+          <svg viewBox="0 0 64 64"><rect x="14" y="8" width="36" height="50" rx="4" fill="#7cc4ff" stroke="#fff" stroke-width="3"/><rect x="20" y="14" width="24" height="38" rx="2" fill="#3b8df0"/><circle cx="39" cy="34" r="3" fill="#ffd23f"/><path d="M2 34h14m-5-6 6 6-6 6" stroke="#ff5d8f" stroke-width="5" fill="none" stroke-linecap="round" stroke-linejoin="round"/></svg>
+          <span>へやに はいる</span>
+        </button>
+      </div>
+
+      <div class="pane sub-code">
+        <div class="digits" id="codeshow"></div>
+        <div class="waiting">あいてを まっているよ<span class="dots"><i>.</i><i>.</i><i>.</i></span></div>
+      </div>
+
+      <div class="pane sub-pick">
+        <div class="pickgrid" id="cards"></div>
+        <div class="preview" id="preview"></div>
+      </div>
+
+      <div class="pane sub-keypad">
+        <div class="digits grid2" id="codein"></div>
+        <div class="keypad" id="keypad"></div>
+      </div>
+
+      <div class="pane sub-msg">
+        <div class="msgface" id="msgface"></div>
+        <div class="msgtext" id="msgtext"></div>
+      </div>
+    </section>
+
+    <!-- 4 Play -->
+    <section id="play" class="screen">
+      <div id="maptag"><b id="pt-title"></b><small id="pt-yomi"></small></div>
+      <div id="notice"></div>
+      <div id="dpad">
+        <button type="button" class="ctl" data-act="fwd" tabindex="-1"><svg viewBox="0 0 24 24"><path d="M12 3l9 12H3z"/></svg><span>まえ</span></button>
+        <button type="button" class="ctl" data-act="left" tabindex="-1"><svg viewBox="0 0 24 24"><path d="M3 12l12-9v18z"/></svg><span>ひだり</span></button>
+        <button type="button" class="ctl" data-act="right" tabindex="-1"><svg viewBox="0 0 24 24"><path d="M21 12 9 3v18z"/></svg><span>みぎ</span></button>
+        <button type="button" class="ctl" data-act="back" tabindex="-1"><svg viewBox="0 0 24 24"><path d="M12 21 3 9h18z"/></svg><span>うしろ</span></button>
+      </div>
+      <button type="button" id="fire" class="ctl" data-act="fire" tabindex="-1">
+        <svg viewBox="0 0 64 64"><g fill="#fff"><rect x="6" y="30" width="34" height="14" rx="4" transform="rotate(-25 20 37)"/><circle cx="26" cy="46" r="13"/><circle cx="54" cy="12" r="5" fill="#222"/></g><circle cx="26" cy="46" r="6" fill="#d9480f"/></svg>
+        <span>うつ</span>
+      </button>
+      <button type="button" id="cam" tabindex="-1"><span class="camrow"><i id="cam-ico"></i></span><span id="cam-label">おいかけ</span></button>
+    </section>
+
+    <!-- 5 Ending -->
+    <section id="ending" class="screen">
+      <div id="confetti"></div>
+      <div class="endleft">
+        <div class="found">みつけた！</div>
+        <div class="who"><i id="end-disc"></i><span id="end-who"></span></div>
+        <div class="endtitle" id="end-title"></div>
+        <div class="endyomi" id="end-yomi"></div>
+      </div>
+      <div class="endpic"><img id="end-pic" alt=""></div>
+    </section>
+
+    <!-- 6 Quit -->
+    <section id="quit" class="screen">
+      <div class="center">
+        <div data-logo="0.55"></div>
+        <div class="bye">おしまい またね！</div>
+      </div>
+    </section>
+
+    <div id="boom">ドゴォーン！</div>
+    <div id="nav"></div>
+    <button type="button" id="home" aria-label="ホーム" tabindex="-1"><svg viewBox="0 0 24 24"><path d="M12 3 1.500 12.500H5V21h5.500v-6h3v6H19v-8.500h3.500z"/></svg></button>
+
+    <div id="modal">
+      <div class="mcard">
+        <div class="mtitle">おわりにしますか？</div>
+        <div class="mbtns">
+          <button type="button" id="m-no" class="nbtn primary" tabindex="-1"><span>いいえ</span></button>
+          <button type="button" id="m-yes" class="nbtn secondary" tabindex="-1"><span>はい</span></button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div id="portrait">
+    <div class="phone"></div>
+    <div class="ptext">スマホを よこに してね！</div>
+  </div>
+</div>
+<!--SCRIPTS-->
+</body>
+</html>
