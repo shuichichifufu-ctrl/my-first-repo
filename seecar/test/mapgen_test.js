@@ -36,12 +36,12 @@ const ok = (c, msg, extra) => { if (!c) fails++; console.log((c ? 'OK   ' : 'NG 
     const dd = (a, b) => Math.hypot(a.x - b.x, a.z - b.z);
     return { ms, w, h, t: m.treasure, reg: { cells: reg.cells, touchesEdge: reg.touchesEdge }, th: H[m.treasure.z * w + m.treasure.x], starts: st, hist, colored,
       cost: m.starts.map(s => reach(s.z * w + s.x)), sep: dd(m.starts[0], m.starts[1]), pic: m.picture.slice(0, 22), picLen: m.picture.length,
-      only0or10: H.every(v => v === 0 || v === 10), img: T.render(m, 6), src: binary ? null : MapGen.presetCanvas(id).toDataURL('image/png'),
+      only0or10: H.every(v => v === 0 || v === 10), nColors: (() => { const s = new Set(); for (let i = 0; i < n; i++) s.add(m.colors[i*3] + ',' + m.colors[i*3+1] + ',' + m.colors[i*3+2]); return s.size; })(), bwOnly: (() => { for (let i = 0; i < n; i++) { const v = m.colors[i*3]; if ((v !== 0 && v !== 255) || m.colors[i*3+1] !== v || m.colors[i*3+2] !== v || (H[i] === 10) !== (v === 0)) return false; } return true; })(), img: T.render(m, 6), src: binary ? null : MapGen.presetCanvas(id).toDataURL('image/png'),
       title: m.title, reading: m.reading, dirs: m.starts.map(s => s.dir) };
   }, [id, binary]);
   for (const p of presets) {
     const r = await common(p.id, false);
-    save('p2_map_' + p.id + '.png', r.img); save('p2_map_' + p.id + '_src.png', r.src);
+    save('p2_map_' + p.id + '.png', r.img); save('p2r2_map_' + p.id + '.png', r.img); save('p2_map_' + p.id + '_src.png', r.src);
     ok(r.w === 128 && r.h === 128, p.id + ' 128x128', [r.w, r.h]);
     ok(r.title === p.title && r.reading === p.reading, p.id + ' title/reading', [r.title, r.reading]);
     ok(!r.reg.touchesEdge && r.reg.cells >= 16, p.id + ' 宝は囲まれた領域内', { t: r.t, ...r.reg });
@@ -51,6 +51,9 @@ const ok = (c, msg, extra) => { if (!c) fails++; console.log((c ? 'OK   ' : 'NG 
     ok(r.cost.every(c => c < 40), p.id + ' 壁を壊せばスタートから宝へ行ける(壊す数)', r.cost);
     ok(r.pic.startsWith('data:image/jpeg'), p.id + ' picture jpeg', r.picLen);
     ok(r.colored === 0, p.id + ' 色(彩度のあるマス)が無い', r.colored);
+    ok(r.only0or10 && r.hist[0] + r.hist[10] === r.w * r.h, p.id + ' 見本は ふつうモードでも高さが0と10だけ', r.hist.join(','));
+    ok(r.bwOnly, p.id + ' 見本の色は白と黒だけ(色の数2以下)', r.nColors);
+    ok(r.reg.cells >= 40, p.id + ' 宝の領域が細いすき間でない(40マス以上)', r.reg.cells);
     ok(r.hist[10] > 300, p.id + ' 壁(高さ10)が十分ある', r.hist[10]);
     console.log('     高さ分布', r.hist.join(','), ' ms=' + r.ms.toFixed(0));
     // 白黒モード

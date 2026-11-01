@@ -393,7 +393,7 @@
     { id: 'roketto', kind: 'illust', title: 'ロケット', reading: 'ろけっと' }
   ];
   var STROKE = 10;
-  var THIN = { '鳥': 0, '麗': 0, '龍': 0 }; // 字ごとの太らせる量（線の多い字は細く。0=太らせない）
+  var THIN = { '鳥': 0, '麗': 0, '龍': 0, '自': 0, '由': 0, '在': 0 }; // 字ごとの太らせる量（線の多い字は細く。0=太らせない）
   var FONT = "'Hiragino Kaku Gothic ProN','Hiragino Sans','Noto Sans JP','Yu Gothic',sans-serif";
   var S = 640;               // 見本の絵の大きさ（画素）
   var LW = 26;               // イラストの線の太さ（画像1画素=10px の約2.6画素分。縮小しても途切れない）
@@ -438,7 +438,7 @@
       shape(g, poly([[420, 330], [550, 220], [550, 440]]));                 // しっぽ
       shape(g, poly([[250, 235], [320, 140], [390, 235]]));                 // せびれ
       shape(g, ellipse(290, 330, 175, 135));                                // からだ
-      shape(g, circle(215, 305, 34));                                       // め
+      shape(g, circle(215, 305, 42));                                       // め
     },
     kuruma: function (g) { // くるま：からだ・うえの へや・まど2つ・タイヤ2つ
       shape(g, poly([[185, 300], [245, 190], [405, 190], [465, 300]]));     // うえの へや
@@ -492,7 +492,10 @@
   }
   function fromPreset(id, opts) {
     var def = findPreset(id);
-    return fromCanvas(presetCanvas(def.id), def.title, def.reading, opts);
+    // 見本は常に白黒（高さ0の白と高さ10の黒だけ）。字や線のふちの灰色の小さな段を作らない。
+    var o = {}; if (opts) for (var key in opts) o[key] = opts[key];
+    o.binary = true;
+    return fromCanvas(presetCanvas(def.id), def.title, def.reading, o);
   }
 
   window.MapGen = {
