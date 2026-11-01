@@ -314,7 +314,7 @@ async function online(browser) {
   for (const need of [2, 1]) { let bestD = 1e9;
     for (let i = 0; i < dist.length; i++) { if (dist[i] < 0 || dist[i] >= bestD) continue; const x = i % pmap.w, z = (i - x) / pmap.w;
       for (let d = 0; d < 4; d++) { const tx2 = x + DX[d] * 2, tz2 = z + DZ[d] * 2; if (tx2 < 0 || tz2 < 0 || tx2 >= pmap.w || tz2 >= pmap.h) continue;
-        if (pmap.heights[tz2 * pmap.w + tx2] >= need && pmap.heights[tz2 * pmap.w + tx2] < 10) { bestD = dist[i]; spot = { x, z, d, tx: tx2, tz: tz2 }; break; } } }
+        if (pmap.heights[tz2 * pmap.w + tx2] >= need && pmap.heights[(z + DZ[d]) * pmap.w + (x + DX[d])] === 0) { bestD = dist[i]; spot = { x, z, d, tx: tx2, tz: tz2 }; break; } } }
     if (spot) break; }
   ok('つうしん: 撃つ場所（2マス先が高さ1以上）が見つかる', !!spot, spot);
   const driven = await drive(A.page, pmap, { x: spot.x, z: spot.z });

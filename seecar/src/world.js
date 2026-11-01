@@ -8,16 +8,19 @@
   var STEP_H = 0.2;
   function vis(h) { return h <= 1 ? 0 : (h - 1) * STEP_H; }
   var FLOOR_SAT = 1.9; // 床の色の鮮やかさ（1で元の色）
-  var TANK_SCALE = 1.12; // 戦車の見た目の大きさ（1マスの中におさまる範囲で、少し大きく）
+  var TANK_SCALE = 1.18; // 戦車の見た目の大きさ（第2期 r2：1.12→1.18。いちばん長い所 0.84×1.18≈0.99 で1マスにおさまる）
   var DX = [0, 1, 0, -1];
   var DZ = [-1, 0, 1, 0];
   var MOVE_DUR = 0.22, TURN_DUR = 0.2, BUMP_DUR = 0.28;
   var FIRE_CD = 0.8, BALL_DUR = 0.6;
   var CAM_BLEND = 0.9;
   // 第2期：止まっても砲塔はふりむかない（撃つ向きがいつも分かるように）。顔はCPUの戦車やねらいの印などで別に見せる
-  var CPU_GAP = { easy: 1.1, normal: 0.6, hard: 0.35 }; // CPUの1手の間隔（秒）
+  var CPU_GAP = { easy: 1.2, normal: 0.6, hard: 0.28 }; // CPUの1手の間隔（秒）。第2期 r2：差がはっきり出るように広げた
+  var CPU_DOUBT = { easy: 0.14, normal: 0.04, hard: 0 };  // まよう（立ち止まる・きょろきょろする）割合
   var CPU_WAIT0 = 0.4;   // 開始演出のあと、CPUが動き出すまでの間
-  var BREAK_COST = 2;    // 道さがし：壁を壊して進む手間（撃つ1手＋弾が飛ぶ間）。進む1手は1
+  // 道さがし：壁を壊して進む手間。進む1手は1。第2期 r2：2→30。30マスまでの遠回りなら壊さずに通る。
+  // 宝は囲まれているので最低限は壊すが、絵（字の線）をむだにくりぬかないように、いちばん薄い所を選ぶ
+  var BREAK_COST = 30;
   var PITCH_MAX = 1;     // 視点の上下（-1〜+1）
   var INTRO_HOLD = 2.0, INTRO_MOVE = 1.8; // 開始演出：真上から2秒見せて、斜め後ろへ寄せる
   var DEBRIS_MAX = 900, PUFF_MAX = 48;
@@ -56,6 +59,7 @@
     T.crayon = new THREE.CanvasTexture(c);
     T.crayon.wrapS = T.crayon.wrapT = THREE.RepeatWrapping;
     T.crayon.anisotropy = 4;
+    T.detail = buildDetailTexture();
 
     // ぼかした丸（影・煙・光）
     c = makeCanvas(64, 64); g = c.getContext('2d');
@@ -124,6 +128,162 @@
     T.desk.wrapS = T.desk.wrapT = THREE.RepeatWrapping;
   }
 
+  // ---------- 紙とクレヨンの質感（第2期 r2） ----------
+  // 起動時に1回だけ作る 256×256 のくり返し模様。色ではなく「明るさの手がかり」を3つのチャンネルに入れる：
+  //   R = 紙のざらつきと繊維（細かい）、G = クレヨンの塗りの筋（高い所＝ろうがのっている、低い所＝紙の目が見える）、
+  //   B = 大きなむら（ゆっくり変わる）。床と積み木のシェーダーで、地図の色に掛けあわせて使う（地図の色そのものは変えない）。
+  function buildDetailTexture() {
+    var N = 256;
+    function tiled(g, x, y, r, fn) { // 端をまたぐ形は反対側にも描く（つなぎ目が見えないように）
+      for (var ox = -N; ox <= N; ox += N) for (var oy = -N; oy <= N; oy += N) {
+        if (x + ox + r < 0 || x + ox - r > N || y + oy + r < 0 || y + oy - r > N) continue;
+        g.save(); g.translate(ox, oy); fn(); g.restore();
+      }
+    }
+    function layer(bg, draw) { var c = makeCanvas(N, N), g = c.getContext('2d'); g.fillStyle = bg; g.fillRect(0, 0, N, N); draw(g); return g.getImageData(0, 0, N, N).data; }
+    // R：紙の繊維
+    var R = layer('rgb(150,150,150)', function (g) {
+      g.lineCap = 'round';
+      for (var i = 0; i < 900; i++) {
+        var x = Math.random() * N, y = Math.random() * N, l = rand(3, 14), a = Math.random() * Math.PI * 2, bend = rand(-4, 4);
+        var light = Math.random() < 0.55;
+        g.strokeStyle = light ? 'rgba(255,255,255,' + rand(0.2, 0.45).toFixed(2) + ')' : 'rgba(40,40,40,' + rand(0.12, 0.3).toFixed(2) + ')';
+        g.lineWidth = rand(0.5, 1.3);
+        tiled(g, x, y, l + 4, function () {
+          g.beginPath(); g.moveTo(x, y);
+          g.quadraticCurveTo(x + Math.cos(a) * l * 0.5 - Math.sin(a) * bend, y + Math.sin(a) * l * 0.5 + Math.cos(a) * bend, x + Math.cos(a) * l, y + Math.sin(a) * l);
+          g.stroke();
+        });
+      }
+    });
+    // G：クレヨンでなぞった筋（ななめの平行線のまとまり。ところどころ かすれる）
+    var G = layer('rgb(150,150,150)', function (g) {
+      for (var k = 0; k < 80; k++) {
+        var cx = Math.random() * N, cy = Math.random() * N, ang = -0.62 + rand(-0.3, 0.3), len = rand(30, 90), n = Math.floor(rand(4, 10)), gap = rand(2.5, 4.5);
+        var ux = Math.cos(ang), uy = Math.sin(ang), vx = -uy, vy = ux;
+        for (var s = 0; s < n; s++) {
+          var off = (s - n / 2) * gap, sx = cx + vx * off - ux * len / 2, sy = cy + vy * off - uy * len / 2, l2 = len * rand(0.7, 1.05);
+          var bright = Math.random() < 0.8;
+          for (var t = 0; t < l2; t += 1.8) {
+            if (Math.random() < 0.22) continue; // かすれ
+            var px = sx + ux * t + rand(-0.6, 0.6), py = sy + uy * t + rand(-0.6, 0.6), sz = rand(2, 3.6);
+            g.fillStyle = bright ? 'rgba(255,255,255,' + rand(0.25, 0.55).toFixed(2) + ')' : 'rgba(60,60,60,' + rand(0.2, 0.4).toFixed(2) + ')';
+            tiled(g, px, py, 3, function () { g.fillRect(px, py, sz, sz * 0.7); });
+          }
+        }
+      }
+      // 紙の目（ろうがのらない小さな穴）
+      for (var i = 0; i < 1700; i++) { g.fillStyle = 'rgba(0,0,0,' + rand(0.15, 0.45).toFixed(2) + ')'; g.fillRect(Math.random() * N, Math.random() * N, rand(0.8, 1.8), rand(0.8, 1.4)); }
+    });
+    // B：大きなむら
+    var B = layer('rgb(128,128,128)', function (g) {
+      for (var i = 0; i < 46; i++) {
+        var x = Math.random() * N, y = Math.random() * N, r = rand(18, 70);
+        var gr = g.createRadialGradient(x, y, 0, x, y, r), col = Math.random() < 0.5 ? '255,255,255' : '0,0,0';
+        gr.addColorStop(0, 'rgba(' + col + ',' + rand(0.15, 0.3).toFixed(2) + ')'); gr.addColorStop(1, 'rgba(' + col + ',0)');
+        g.fillStyle = gr;
+        tiled(g, x, y, r, function () { g.fillRect(x - r, y - r, r * 2, r * 2); });
+      }
+    });
+    var c = makeCanvas(N, N), cg = c.getContext('2d'), img = cg.createImageData(N, N), d = img.data;
+    for (var p = 0; p < N * N * 4; p += 4) {
+      d[p] = clamp(R[p] + rand(-26, 26), 0, 255);
+      d[p + 1] = G[p];
+      d[p + 2] = B[p];
+      d[p + 3] = 255;
+    }
+    cg.putImageData(img, 0, 0);
+    var tex = new THREE.CanvasTexture(c);
+    tex.wrapS = tex.wrapT = THREE.RepeatWrapping;
+    tex.anisotropy = 4;
+    return tex;
+  }
+
+  // 床：地図の色 × 紙のざらつき × 白いクレヨンの筋 × 温かい白（画用紙の色）。明かりで白がとばないよう少しおさえる
+  var FLOOR_FRAG = [
+    '{',
+    '  vec2 fu = vUv * uRep;',
+    '  vec3 dt = texture2D(uDetail, fu).rgb;',
+    '  float mott = texture2D(uDetail, fu * 0.093 + vec2(0.31, 0.67)).b;',
+    '  float paper = 0.94 + 0.06 * dt.r;',
+    '  float wax = 1.0 - 0.07 * smoothstep(0.5, 0.95, dt.g);',
+    '  diffuseColor.rgb *= paper * wax * (0.96 + 0.06 * mott) * vec3(0.8, 0.778, 0.74);',
+    '}'
+  ].join('\n');
+  // 積み木：クレヨンで塗りつぶした面（筋とすき間から紙が少し見える）、上面と側面の明暗、出っぱったふちの柔らかいハイライト、足元のかげ
+  var BLOCK_VERT = [
+    '{',
+    '  vec4 cw = vec4(transformed, 1.0);',
+    '#ifdef USE_INSTANCING',
+    '  cw = instanceMatrix * cw;',
+    '  vCell = vec3(instanceMatrix[3].x - 0.5, instanceMatrix[1].y, instanceMatrix[3].z - 0.5);',
+    '#else',
+    '  vCell = vec3(0.0, 1.0, 0.0);',
+    '#endif',
+    '  vWP = (modelMatrix * cw).xyz;',
+    '  vNl = normal;',
+    '  vEdge = aEdge;',
+    '}'
+  ].join('\n');
+  var BLOCK_FRAG = [
+    '{',
+    '  float isTop = step(0.5, vNl.y);',
+    '  vec2 tc = isTop > 0.5 ? vWP.xz : (abs(vNl.x) > 0.5 ? vWP.zy : vWP.xy);',
+    '  vec3 dt = texture2D(uDetail, tc * 0.34, 0.7).rgb;',
+    // 辺の印（1=北 2=東 4=南 8=西）
+    '  float e = vEdge;',
+    '  float bN = mod(e, 2.0); e = floor(e / 2.0);',
+    '  float bE = mod(e, 2.0); e = floor(e / 2.0);',
+    '  float bS = mod(e, 2.0); e = floor(e / 2.0);',
+    '  float bW = mod(e, 2.0);',
+    // となりと接している（見えないはずの）側面は、上面と同じ明るさにする。
+    // となりの積み木との境目のすき間から内側の側面が見えて、壁の上に細い縦すじが出ていたため
+    '  float sideOpen = vNl.x > 0.5 ? bE : (vNl.x < -0.5 ? bW : (vNl.z < -0.5 ? bN : bS));',
+    '  float hidden = (1.0 - isTop) * (1.0 - sideOpen);',
+    // （明かりは頂点ごとに計算されるので、上面との日ざしの差も おおよそ埋める：環境光0.88＋日ざし0.5）
+    '  if (hidden > 0.5) diffuseColor.rgb *= 1.29 / ((abs(vNl.x) > 0.5 ? 0.62 : 0.72) * (0.88 + 0.5 * max(dot(vNl, vec3(-0.455, 0.827, -0.331)), 0.0)));',
+    '  float mott = texture2D(uDetail, tc * 0.11 + vec2(0.5, 0.2)).b;',
+    '  float shade = (isTop > 0.5 || hidden > 0.5) ? 1.0 : (abs(vNl.x) > 0.5 ? 0.62 : 0.72);',
+    '  vec3 paperC = vec3(0.86, 0.84, 0.8) * shade;',
+    '  float cov = mix(0.74, 1.0, smoothstep(0.22, 0.8, dt.g)) * mix(0.94, 1.0, mott);',
+    '  diffuseColor.rgb = mix(paperC, diffuseColor.rgb, cov);',
+    '  diffuseColor.rgb *= 0.93 + 0.1 * dt.r;',
+    '  float rim = 0.0;',
+    '  if (isTop > 0.5) {',
+    '    float lx = vWP.x - vCell.x, lz = vWP.z - vCell.z;',
+    '    rim = max(max(bN * (1.0 - smoothstep(0.0, 0.15, lz)), bS * (1.0 - smoothstep(0.0, 0.15, 1.0 - lz))),',
+    '              max(bW * (1.0 - smoothstep(0.0, 0.15, lx)), bE * (1.0 - smoothstep(0.0, 0.15, 1.0 - lx))));',
+    '  } else if (hidden < 0.5) {',
+    '    rim = (1.0 - smoothstep(0.0, 0.09, vCell.y - vWP.y)) * 0.55;',
+    '    diffuseColor.rgb *= mix(0.7, 1.0, smoothstep(0.0, 0.4, vWP.y));',
+    '  }',
+    '  rim *= 0.5 + 0.5 * smoothstep(0.2, 0.8, dt.g);',
+    '  diffuseColor.rgb += rim * 0.2 * vec3(1.0, 0.97, 0.9);',
+    '}'
+  ].join('\n');
+  // MeshLambertMaterial にクレヨンの質感を足す（描画命令の数は変わらない）
+  function crayonize(mat, mode, rep) {
+    var uDetail = { value: T.detail }, uRep = { value: rep || new THREE.Vector2(1, 1) };
+    mat.userData.uRep = uRep;
+    mat.onBeforeCompile = function (sh) {
+      sh.uniforms.uDetail = uDetail; sh.uniforms.uRep = uRep;
+      if (mode === 'floor') {
+        sh.fragmentShader = sh.fragmentShader
+          .replace('#include <common>', '#include <common>\nuniform sampler2D uDetail;\nuniform vec2 uRep;')
+          .replace('#include <map_fragment>', '#include <map_fragment>\n' + FLOOR_FRAG);
+      } else {
+        sh.vertexShader = sh.vertexShader
+          .replace('#include <common>', '#include <common>\nattribute float aEdge;\nvarying vec3 vWP;\nvarying vec3 vNl;\nvarying float vEdge;\nvarying vec3 vCell;')
+          .replace('#include <begin_vertex>', '#include <begin_vertex>\n' + BLOCK_VERT);
+        sh.fragmentShader = sh.fragmentShader
+          .replace('#include <common>', '#include <common>\nuniform sampler2D uDetail;\nvarying vec3 vWP;\nvarying vec3 vNl;\nvarying float vEdge;\nvarying vec3 vCell;')
+          .replace('#include <color_fragment>', '#include <color_fragment>\n' + BLOCK_FRAG);
+      }
+    };
+    mat.customProgramCacheKey = function () { return 'seecar-crayon-' + mode; };
+    return mat;
+  }
+
   // ---------- 角の丸い箱 ----------
   function roundedBox(w, h, d, r) {
     var s = new THREE.Shape();
@@ -153,24 +313,27 @@
       track: roundedBox(0.17, 0.2, 0.84, 0.07),
       wheel: new THREE.CylinderGeometry(0.075, 0.075, 0.03, 14),
       hub: new THREE.CylinderGeometry(0.035, 0.035, 0.035, 10),
-      turret: new THREE.SphereGeometry(0.2, 20, 14, 0, Math.PI * 2, 0, Math.PI * 0.55),
-      ring: new THREE.CylinderGeometry(0.2, 0.21, 0.05, 20),
+      turret: new THREE.SphereGeometry(0.235, 22, 16, 0, Math.PI * 2, 0, Math.PI * 0.55),
+      ring: new THREE.CylinderGeometry(0.235, 0.245, 0.05, 22),
       barrel: new THREE.CylinderGeometry(0.048, 0.055, 0.38, 14),
       muzzle: new THREE.CylinderGeometry(0.068, 0.068, 0.07, 14),
-      eye: new THREE.SphereGeometry(0.07, 14, 10),
-      pupil: new THREE.SphereGeometry(0.036, 10, 8),
+      eye: new THREE.SphereGeometry(0.082, 14, 10),
+      pupil: new THREE.SphereGeometry(0.042, 10, 8),
       shine: new THREE.SphereGeometry(0.013, 6, 5),
       cheek: new THREE.CircleGeometry(0.035, 12),
       hatch: new THREE.CylinderGeometry(0.07, 0.07, 0.03, 14),
-      antenna: new THREE.CylinderGeometry(0.008, 0.008, 0.22, 5),
+      antenna: new THREE.CylinderGeometry(0.009, 0.009, 0.34, 5),
+      flag: (function () { var sh = new THREE.Shape(); sh.moveTo(0, 0); sh.quadraticCurveTo(0.1, -0.01, 0.2, -0.045); sh.quadraticCurveTo(0.1, -0.075, 0, -0.11); sh.lineTo(0, 0); return new THREE.ShapeGeometry(sh); })(),
+      glow: new THREE.PlaneGeometry(1.08, 1.08),
       knob: new THREE.SphereGeometry(0.03, 8, 6),
       shadow: new THREE.PlaneGeometry(1.05, 1.15),
       marker: new THREE.ConeGeometry(0.5, 0.9, 16),
       lamp: new THREE.SphereGeometry(0.035, 8, 6),
       star: starGeometry(0.075, 0.032, 0.02),
-      fender: roundedBox(0.2, 0.05, 0.9, 0.022)
+      fender: roundedBox(0.2, 0.05, 0.84, 0.022)
     };
     tankGeo.shadow.rotateX(-Math.PI / 2);
+    tankGeo.glow.rotateX(-Math.PI / 2);
     tankGeo.marker.rotateX(Math.PI); // 下向きの矢印
   }
 
@@ -179,7 +342,7 @@
     var dark = col.clone().multiplyScalar(0.62);
     var light = col.clone().lerp(new THREE.Color('#ffffff'), 0.35);
     var mats = {
-      main: new THREE.MeshStandardMaterial({ color: col, roughness: 0.42, metalness: 0.05 }),
+      main: new THREE.MeshStandardMaterial({ color: col, roughness: 0.32, metalness: 0.05, emissive: col.clone().multiplyScalar(0.16) }), // 白い紙の上でも黒い壁の前でも色がはっきり出るよう、少し自分で光らせる
       dark: new THREE.MeshStandardMaterial({ color: dark, roughness: 0.5 }),
       light: new THREE.MeshStandardMaterial({ color: light, roughness: 0.4 }),
       track: new THREE.MeshStandardMaterial({ color: 0x2e2f36, roughness: 0.8 }),
@@ -189,7 +352,10 @@
       cheek: new THREE.MeshBasicMaterial({ color: 0xff8fa8, transparent: true, opacity: 0.85 }),
       yellow: new THREE.MeshStandardMaterial({ color: 0xffd23f, roughness: 0.3, emissive: 0x332200 }),
       shadow: new THREE.MeshBasicMaterial({ map: T.soft, color: 0x000000, transparent: true, opacity: 0.38, depthWrite: false }),
-      marker: new THREE.MeshBasicMaterial({ color: col, transparent: true, opacity: 0.95, depthTest: false })
+      marker: new THREE.MeshBasicMaterial({ color: col, transparent: true, opacity: 0.95, depthTest: false }),
+      outline: new THREE.MeshBasicMaterial({ color: 0x1d1b22, side: THREE.BackSide }), // クレヨンでふちどりしたような黒い線
+      flag: new THREE.MeshLambertMaterial({ color: col, side: THREE.DoubleSide, emissive: col.clone().multiplyScalar(0.25) }),
+      glow: new THREE.MeshBasicMaterial({ map: T.soft, color: col, transparent: true, opacity: 0.42, depthWrite: false })
     };
     var G = tankGeo;
     var root = new THREE.Group();      // 位置・向き
@@ -203,6 +369,7 @@
     var wheels = [];
     [-1, 1].forEach(function (side) {
       var tr = M(G.track, mats.track, side * 0.31, 0.11, 0); hull.add(tr);
+      var tro = M(G.track, mats.outline, side * 0.31, 0.11, 0); tro.scale.set(1.14, 1.1, 1.04); hull.add(tro);
       for (var k = 0; k < 3; k++) {
         var wz = -0.25 + k * 0.25;
         var wh = M(G.wheel, mats.wheel, side * 0.405, 0.11, wz); wh.rotation.z = Math.PI / 2; hull.add(wh); wheels.push(wh);
@@ -213,6 +380,7 @@
     hull.add(M(G.fender, mats.light, -0.31, 0.225, 0)); hull.add(M(G.fender, mats.light, 0.31, 0.225, 0));
     // 車体
     var body = M(G.body, mats.main, 0, 0.28, 0); body.rotation.y = 0; hull.add(body);
+    var bodyO = M(G.body, mats.outline, 0, 0.28, 0); bodyO.scale.set(1.07, 1.1, 1.05); hull.add(bodyO);
     // 後ろの黄色い星（おいかけ視点で見える。顔ではないので向きを取りちがえない）
     var backStar = M(G.star, mats.yellow, 0, 0.3, 0.375); hull.add(backStar);
     // 前のライト
@@ -222,16 +390,19 @@
     var turret = new THREE.Group(); turret.position.set(0, 0.41, 0.06); hull.add(turret);
     turret.add(M(G.ring, mats.dark, 0, 0.0, 0));
     var dome = M(G.turret, mats.main, 0, 0.02, 0); dome.scale.set(1, 0.95, 1.05); turret.add(dome);
-    turret.add(M(G.hatch, mats.light, 0, 0.21, 0.03));
-    var ant = M(G.antenna, mats.track, 0.11, 0.24, 0.12); turret.add(ant);
-    turret.add(M(G.knob, mats.yellow, 0.11, 0.35, 0.12));
+    var domeO = M(G.turret, mats.outline, 0, 0.02, 0); domeO.scale.set(1.07, 1.02, 1.12); turret.add(domeO);
+    turret.add(M(G.hatch, mats.light, 0, 0.24, 0.03));
+    var ant = M(G.antenna, mats.track, 0.13, 0.32, 0.13); turret.add(ant);
+    turret.add(M(G.knob, mats.yellow, 0.13, 0.5, 0.13));
+    // 旗（チームの色）：遠くからでも、どちらの戦車か分かる
+    var flag = M(G.flag, mats.flag, 0.13, 0.47, 0.13); flag.rotation.y = -Math.PI / 2; turret.add(flag); // 後ろへなびく
     // 顔（目とほっぺ）は砲塔＝頭の前に付ける（砲塔は ふりむかない）
-    var eyes = new THREE.Group(); eyes.position.set(0, 0.155, -0.165); eyes.rotation.x = -0.35; turret.add(eyes);
+    var eyes = new THREE.Group(); eyes.position.set(0, 0.175, -0.19); eyes.rotation.x = -0.35; turret.add(eyes);
     [-1, 1].forEach(function (side) {
-      var e = M(G.eye, mats.white, side * 0.085, 0, 0); e.scale.set(0.9, 1.05, 0.55); eyes.add(e);
-      var p = M(G.pupil, mats.black, side * 0.08, -0.005, -0.036); p.scale.set(1, 1.2, 0.6); eyes.add(p);
-      var s = M(G.shine, mats.white, side * 0.07, 0.02, -0.055); eyes.add(s);
-      var ck = M(G.cheek, mats.cheek, side * 0.155, -0.07, 0.03); ck.rotation.y = Math.PI - side * 0.6; eyes.add(ck);
+      var e = M(G.eye, mats.white, side * 0.095, 0, 0); e.scale.set(0.9, 1.05, 0.55); eyes.add(e);
+      var p = M(G.pupil, mats.black, side * 0.09, -0.005, -0.042); p.scale.set(1, 1.2, 0.6); eyes.add(p);
+      var s = M(G.shine, mats.white, side * 0.078, 0.024, -0.063); s.scale.setScalar(1.3); eyes.add(s);
+      var ck = M(G.cheek, mats.cheek, side * 0.175, -0.08, 0.03); ck.rotation.y = Math.PI - side * 0.6; eyes.add(ck);
     });
     // 砲身（少し上向き）
     var gun = new THREE.Group(); gun.position.set(0, 0.07, -0.1); gun.rotation.x = 0.12; turret.add(gun);
@@ -240,11 +411,13 @@
     var muzzle = M(G.muzzle, mats.dark, 0, 0, -0.38); muzzle.rotation.x = Math.PI / 2; barrelPivot.add(muzzle);
     // 足元の柔らかい影
     var shadow = new THREE.Mesh(G.shadow, mats.shadow); shadow.position.y = 0.012; shadow.renderOrder = 1; root.add(shadow);
+    // 足元のチーム色の光（1マスの中）。白い紙の上で自分の戦車がすぐ見つかるように
+    var glow = new THREE.Mesh(G.glow, mats.glow); glow.position.y = 0.016; glow.renderOrder = 2; root.add(glow);
     // 俯瞰のときの目じるし
     var marker = new THREE.Mesh(G.marker, mats.marker); marker.renderOrder = 10; marker.visible = false; root.add(marker);
 
     return {
-      root: root, bump: bump, hull: hull, turret: turret, barrel: barrelPivot, wheels: wheels, eyes: eyes, marker: marker, mats: mats,
+      root: root, bump: bump, hull: hull, turret: turret, barrel: barrelPivot, wheels: wheels, eyes: eyes, marker: marker, mats: mats, flag: flag,
       colorStr: colorStr,
       x: 0, z: 0, y: 0, heading: 0, // 表示の位置（マス単位）
       wobble: 0, recoil: 0, blink: rand(1, 4), wheelRot: 0, moving: false, tilt: 0, hop: 0
@@ -261,6 +434,9 @@
     tk.mats.dark.color.copy(col).multiplyScalar(0.62);
     tk.mats.light.color.copy(col).lerp(new THREE.Color('#ffffff'), 0.35);
     tk.mats.marker.color.copy(col);
+    tk.mats.main.emissive.copy(col).multiplyScalar(0.16);
+    tk.mats.flag.color.copy(col); tk.mats.flag.emissive.copy(col).multiplyScalar(0.25);
+    tk.mats.glow.color.copy(col);
     tk.colorStr = colorStr;
   }
   // 毎フレームの小さな動き（ゆれ・反動・まばたき・車輪）
@@ -286,6 +462,7 @@
     if (tk.blink < 0) tk.blink = rand(2, 5);
     tk.eyes.scale.y = ey;
     tk.turret.rotation.y = 0; // 砲塔はいつも車体と同じ前を向く（撃つ向き）
+    tk.flag.rotation.y = -Math.PI / 2 + Math.sin(time * (tk.moving ? 11 : 4)) * (tk.moving ? 0.45 : 0.22); // 旗がはためく
   }
 
   // ---------- 状態 ----------
@@ -628,6 +805,7 @@
     S.camMode = 1; S.intro = { t: 0 }; S.topFlag = null; // 開始演出のあと斜め後ろ（1）へ
     var pose = poseFor(2);
     S.camera.position.copy(pose.p); S.camera.quaternion.copy(pose.q);
+    fitNear();
     if (!S.running) render();
   }
 
@@ -667,7 +845,12 @@
       cols[i * 3] = cols[i * 3 + 1] = cols[i * 3 + 2] = v;
     }
     geo.setAttribute('color', new THREE.BufferAttribute(cols, 3));
-    var mat = new THREE.MeshLambertMaterial({ map: T.crayon, vertexColors: true });
+    // 出っぱったふち（となりが低い辺）の印：ふちにだけ柔らかいハイライトを入れる
+    var edgeArr = new Float32Array(Math.max(1, n));
+    var edgeAttr = new THREE.InstancedBufferAttribute(edgeArr, 1);
+    edgeAttr.setUsage(THREE.DynamicDrawUsage);
+    geo.setAttribute('aEdge', edgeAttr);
+    var mat = crayonize(new THREE.MeshLambertMaterial({ vertexColors: true }), 'block');
     var mesh = new THREE.InstancedMesh(geo, mat, Math.max(1, n));
     mesh.instanceMatrix.setUsage(THREE.DynamicDrawUsage);
     var cellToInst = new Int32Array(w * h).fill(-1);
@@ -681,50 +864,89 @@
       // 積み木は側面も含めて地図の色で塗る。壁（高さ10）と黒に近い色だけ黒にする
       blockColor(c, hh);
       mesh.setColorAt(k, c);
+      edgeArr[k] = edgeMask(x, z);
       cellToInst[i] = k++;
     }
     if (n === 0) { mesh.setMatrixAt(0, m.makeScale(0, 0, 0)); mesh.setColorAt(0, c.set(1, 1, 1)); }
     mesh.instanceMatrix.needsUpdate = true;
     if (mesh.instanceColor) mesh.instanceColor.needsUpdate = true;
     add(mesh);
-    L.terrain = mesh; L.cellToInst = cellToInst;
+    L.terrain = mesh; L.cellToInst = cellToInst; L.edgeAttr = edgeAttr;
     L.dispose.push(geo, mat);
   }
+  // となりが低い（または地図の外）辺：1=北(z-1) 2=東(x+1) 4=南(z+1) 8=西(x-1)
+  function edgeMask(x, z) {
+    var hh = S.heights[idx(x, z)], m = 0;
+    for (var d = 0; d < 4; d++) {
+      var nx = x + DX[d], nz = z + DZ[d];
+      if (!inMap(nx, nz) || S.heights[idx(nx, nz)] < hh) m |= 1 << d;
+    }
+    return m;
+  }
 
-  // 床：地図の色から作ったCanvasTexture（影とクレヨンのざらざらも描きこむ）
+  // 床：地図の色から作ったCanvasTexture（影・マスの手描き線・壁ぎわのクレヨンのにじみ）。
+  // 紙のざらつきとクレヨンの筋は、細かいのでシェーダー（crayonize 'floor'）で重ねる。
   function buildFloor(L, add) {
     var w = S.w, h = S.h;
     var px = clamp(Math.floor(1024 / Math.max(w, h)), 4, 16);
     var small = makeCanvas(w, h), big = makeCanvas(w * px, h * px);
     L.floorSmall = small; L.floorBig = big; L.floorPx = px;
-    L.floorPattern = big.getContext('2d').createPattern(T.crayonCanvas, 'repeat');
+    L.floorGrid = buildGridLayer(w, h, px);
     var tex = new THREE.CanvasTexture(big);
     tex.anisotropy = 4;
     L.floorTex = tex;
     paintFloor();
     var fg = new THREE.PlaneGeometry(w, h); fg.rotateX(-Math.PI / 2);
-    var fm = new THREE.MeshLambertMaterial({ map: tex });
+    var fm = crayonize(new THREE.MeshLambertMaterial({ map: tex }), 'floor', new THREE.Vector2(w / 2, h / 2)); // 2マスで模様1つ
     var floor = new THREE.Mesh(fg, fm); floor.position.set(w / 2, 0, h / 2);
     add(floor);
-    // 紙のふち（少し影）と机
-    var eg = new THREE.PlaneGeometry(w + 1.2, h + 1.2); eg.rotateX(-Math.PI / 2);
-    var em = new THREE.MeshBasicMaterial({ color: 0x8a7458, transparent: true, opacity: 0.35, depthWrite: false });
-    var edge = new THREE.Mesh(eg, em); edge.position.set(w / 2 + 0.25, -0.02, h / 2 + 0.25); add(edge);
+    // 紙のふちの影：紙の外側だけの「わく」の形にする。
+    // （前は紙の下に全面の板を置いていたため、上から遠く見ると奥行きの精度が足りず、紙の上に斜めの灰色の三角形として出ていた）
+    var es = new THREE.Shape();
+    es.moveTo(-0.35, -0.35); es.lineTo(w + 0.85, -0.35); es.lineTo(w + 0.85, h + 0.85); es.lineTo(-0.35, h + 0.85); es.lineTo(-0.35, -0.35);
+    var hole = new THREE.Path();
+    hole.moveTo(0, 0); hole.lineTo(0, h); hole.lineTo(w, h); hole.lineTo(w, 0); hole.lineTo(0, 0);
+    es.holes.push(hole);
+    var eg = new THREE.ShapeGeometry(es); eg.rotateX(Math.PI / 2);
+    var em = new THREE.MeshBasicMaterial({ color: 0x8a7458, transparent: true, opacity: 0.35, depthWrite: false, side: THREE.DoubleSide });
+    var edge = new THREE.Mesh(eg, em); edge.position.y = -0.01; add(edge);
     var size = Math.max(w, h) * 6 + 200;
     var dg = new THREE.PlaneGeometry(size, size); dg.rotateX(-Math.PI / 2);
     var dtex = T.desk.clone(); dtex.needsUpdate = true; dtex.repeat.set(size / 12, size / 12);
     var dm = new THREE.MeshLambertMaterial({ map: dtex });
-    var desk = new THREE.Mesh(dg, dm); desk.position.set(w / 2, -0.05, h / 2); add(desk);
+    var desk = new THREE.Mesh(dg, dm); desk.position.set(w / 2, -0.4, h / 2); add(desk); // 紙から十分はなす（重なってちらつかないように）
     L.dispose.push(tex, fg, fm, eg, em, dg, dm, dtex);
   }
 
-  function paintFloor() {
-    var L = S.level, w = S.w, h = S.h;
+  // マスの境目の、ごく淡い手描きの鉛筆線（少しゆれる）。地図ごとに1回だけ作る
+  function buildGridLayer(w, h, px) {
+    var c = makeCanvas(w * px, h * px), g = c.getContext('2d');
+    g.lineCap = 'round'; g.lineJoin = 'round';
+    function line(horiz, i) {
+      var len = horiz ? w : h, base = i * px + rand(-0.4, 0.4), drift = 0;
+      g.strokeStyle = 'rgba(112,98,82,' + rand(0.045, 0.085).toFixed(3) + ')';
+      g.lineWidth = rand(0.7, 1.1);
+      g.beginPath();
+      for (var t = 0; t <= len; t += 1.5) {
+        drift = clamp(drift + rand(-0.25, 0.25), -0.7, 0.7);
+        var a = t * px, b = base + drift;
+        if (t === 0) { if (horiz) g.moveTo(a, b); else g.moveTo(b, a); } else if (horiz) g.lineTo(a, b); else g.lineTo(b, a);
+      }
+      g.stroke();
+    }
+    for (var x = 1; x < w; x++) line(false, x);
+    for (var z = 1; z < h; z++) line(true, z);
+    return c;
+  }
+
+  // dirty（任意）：[x0,z0, x1,z1, ...] 壊れたマス。そのまわりだけ描き直す
+  function paintFloor(dirty) {
+    var L = S.level, w = S.w, h = S.h, px = L.floorPx;
     var sctx = L.floorSmall.getContext('2d');
     var img = sctx.createImageData(w, h), d = img.data;
     for (var z = 0; z < h; z++) for (var x = 0; x < w; x++) {
       var i = z * w + x, hh = S.heights[i], r, g, b;
-      if (S.destroyed[i]) { r = 236; g = 230; b = 218; }
+      if (S.destroyed[i]) { r = 232; g = 225; b = 212; } // 壊したあと：消しゴムでこすったような跡
       else if (hh > 1) { r = 40; g = 40; b = 42; } // 積み木の下：にじんで足元の影になる
       else {
         r = S.colors[i * 3]; g = S.colors[i * 3 + 1]; b = S.colors[i * 3 + 2];
@@ -736,7 +958,7 @@
       var sh = 1;
       for (var k = 1; k <= 4; k++) {
         var hx = vis(hAt(x - k, z - k)) - vis(hh);
-        if (hx > k * 0.35) { sh = Math.min(sh, 0.7 + k * 0.04); break; }
+        if (hx > k * 0.35) { sh = Math.min(sh, 0.72 + k * 0.045); break; }
       }
       // まわりが高いとほんのり暗く（すみっこの影）
       var ao = 0;
@@ -746,15 +968,42 @@
     }
     sctx.putImageData(img, 0, 0);
     var big = L.floorBig, g2 = big.getContext('2d');
+    // 描き直す範囲（マス）
+    var x0 = 0, z0 = 0, x1 = w - 1, z1 = h - 1;
+    if (dirty && dirty.length) {
+      x0 = w; z0 = h; x1 = 0; z1 = 0;
+      for (var q = 0; q < dirty.length; q += 2) { x0 = Math.min(x0, dirty[q]); x1 = Math.max(x1, dirty[q]); z0 = Math.min(z0, dirty[q + 1]); z1 = Math.max(z1, dirty[q + 1]); }
+      x0 = Math.max(0, x0 - 2); z0 = Math.max(0, z0 - 2); x1 = Math.min(w - 1, x1 + 5); z1 = Math.min(h - 1, z1 + 5); // 影は右下へ4マスまで
+    }
+    g2.save();
+    g2.beginPath(); g2.rect(x0 * px, z0 * px, (x1 - x0 + 1) * px, (z1 - z0 + 1) * px); g2.clip();
     g2.globalCompositeOperation = 'source-over';
+    g2.globalAlpha = 1;
     g2.imageSmoothingEnabled = true;
     g2.drawImage(L.floorSmall, 0, 0, big.width, big.height);
-    g2.globalCompositeOperation = 'multiply';
-    g2.globalAlpha = 0.55;
-    g2.fillStyle = L.floorPattern;
-    g2.fillRect(0, 0, big.width, big.height);
-    g2.globalAlpha = 1;
-    g2.globalCompositeOperation = 'source-over';
+    g2.drawImage(L.floorGrid, 0, 0);
+    // 壁ぎわのクレヨンのにじみ：床のマスのうち、となりが積み木の辺に、少しゆれた濃い線
+    g2.lineCap = 'round';
+    g2.strokeStyle = 'rgba(38,36,34,0.2)';
+    g2.lineWidth = Math.max(1, px * 0.2);
+    g2.beginPath();
+    for (z = z0; z <= z1; z++) for (x = x0; x <= x1; x++) {
+      var hh2 = S.heights[z * w + x];
+      if (hh2 > 1) continue;
+      for (var dd = 0; dd < 4; dd++) {
+        var nx = x + DX[dd], nz = z + DZ[dd];
+        if (!inMap(nx, nz) || S.heights[nz * w + nx] <= 1) continue;
+        // 辺の両はし（ピクセル）。少し床側へ寄せ、ゆらす
+        var ax, az, bx, bz, inset = px * 0.12;
+        if (dd === 0) { ax = x; az = z; bx = x + 1; bz = z; } else if (dd === 2) { ax = x; az = z + 1; bx = x + 1; bz = z + 1; }
+        else if (dd === 1) { ax = x + 1; az = z; bx = x + 1; bz = z + 1; } else { ax = x; az = z; bx = x; bz = z + 1; }
+        var ix = -DX[dd] * inset, iz = -DZ[dd] * inset;
+        g2.moveTo(ax * px + ix + rand(-0.5, 0.5), az * px + iz + rand(-0.5, 0.5));
+        g2.lineTo(bx * px + ix + rand(-0.5, 0.5), bz * px + iz + rand(-0.5, 0.5));
+      }
+    }
+    g2.stroke();
+    g2.restore();
     L.floorTex.needsUpdate = true;
   }
 
@@ -833,7 +1082,7 @@
   function destroyCells(cells, withFx) {
     var L = S.level; if (!L) return [];
     var done = [], zero = new THREE.Matrix4().makeScale(0, 0, 0), c = new THREE.Color(), changed = false;
-    var cx = 0, cz = 0, cy = 0, cnt = 0;
+    var cx = 0, cz = 0, cy = 0, cnt = 0, dirty = [];
     for (var k = 0; k < cells.length; k++) {
       var x = cells[k][0] | 0, z = cells[k][1] | 0;
       if (!inMap(x, z)) continue;
@@ -856,9 +1105,16 @@
         S.heights[i] = 0; S.destroyed[i] = 1; changed = true;
         var inst = L.cellToInst[i];
         if (inst >= 0) L.terrain.setMatrixAt(inst, zero); // そのマスの行列だけ更新
+        for (var dd = 0; dd < 4; dd++) { // となりの積み木に、新しく出たふちのハイライトを足す
+          var ex = x + DX[dd], ez = z + DZ[dd];
+          if (!inMap(ex, ez)) continue;
+          var ni = L.cellToInst[idx(ex, ez)];
+          if (ni >= 0 && S.heights[idx(ex, ez)] > 1) { L.edgeAttr.array[ni] = edgeMask(ex, ez); L.edgeAttr.needsUpdate = true; }
+        }
+        dirty.push(x, z);
       }
     }
-    if (changed) { L.terrain.instanceMatrix.needsUpdate = true; paintFloor(); S.mapVer++; }
+    if (changed) { L.terrain.instanceMatrix.needsUpdate = true; paintFloor(dirty); S.mapVer++; }
     if (withFx && cnt) {
       cx /= cnt; cz /= cnt;
       spawnBurst(cx, Math.max(0.3, cy * 0.5), cz, true);
@@ -1142,6 +1398,8 @@
   }
   function updateCpu(dt) {
     var c = S.cpu; if (!c) return;
+    // どちらかが見つけたら、CPUはその場でぴたっと止まる（動きかけの1マスも進めない）
+    if (S.found && (c.move || c.turn)) { c.move = null; c.turn = null; }
     stepActor(c, dt);
     var ai = c.ai;
     ai.time += dt;
@@ -1152,6 +1410,14 @@
     if (!ai.plan || !ai.plan.length || ai.ver !== S.mapVer) { ai.plan = planPath(c); ai.ver = S.mapVer; }
     if (!ai.plan || !ai.plan.length) { ai.wait = ai.gap; return; }
     var step = ai.plan[0];
+    // まよい（おもに やさしい）：前へ進む前に、ときどき立ち止まったり、きょろきょろ（左右を見て戻る）したりする
+    if (step === 'F' && !ai.doubted && Math.random() < CPU_DOUBT[ai.level]) {
+      ai.doubted = true;
+      if (Math.random() < 0.5) { ai.wait = ai.gap; return; }
+      var look = Math.random() < 0.5 ? ['L', 'R'] : ['R', 'L'];
+      ai.plan.unshift(look[0], look[1]);
+      step = ai.plan[0];
+    } else if (step === 'F') ai.doubted = false;
     if (step === 'S') {
       if (c.fireCd > 0) return; // 撃てるようになったらすぐ
       ai.plan.shift(); fire(c);
@@ -1279,6 +1545,13 @@
     try { sfx('tap'); } catch (e) { }
   }
   var shakeV = new THREE.Vector3();
+  // 奥行きの精度：カメラが高い（そら視点）ほど、手前の切りとり面を遠くする。
+  // near=0.05 のまま高さ100以上から見ると、紙（高さ0）と紙のふちの影（-0.02）の奥行きの差が精度より小さくなり、
+  // 三角形の片方だけ影が勝って「斜めの灰色の三角形」になっていた。地面の物はカメラから (高さ-2) 以上はなれているので安全。
+  function fitNear() {
+    var want = Math.max(0.05, (S.camera.position.y - 10) * 0.25);
+    if (Math.abs(want - S.camera.near) > S.camera.near * 0.03 + 1e-4) { S.camera.near = want; S.camera.updateProjectionMatrix(); }
+  }
   function updateCamera(dt) {
     if (!S.camera) return;
     S.chaseLift += (chaseLiftTarget() - S.chaseLift) * (1 - Math.exp(-dt * 5));
@@ -1315,6 +1588,7 @@
       S.shakeOff = shakeV;
       S.shake *= Math.exp(-dt * 6);
     } else { S.shake = 0; S.shakeOff = null; }
+    fitNear();
     // 1人称のときは自分の戦車を隠す（カメラが中に入るため）
     if (S.me) S.me.tank.root.visible = !(S.camMode === 0 && S.camBlendT > 0.55);
     // 俯瞰のときの目じるし
