@@ -42,7 +42,7 @@
 
   // ---------- 解析 ----------
   // 画素(pw x ph)のRGBA -> MapData（絵の部分）。picture/title/reading は呼び出し側で入れる。
-  function analyze(rgba, pw, ph) {
+  function analyze(rgba, pw, ph, darkL) {
     var w = pw * BLOCK, h = ph * BLOCK, n = w * h;
     var heights = new Uint8Array(n), colors = new Uint8Array(n * 3);
     var px, pz, i, j, dx, dz;
@@ -55,6 +55,8 @@
         var g = Math.round(rgba[p + 1] * a + 255 * (1 - a));
         var b = Math.round(rgba[p + 2] * a + 255 * (1 - a));
         var L = (0.299 * r + 0.587 * g + 0.114 * b) / 255;
+        // 高さは「その画素が受け持つ範囲で一番濃い色」で決める（縮小で細い線が薄れて壁が途切れるのを防ぐ）
+        if (darkL) L = Math.min(L, darkL[pz * pw + px]);
         var hh = Math.round((1 - L) * 10);
         if (hh < 0) hh = 0; if (hh > 10) hh = 10;
         for (dz = 0; dz < BLOCK; dz++) {
@@ -199,10 +201,35 @@
     var small = shrink(pic, pic.width, pic.height, MAX_LONG);
     var pw = small.width, ph = small.height;
     var rgba = small.getContext('2d').getImageData(0, 0, pw, ph).data;
-    var map = analyze(rgba, pw, ph);
+    var map = analyze(rgba, pw, ph, darkest(src, sw, sh, pw, ph));
     map.title = title; map.reading = reading;
     map.picture = pic.toDataURL('image/jpeg', 0.82);
     return map;
+  }
+  // 元画像（長辺2048まで）を見て、縮小後の各画素が受け持つ範囲の最も暗い輝度を求める。
+  // 3x3 の近傍で2番目に暗い値を使い、写真の1画素だけの汚れは拾わない。
+  function darkest(src, sw, sh, pw, ph) {
+    var big = shrink(src, sw, sh, 2048), bw = big.width, bh = big.height;
+    var d = big.getContext('2d').getImageData(0, 0, bw, bh).data;
+    var lum = new Float32Array(bw * bh), i;
+    for (i = 0; i < bw * bh; i++) {
+      var a = d[i * 4 + 3] / 255;
+      lum[i] = ((0.299 * d[i * 4] + 0.587 * d[i * 4 + 1] + 0.114 * d[i * 4 + 2]) * a + 255 * (1 - a)) / 255;
+    }
+    var out = new Float32Array(pw * ph);
+    for (var pz = 0; pz < ph; pz++) {
+      var z0 = Math.floor(pz * bh / ph), z1 = Math.max(z0 + 1, Math.floor((pz + 1) * bh / ph));
+      for (var px = 0; px < pw; px++) {
+        var x0 = Math.floor(px * bw / pw), x1 = Math.max(x0 + 1, Math.floor((px + 1) * bw / pw));
+        var m1 = 1, m2 = 1;
+        for (var z = z0; z < z1; z++) for (var x = x0; x < x1; x++) {
+          var v = lum[z * bw + x];
+          if (v < m1) { m2 = m1; m1 = v; } else if (v < m2) m2 = v;
+        }
+        out[pz * pw + px] = (z1 - z0) * (x1 - x0) > 1 ? m2 : m1;
+      }
+    }
+    return out;
   }
   function fromCanvas(canvas, title, reading) {
     return build(canvas, canvas.width, canvas.height, title || 'よみこんだ え', reading || 'よみこんだ え');
