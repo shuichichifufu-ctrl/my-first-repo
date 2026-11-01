@@ -220,20 +220,34 @@
       }
       return best;
     }
+    // 前方に見える黒い壁（高さ10）の数：おいかけ視点で、出発してすぐ迷路（字の形）が画面に入る所を選ぶため
+    function wallsAhead(c, d) {
+      var cx = c % w, cz = (c - cx) / w, cnt = 0, rx = DZ[d] === 0 ? 0 : 1, rz = DX[d] === 0 ? 0 : 1;
+      for (var f = 3; f <= 18; f++) for (var sd = -7; sd <= 7; sd++) {
+        var qx = cx + DX[d] * f + rx * sd, qz = cz + DZ[d] * f + rz * sd;
+        if (qx >= 0 && qz >= 0 && qx < w && qz < h && heights[qz * w + qx] >= WALL_H) cnt++;
+      }
+      return cnt;
+    }
     if (picked) {
-      // 前方がひらけ、宝のほうを向ける所だけに絞り、宝から ほどよい遠さ（遠すぎず近すぎず）の所を選ぶ
-      var WANT = Math.min(35, 0.3 * Math.sqrt(w * w + h * h)), good = [], open = [];
+      // 前方がひらけ、宝のほうを向ける所だけに絞り、宝から ほどよい遠さ（遠すぎず近すぎず）で、
+      // 前方に黒い壁が見え、宝の方向をまっすぐ向ける所を選ぶ
+      var WANT = Math.min(22, 0.2 * Math.sqrt(w * w + h * h)), good = [], open = [];
       picked.forEach(function (c) {
         var bd = dirFor(c); if (!bd) return;
         open.push(c);
         var dist = Math.sqrt(d2(c, tI));
-        if (bd.cs >= 0.5 && dist >= 8) good.push({ c: c, key: Math.abs(dist - WANT) });
+        if (bd.cs >= 0.5 && dist >= 8) good.push({ c: c, key: Math.abs(dist - WANT) + (1 - bd.cs) * 16 - Math.min(wallsAhead(c, bd.d), 90) * 0.12 });
       });
       good.sort(function (p, q) { return p.key - q.key; });
       if (good.length) s0 = good[0].c; else s0 = farthest(tI, open.length ? open : picked);
-      var pool2 = good.length > 1 ? good.map(function (g) { return g.c; }) : (open.length > 1 ? open : picked);
-      pool2 = pool2.filter(function (c) { return c !== s0; });
-      s1 = pool2.length ? farthest(s0, pool2) : s0;
+      // ゲスト：ホストから離れた（12マス以上）中で、いちばん条件のよい所
+      var SEP = 12 * 12; s1 = -1;
+      for (k = 0; k < good.length; k++) if (good[k].c !== s0 && d2(good[k].c, s0) >= SEP) { s1 = good[k].c; break; }
+      if (s1 < 0) {
+        var pool2 = (open.length > 1 ? open : picked).filter(function (c) { return c !== s0; });
+        s1 = pool2.length ? farthest(s0, pool2) : s0;
+      }
     }
     function runLen(cell, d) {
       var cx = cell % w, cz = (cell - cx) / w, run = 0, ph = heights[cell];
@@ -245,7 +259,6 @@
       }
       return run;
     }
-    if (d2(s0, 0) > d2(s1, 0)) { var t2 = s0; s0 = s1; s1 = t2; }
 
     // --- 向き：すぐ前に進める所が長く続く向き。同じなら宝の方へ ---
     function pickDir(cell) {
