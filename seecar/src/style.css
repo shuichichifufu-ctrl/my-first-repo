@@ -85,7 +85,8 @@ body[data-state=play] #play,body[data-state=ending] #ending,body[data-state=quit
 body[data-state=quit] #quit .center{padding-bottom:14cqmin}
 
 /* ---------- 進行ボタン #nav（全画面で同じ大きさ・同じホップ） ---------- */
-#nav{position:absolute;left:0;right:0;bottom:4cqmin;display:flex;justify-content:center;align-items:flex-end;gap:5cqmin;z-index:50;pointer-events:none}
+#nav{position:absolute;left:0;right:0;bottom:4cqmin;display:flex;flex-wrap:wrap;justify-content:center;align-items:flex-end;gap:5cqmin;z-index:50;pointer-events:none}
+.brk{flex-basis:100%;height:0}
 .nbtn{pointer-events:auto;display:flex;align-items:center;justify-content:center;gap:2cqmin;width:64cqmin;height:16cqmin;border-radius:8cqmin;
   font-size:6.4cqmin;line-height:1;white-space:nowrap;border:.8cqmin solid #fff;box-shadow:0 1.3cqmin 0 rgba(20,40,100,.3);animation:hop 1.15s ease-in-out infinite}
 .nbtn i{display:block;width:8cqmin;height:8cqmin;flex:none}
@@ -142,11 +143,9 @@ body[data-state=quit] #quit .center{padding-bottom:14cqmin}
 @keyframes dot{0%,100%{opacity:.2}50%{opacity:1}}
 
 .sub-pick{gap:4cqmin;align-items:stretch}
-.pickgrid{flex:1.25;display:grid;grid-template-columns:repeat(var(--cols,2),1fr);grid-auto-rows:1fr;gap:3cqmin;min-width:0}
 .card{position:relative;border-radius:4cqmin;background:#fff;border:.8cqmin solid #fff;box-shadow:0 1.1cqmin 0 rgba(20,40,100,.28);display:flex;flex-direction:column;align-items:center;justify-content:center;gap:.8cqmin;overflow:hidden;color:#1f5fd9}
 .card .kan{font-size:8.4cqmin;line-height:1.1;font-weight:900;letter-spacing:.04em;color:#12327a}
 .card .yomi{font-size:3.5cqmin;color:#4a6aa8}
-.pickgrid.c3 .kan{font-size:6cqmin}.pickgrid.c3 .yomi{font-size:2.8cqmin}
 .card.on{background:linear-gradient(#fff9c4,#ffe45e);border-color:#ff9f1c;box-shadow:0 1.1cqmin 0 rgba(255,140,0,.5)}
 .card.file{background:linear-gradient(#fff,#e3f3ff)}
 .card.file svg{width:11cqmin;height:11cqmin}
@@ -223,3 +222,110 @@ body.camtop #maptag{opacity:0} /* 真上のときは地図の上はしと戦車�
 #confetti i{position:absolute;top:-6cqmin;width:2cqmin;height:3.2cqmin;opacity:.9;animation:fall linear infinite}
 @keyframes fall{to{transform:translateY(112cqmin) rotate(540deg)}}
 .endpic img.pix{image-rendering:crisp-edges;image-rendering:pixelated} /* 小さい絵は拡大しても画素をくっきり */
+
+/* =====================================================================
+   第2期：タイトル・難しさ・地図えらび・せってい・結果を おなじデザインに そろえる
+   ぜんぶ「白ふち＋ふっくらした影＋つやのある色」。押せる物は 画面の短いほう(=100cqmin)の 8% 以上
+   ===================================================================== */
+.head{background:linear-gradient(#fff,#fff3c4);color:#12327a;font-size:6.2cqmin;border:.7cqmin solid #fff;box-shadow:0 1cqmin 0 rgba(20,40,100,.28),0 0 0 .5cqmin #ffd23f;padding:1.2cqmin 7cqmin}
+.backbtn{height:12cqmin;border:.7cqmin solid #fff;background:linear-gradient(#fff,#e6f1ff);box-shadow:0 1cqmin 0 rgba(20,40,100,.3)}
+
+/* ---- タイトル：主ボタン「はじめる」だけ大きく・はずむ ---- */
+body[data-state=title] #nav{gap:2.6cqmin 3cqmin;padding:0 4cqmin;bottom:3.6cqmin}
+.nbtn small{display:block;font-size:3.2cqmin;font-weight:800;opacity:.85;letter-spacing:.04em}
+.nbtn.hero{display:grid;grid-template-columns:11cqmin auto;grid-template-rows:auto auto;column-gap:2.4cqmin;row-gap:.4cqmin;align-content:center;justify-content:center;
+  width:96cqmin;height:20cqmin;border-radius:10cqmin;font-size:9.6cqmin;text-align:left;border-width:1cqmin;box-shadow:0 1.6cqmin 0 rgba(150,80,0,.45),0 0 0 .6cqmin #ffb703}
+.nbtn.hero i{grid-row:1/3;width:11cqmin;height:11cqmin;align-self:center}
+.nbtn.hero span{grid-column:2;align-self:end;line-height:1}
+.nbtn.hero small{grid-column:2;align-self:start;font-size:3.4cqmin}
+.nbtn.sub{width:auto;height:12.4cqmin;padding:0 4.4cqmin;gap:1.8cqmin;font-size:4.7cqmin;border-radius:6.4cqmin;border-width:.7cqmin;box-shadow:0 1cqmin 0 rgba(10,40,120,.4)}
+.nbtn.sub i{width:6.2cqmin;height:6.2cqmin}
+.nbtn.secondary{background:linear-gradient(#a6dcff,#3b8df0 60%,#2f78dc)}
+.recchip{position:absolute;left:3cqmin;top:3cqmin;display:flex;align-items:center;gap:1.4cqmin;background:rgba(255,255,255,.94);border:.5cqmin solid #fff;box-shadow:0 .7cqmin 0 rgba(20,40,100,.25);border-radius:5cqmin;padding:.6cqmin 2.6cqmin .6cqmin 1.2cqmin;font-size:3.4cqmin;color:#12327a;white-space:nowrap}
+.recchip b,.endrec b{font-size:3.6cqmin;background:#ffd23f;border-radius:3cqmin;padding:.2cqmin 1.6cqmin}
+.rc-ico{display:block;width:5.6cqmin;height:5.6cqmin}.rc-ico svg{width:100%;height:100%}
+.rc-n{font-weight:900}
+
+/* ---- ペインの高さ（下に進行ボタンが無い画面は 下まで使う） ---- */
+#setting[data-sub=level] .pane,#setting[data-sub=opts] .pane{bottom:6cqmin}
+#setting[data-sub=level] .sub-level{display:flex}
+#setting[data-sub=opts] .sub-opts{display:grid}
+
+/* ---- 難しさえらび ---- */
+.sub-level{align-items:center;justify-content:center;gap:5cqmin}
+.lvcard{flex:1;max-width:50cqmin;height:68cqmin;border-radius:5cqmin;background:linear-gradient(#fff,#eef6ff);border:.9cqmin solid #fff;box-shadow:0 1.4cqmin 0 rgba(20,40,100,.3);
+  display:flex;flex-direction:column;align-items:center;justify-content:center;gap:1.2cqmin;color:#12327a}
+.lvcard .lvpic{display:block;width:26cqmin;height:26cqmin;border-radius:50%;background:#fff6cf;border:.7cqmin solid #fff;box-shadow:inset 0 0 0 .5cqmin #ffe58a;padding:2.4cqmin}
+.lvcard .lvpic svg{width:100%;height:100%}
+.lvcard b{font-size:8cqmin;line-height:1.1;font-weight:900}
+.lvcard small{font-size:3.4cqmin;color:#4a6aa8;font-weight:800}
+.lvcard em{font-style:normal;font-size:3.8cqmin;background:#e8f1ff;border-radius:3cqmin;padding:.6cqmin 2.4cqmin;margin-top:.6cqmin;color:#12327a}
+.lvcard.on{background:linear-gradient(#fff9c4,#ffe45e);border-color:#fff;box-shadow:0 1.4cqmin 0 rgba(255,140,0,.55),0 0 0 .8cqmin #ff9f1c}
+.lvcard.on em{background:#fff}
+
+/* ---- せってい ---- */
+.sub-opts{grid-template-columns:1fr 1fr;grid-template-rows:1fr 1fr;gap:4cqmin}
+.setcard{border-radius:4.6cqmin;background:linear-gradient(#fff,#f1f7ff);border:.9cqmin solid #fff;box-shadow:0 1.3cqmin 0 rgba(20,40,100,.28);padding:2.4cqmin 3.4cqmin;display:flex;flex-direction:column;justify-content:space-between;gap:1.2cqmin;min-height:0;color:#12327a}
+.sc-head{display:flex;align-items:center;gap:2cqmin;font-size:5.2cqmin;line-height:1.1;font-weight:900;white-space:nowrap}
+.sc-ico{display:block;width:8.4cqmin;height:8.4cqmin;flex:none}.sc-ico svg{width:100%;height:100%}
+.seg{display:flex;gap:2cqmin}
+.seg button{flex:1;height:11.6cqmin;border-radius:6cqmin;background:#fff;border:.6cqmin solid #c9d9f2;box-shadow:0 .8cqmin 0 rgba(20,40,100,.22);font-size:4.8cqmin;color:#4a6aa8;display:flex;align-items:center;justify-content:center;gap:1cqmin}
+.seg button.on{background:linear-gradient(#ffe86b,#ffb703);border-color:#fff;color:#3d2800;box-shadow:0 .8cqmin 0 rgba(150,80,0,.4),0 0 0 .6cqmin #ff9f1c}
+.seg button.on::before{content:"";width:2.2cqmin;height:3.8cqmin;border:solid #3d2800;border-width:0 .8cqmin .8cqmin 0;transform:rotate(45deg) translate(-.3cqmin,-.5cqmin);margin-right:.8cqmin}
+.seg button.danger{background:linear-gradient(#ffd0d8,#ff8fa6);border-color:#fff;color:#7a1230;box-shadow:0 .8cqmin 0 rgba(120,20,50,.35)}
+.sc-hint{font-size:3.3cqmin;color:#4a6aa8;line-height:1.2;min-height:3.6cqmin;white-space:nowrap}
+
+/* ---- 地図えらび：よじじゅくご／イラスト ---- */
+.sub-pick{gap:3.4cqmin}
+.maps{flex:3;display:flex;flex-direction:column;gap:1.6cqmin;min-width:0}
+.grp{flex:1;display:flex;flex-direction:column;gap:.8cqmin;min-height:0}
+.gl{font-size:3.8cqmin;line-height:1;color:#12327a;align-self:flex-start;background:rgba(255,255,255,.9);border-radius:3cqmin;padding:.7cqmin 2.6cqmin;border:.4cqmin solid #fff;box-shadow:0 .5cqmin 0 rgba(20,40,100,.2)}
+.grp.yoji .gl{background:#222;color:#fff}.grp.illust .gl{background:#ff9f1c;color:#fff}
+.grp .row{flex:1;display:grid;grid-template-columns:repeat(var(--n,4),1fr);gap:1.8cqmin;min-height:0}
+.card{padding:0 .4cqmin}
+.card .ic{display:block;width:9cqmin;height:9cqmin}.card .ic svg,.card .ic img{width:100%;height:100%;object-fit:contain;display:block}
+.card.illust{background:linear-gradient(#fff,#fffdf3)}
+.card.yoji .kan{font-size:5.2cqmin;letter-spacing:0;white-space:nowrap}
+.card.illust .kan{font-size:4.8cqmin;white-space:nowrap}
+.maps.dense .card.yoji .kan{font-size:4.3cqmin}.maps.dense .card.illust .kan{font-size:3.8cqmin}.maps.dense .card .ic{width:8cqmin;height:8cqmin}
+.card .yomi{font-size:2.2cqmin;letter-spacing:-.02em;white-space:nowrap}
+.card.file{flex:none;height:10.4cqmin;flex-direction:row;gap:1.6cqmin;border-radius:5.2cqmin;background:linear-gradient(#fff,#d8ecff);padding:0 2cqmin}
+.card.file .ic{width:6.4cqmin;height:6.4cqmin}
+.card.file .kan{width:auto;font-size:4.6cqmin;color:#1f5fd9}
+.card.file .bw{font-size:3cqmin;background:#222;color:#fff;border-radius:2cqmin;padding:.3cqmin 1.4cqmin}
+.card.on{border-color:#fff;box-shadow:0 1.1cqmin 0 rgba(255,140,0,.55),0 0 0 .7cqmin #ff9f1c}
+.preview{flex:1;padding:1.6cqmin;gap:1cqmin}
+.preview img{max-height:30cqmin}
+.preview .pt{font-size:5.8cqmin}.preview .py{font-size:3.2cqmin}.preview .hint{font-size:4.6cqmin}
+
+/* ---- プレイ：スワイプ ---- */
+#swipe{position:absolute;inset:0;background:transparent}
+#tip{position:absolute;left:50%;bottom:3cqmin;transform:translateX(-50%);display:none;align-items:center;gap:2cqmin;background:rgba(255,255,255,.93);border:.5cqmin solid #fff;border-radius:6cqmin;padding:1cqmin 3.6cqmin 1cqmin 2.4cqmin;font-size:3.4cqmin;color:#12327a;white-space:nowrap;pointer-events:none;box-shadow:0 .7cqmin 0 rgba(20,40,100,.28)}
+#tip.on{display:flex;animation:tipin .4s ease-out}#tip svg{width:9cqmin;height:4.5cqmin}
+@keyframes tipin{from{opacity:0;transform:translateX(-50%) translateY(2cqmin)}to{opacity:1;transform:translateX(-50%)}}
+#flash{position:absolute;top:50%;width:20cqmin;height:20cqmin;margin-top:-10cqmin;border-radius:50%;background:rgba(31,95,217,.55);border:.8cqmin solid rgba(255,255,255,.9);display:none;align-items:center;justify-content:center;pointer-events:none}
+#flash svg{width:12cqmin;height:12cqmin}
+#flash.l{left:14cqmin}#flash.r{right:14cqmin}#flash.r svg{transform:scaleX(-1)}
+#flash.on{display:flex;animation:fl .5s ease-out forwards}
+@keyframes fl{0%{opacity:0;transform:scale(.6)}25%{opacity:1;transform:scale(1.1)}100%{opacity:0;transform:scale(1)}}
+/* やじるしボタンを消すと「まえ」だけ のこる（ひとつだけ大きく・おしつづけで すすむ） */
+body.noarrows #dpad{grid-template-columns:24cqmin;grid-template-rows:24cqmin}
+body.noarrows #dpad .ctl:not([data-act=fwd]){display:none}
+body.noarrows #dpad [data-act=fwd]{grid-column:1;grid-row:1;border-radius:50%}
+body.noarrows #dpad .ctl svg{width:10cqmin;height:10cqmin}body.noarrows #dpad .ctl span{font-size:4.6cqmin}
+
+/* ---- 結果：かち！／まけ… ---- */
+.endrec{display:flex;align-items:center;gap:1.4cqmin;background:rgba(255,255,255,.94);border:.5cqmin solid #fff;box-shadow:0 .7cqmin 0 rgba(20,40,100,.25);border-radius:5cqmin;padding:.8cqmin 3cqmin .8cqmin 1.4cqmin;font-size:4.6cqmin;color:#12327a}
+.endrec .rc-ico{width:7cqmin;height:7cqmin}.endrec b{font-size:4.4cqmin}
+#ending[data-res=win] .found{color:#ff6a00}
+#ending[data-res=lose] .found{color:#3b6fd9;text-shadow:calc(var(--e)*-1) 0 #fff,var(--e) 0 #fff,0 calc(var(--e)*-1) #fff,0 var(--e) #fff,calc(var(--e)*2) calc(var(--e)*2) #fff,calc(var(--e)*-2) calc(var(--e)*-2) #fff,calc(var(--e)*-2) calc(var(--e)*2) #fff,calc(var(--e)*2) calc(var(--e)*-2) #fff,0 1.4cqmin 0 #123a8a;animation:none}
+#ending[data-res=lose] #confetti{opacity:.25}
+.mbtns .nbtn{width:50cqmin}
+.mtitle{font-size:7.6cqmin;text-align:center}
+/* 結果：左の列をすっきり（文は1行、読みがなは進行ボタンに かからない） */
+.endleft{top:6cqmin;width:76cqmin;gap:2cqmin}
+.found{font-size:16cqmin}
+.who{font-size:4.4cqmin;white-space:nowrap;padding:1cqmin 4cqmin 1cqmin 2cqmin}
+.endtitle{font-size:9.6cqmin;margin-top:.6cqmin}
+.endyomi{font-size:3.8cqmin;margin-top:-1cqmin}
+.endpic{left:86cqmin}

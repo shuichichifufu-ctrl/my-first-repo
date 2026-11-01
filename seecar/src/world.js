@@ -641,8 +641,9 @@
   function blockColor(c, hh) {
     var lum = 0.299 * c.r + 0.587 * c.g + 0.114 * c.b;
     if (hh >= 8 || lum < 0.3) { c.setRGB(WALL_RGB[0], WALL_RGB[1], WALL_RGB[2]); return c; }
+    var chroma = Math.max(c.r, c.g, c.b) - Math.min(c.r, c.g, c.b); // 色みの強さ（カーキ・灰色は小さい）
     c.getHSL(hsl);
-    if (hsl.s < 0.42 && hh >= 4) {
+    if (chroma < 0.28 && hh >= 4) {
       // くすんだ色：高さ4で半分、6以上はほぼ壁の黒
       var k = clamp((hh - 3) / 3, 0, 1) * 0.9 + 0.1;
       c.setRGB(c.r + (WALL_RGB[0] - c.r) * k, c.g + (WALL_RGB[1] - c.g) * k, c.b + (WALL_RGB[2] - c.b) * k);
@@ -871,7 +872,15 @@
     return done;
   }
 
-  // ---------- 自分の戦車の操作 ----------
+  // ---------- 戦車の動き（自分もCPUも同じ） ----------
+  // actor: {idx, tank, cx, cz, dir, move, turn, bump, bumpCd, fireCd, fireAnim, shots}
+  function makeActor(tk, st, i) {
+    var a = { idx: i, tank: tk, cx: st.x, cz: st.z, dir: ((st.dir | 0) % 4 + 4) % 4, move: null, turn: null, bump: null, bumpCd: 0, fireCd: 0, fireAnim: 0, shots: 0 };
+    tk.x = st.x; tk.z = st.z; tk.y = vis(hAt(st.x, st.z)); tk.heading = dirToHeading(a.dir);
+    return a;
+  }
+  function actorFree(a) { return !a.move && !a.turn && !a.bump; }
+
   function press(action, isDown) {
     if (['fwd', 'back', 'left', 'right', 'fire'].indexOf(action) < 0) return;
     if (!isDown) { S.held[action] = false; return; }
@@ -883,125 +892,148 @@
   }
   function want(a) { return S.held[a] || S.tapQ[a]; }
 
-  function updateMe(dt) {
-    var me = S.me; if (!me) return;
-    var tk = me.tank;
-    me.fireCd = Math.max(0, me.fireCd - dt);
-    me.fireAnim = Math.max(0, me.fireAnim - dt);
-    me.bumpCd = Math.max(0, me.bumpCd - dt);
-
-    // 大砲（いつでも撃てる。間隔0.8秒）
-    if (want('fire')) {
-      S.tapQ.fire = false;
-      if (me.fireCd <= 0) fire();
-    }
-
-    // 進行中の動き
-    if (me.move) {
-      var mv = me.move; mv.t += dt;
-      var u = clamp(mv.t / MOVE_DUR, 0, 1), e = ease(u);
+  // 進行中の動き（移動・回転・ぶつかり）を進める
+  function stepActor(a, dt) {
+    var tk = a.tank;
+    a.fireCd = Math.max(0, a.fireCd - dt);
+    a.fireAnim = Math.max(0, a.fireAnim - dt);
+    a.bumpCd = Math.max(0, a.bumpCd - dt);
+    tk.tilt *= Math.exp(-dt * 10);
+    if (a.move) {
+      var mv = a.move; mv.t += dt;
+      var u = clamp(mv.t / mv.dur, 0, 1);
       tk.x = mv.fx + (mv.tx - mv.fx) * u;
       tk.z = mv.fz + (mv.tz - mv.fz) * u;
-      // 段差：前半は平らに進み、ふちで滑らかに上り下り
-      var su = clamp((u - 0.25) / 0.5, 0, 1);
-      tk.y = mv.fy + (mv.ty - mv.fy) * ease(su);
-      if (u >= 1) {
-        me.move = null; me.cx = mv.tx; me.cz = mv.tz; tk.x = mv.tx; tk.z = mv.tz; tk.y = mv.ty;
-        checkFound();
+      var drop = mv.fy - mv.ty;
+      if (drop > 0.25) {
+        // 高い所から降りる：ふちまで進み、前へ少し傾きながら（重力のように）すとんと落ちる
+        var fu = clamp((u - 0.38) / 0.62, 0, 1);
+        tk.y = mv.fy - drop * fu * fu;
+        tk.tilt = -0.32 * Math.sin(fu * Math.PI);
+      } else {
+        // 小さな段差：前半は平らに進み、ふちで滑らかに上り下り
+        var su = clamp((u - 0.25) / 0.5, 0, 1);
+        tk.y = mv.fy + (mv.ty - mv.fy) * ease(su);
       }
-    } else if (me.turn) {
-      var tn = me.turn; tn.t += dt;
+      if (u >= 1) {
+        a.move = null; a.cx = mv.tx; a.cz = mv.tz; tk.x = mv.tx; tk.z = mv.tz; tk.y = mv.ty;
+        if (drop > 0.25) {
+          tk.wobble = Math.min(1, 0.4 + drop * 0.35); tk.tilt = 0.12;
+          for (var k = 0; k < 4; k++) spawnPuff(tk.x + 0.5 + rand(-0.4, 0.4), tk.y + 0.08, tk.z + 0.5 + rand(-0.4, 0.4), { color: 0xf3eee4, vx: rand(-1, 1), vy: 0.4, vz: rand(-1, 1), s0: 0.3, s1: 0.9, life: 0.6, a: 0.65 });
+          if (a === S.me) S.shake = Math.max(S.shake, clamp(drop * 0.08, 0.04, 0.14));
+        }
+        checkFound(a);
+      }
+    } else if (a.turn) {
+      var tn = a.turn; tn.t += dt;
       var v = clamp(tn.t / TURN_DUR, 0, 1);
       tk.heading = tn.from + (tn.to - tn.from) * ease(v);
-      if (v >= 1) { me.turn = null; tk.heading = tn.to; }
-    } else if (me.bump) {
-      var bp = me.bump; bp.t += dt;
+      if (v >= 1) { a.turn = null; tk.heading = tn.to; }
+    } else if (a.bump) {
+      var bp = a.bump; bp.t += dt;
       var w = clamp(bp.t / BUMP_DUR, 0, 1);
       var off = Math.sin(w * Math.PI) * 0.16 * (w < 0.5 ? 1 : 0.6);
       tk.bump.position.set(0, 0, -off * bp.sign);
-      if (w >= 1) { me.bump = null; tk.bump.position.set(0, 0, 0); me.bumpCd = 0.18; }
+      if (w >= 1) { a.bump = null; tk.bump.position.set(0, 0, 0); a.bumpCd = 0.18; }
     }
-
-    // つぎの動き
-    if (!me.move && !me.turn && !me.bump) {
-      var groundY = vis(hAt(me.cx, me.cz));
+    if (actorFree(a)) {
+      var groundY = vis(hAt(a.cx, a.cz));
       tk.y += (groundY - tk.y) * Math.min(1, dt * 12); // 足元が壊れたら下りる
-      if (want('fwd')) { S.tapQ.fwd = false; tryMove(1); }
-      else if (want('back')) { S.tapQ.back = false; tryMove(-1); }
-      else if (S.tapQ.left) { S.tapQ.left = false; startTurn(-1); }   // 回転は押した回数だけ（押しっぱなしでは続けない）
-      else if (S.tapQ.right) { S.tapQ.right = false; startTurn(1); }
     }
-    tk.moving = !!me.move;
-    // 何も押さずに止まっているとき（おいかけ視点）は、頭をふりむかせて顔を見せる。押したらすぐ前を向く
-    var busy = me.move || me.turn || me.bump || me.fireAnim > 0 || S.held.fwd || S.held.back || S.held.left || S.held.right || S.held.fire;
-    me.idle = busy ? 0 : (me.idle || 0) + dt;
-    tk.lookTo = (me.idle > 0.9 && S.camMode === 1 && !S.intro) ? LOOK_BACK : 0;
-    if (busy) tk.look *= 0.5;
+    tk.moving = !!a.move;
   }
 
-  function tryMove(sign) {
-    var me = S.me, tk = me.tank;
-    var tx = me.cx + DX[me.dir] * sign, tz = me.cz + DZ[me.dir] * sign;
-    var cur = hAt(me.cx, me.cz);
-    if (!inMap(tx, tz) || Math.abs(hAt(tx, tz) - cur) > 1) {
-      if (me.bumpCd > 0) return;
-      me.bump = { t: 0, sign: sign };
-      tk.wobble = 1;
-      sfx('bump');
-      return;
+  function updateMe(dt) {
+    var me = S.me; if (!me) return;
+    stepActor(me, dt);
+    if (S.found) { S.tapQ = {}; return; } // どちらかが見つけたら止める
+    // 大砲（いつでも撃てる。間隔0.8秒）
+    if (want('fire')) {
+      S.tapQ.fire = false;
+      if (me.fireCd <= 0) fire(me);
     }
-    me.move = { fx: me.cx, fz: me.cz, tx: tx, tz: tz, fy: tk.y, ty: vis(hAt(tx, tz)), t: 0 };
+    if (actorFree(me)) {
+      if (want('fwd')) { S.tapQ.fwd = false; tryMove(me, 1); }
+      else if (want('back')) { S.tapQ.back = false; tryMove(me, -1); }
+      else if (S.tapQ.left) { S.tapQ.left = false; startTurn(me, -1); }   // 回転は押した回数だけ（押しっぱなしでは続けない）
+      else if (S.tapQ.right) { S.tapQ.right = false; startTurn(me, 1); }
+    }
+  }
+
+  // 進めるか：登りは1段まで、降りは何段でも
+  function canStep(fromH, toH) { return toH - fromH <= 1; }
+  function tryMove(a, sign) {
+    var tk = a.tank;
+    var tx = a.cx + DX[a.dir] * sign, tz = a.cz + DZ[a.dir] * sign;
+    var cur = hAt(a.cx, a.cz);
+    if (!inMap(tx, tz) || !canStep(cur, hAt(tx, tz))) {
+      if (a.bumpCd > 0) return false;
+      a.bump = { t: 0, sign: sign };
+      tk.wobble = 1;
+      if (a === S.me) sfx('bump');
+      return false;
+    }
+    var ty = vis(hAt(tx, tz)), drop = tk.y - ty;
+    a.move = { fx: a.cx, fz: a.cz, tx: tx, tz: tz, fy: tk.y, ty: ty, t: 0, dur: MOVE_DUR + (drop > 0.25 ? Math.min(0.12, drop * 0.07) : 0) };
     // 走るときのほこり
-    spawnPuff(tk.x + 0.5 - DX[me.dir] * 0.4 * sign, tk.y + 0.1, tk.z + 0.5 - DZ[me.dir] * 0.4 * sign, { color: 0xf3eee4, vy: 0.3, s0: 0.25, s1: 0.75, life: 0.6, a: 0.6 });
-    sfx('move');
+    spawnPuff(tk.x + 0.5 - DX[a.dir] * 0.4 * sign, tk.y + 0.1, tk.z + 0.5 - DZ[a.dir] * 0.4 * sign, { color: 0xf3eee4, vy: 0.3, s0: 0.25, s1: 0.75, life: 0.6, a: 0.6 });
+    if (a === S.me) sfx('move');
+    return true;
   }
-  function startTurn(s) {
-    var me = S.me, tk = me.tank;
-    me.dir = (me.dir + s + 4) % 4;
-    me.turn = { from: tk.heading, to: tk.heading - s * Math.PI / 2, t: 0 };
-    sfx('turn');
+  function startTurn(a, s) {
+    var tk = a.tank;
+    a.dir = (a.dir + s + 4) % 4;
+    a.turn = { from: tk.heading, to: tk.heading - s * Math.PI / 2, t: 0 };
+    if (a === S.me) sfx('turn');
   }
-  function checkFound() {
+  function checkFound(a) {
     if (S.found || !S.treasure) return;
-    if (S.me.cx === S.treasure.x && S.me.cz === S.treasure.z) {
+    if (a.cx === S.treasure.x && a.cz === S.treasure.z) {
       S.found = true;
       S.treasure.celebrate = 1.5;
+      a.tank.hop = 1.6;
       sfx('found');
-      emit('found', S.myIndex);
+      emit('found', a.idx);
     }
   }
 
-  function fire() {
-    var me = S.me, tk = me.tank;
-    tk.look = 0; tk.lookTo = 0; me.idle = 0;
-    me.fireCd = FIRE_CD; me.fireAnim = 0.35;
-    tk.recoil = 1;
-    var bx = Math.round(tk.x), bz = Math.round(tk.z), d = me.dir;
-    var tx = bx + DX[d] * 2, tz = bz + DZ[d] * 2;
-    var all = [[tx, tz], [tx + DX[d], tz + DZ[d]]];
-    var cells = all.filter(function (c) { return inMap(c[0], c[1]); });
-    shootBall(tk.x, tk.z, tk.y, d, all, false);
-    sfx('fire');
-    // 発射のしらせ（通信のときは、これを相手へ1回だけ送る）
-    emit('fire', { cells: cells, from: { x: Math.round(tk.x * 100) / 100, z: Math.round(tk.z * 100) / 100, dir: d } });
+  // 大砲のねらい：向いている方向の1マス先→2マス先の順に見て、最初の高さ1以上のマス。どちらも0なら2マス先（何も壊さない）
+  function aimFrom(cx, cz, d) {
+    for (var k = 1; k <= 2; k++) {
+      var x = cx + DX[d] * k, z = cz + DZ[d] * k;
+      if (inMap(x, z) && S.heights[idx(x, z)] >= 1) return { x: x, z: z, hit: true };
+    }
+    return { x: cx + DX[d] * 2, z: cz + DZ[d] * 2, hit: false };
   }
-  // 弾を飛ばす。px,pz は撃つ戦車の位置（マス単位の小数）、cells の先頭が着弾のマス。
-  function shootBall(px, pz, py, d, cells, remote) {
-    if (!cells || !cells.length) return;
+  function fire(a) {
+    var tk = a.tank;
+    a.fireCd = FIRE_CD; a.fireAnim = 0.35;
+    tk.recoil = 1;
+    var bx = Math.round(tk.x), bz = Math.round(tk.z), d = a.dir;
+    var aim = aimFrom(bx, bz, d);
+    var cells = aim.hit ? [[aim.x, aim.z]] : [];
+    shootBall(tk.x, tk.z, tk.y, d, [aim.x, aim.z], cells, a !== S.me, a);
+    if (a === S.me) {
+      sfx('fire');
+      // 発射のしらせ（通信のときは、これを相手へ1回だけ送る）。CPUの発射は知らせない
+      emit('fire', { cells: cells, from: { x: Math.round(tk.x * 100) / 100, z: Math.round(tk.z * 100) / 100, dir: d } });
+    } else sfx('fire');
+  }
+  // 弾を飛ばす。px,pz は撃つ戦車の位置（マス単位の小数）、target は着弾のマス、cells は壊すマス（0か1個）。
+  function shootBall(px, pz, py, d, target, cells, remote, owner) {
     var fwdx = DX[d], fwdz = DZ[d];
-    var bx = Math.round(px), bz = Math.round(pz);
-    var tx = cells[0][0], tz = cells[0][1];
+    var tx = target[0], tz = target[1];
     var from = new THREE.Vector3(px + 0.5 + fwdx * 0.5, py + 0.55, pz + 0.5 + fwdz * 0.5);
     var to = new THREE.Vector3(tx + 0.5, groundTopAt(tx + 0.5, tz + 0.5), tz + 0.5);
-    var mid = vis(Math.max(hAt(bx + fwdx, bz + fwdz), hAt(tx, tz)));
-    var apex = Math.max(from.y, to.y, mid) + 1.3;
+    var apex = Math.max(from.y, to.y) + 1.3;
     var ball = S.fx.balls.find(function (b) { return !b.visible; }) || S.fx.balls[0];
     ball.visible = true; ball.position.copy(from);
-    S.projectiles.push({ ball: ball, from: from, to: to, arc: apex - (from.y + to.y) / 2, t: 0, cells: cells, trail: 0, remote: !!remote });
+    if (owner) owner.shots++;
+    S.projectiles.push({ ball: ball, from: from, to: to, arc: apex - (from.y + to.y) / 2, t: 0, cells: cells || [], trail: 0, remote: !!remote, owner: owner || null });
     // 発射のけむり
     spawnPuff(from.x, from.y, from.z, { color: 0xffffff, vx: fwdx * 1.5, vy: 0.6, vz: fwdz * 1.5, s0: 0.3, s1: 1.1, life: 0.6, a: 0.9 });
     spawnPuff(from.x, from.y, from.z, { color: 0xffe08a, vx: fwdx * 0.5, vy: 0.2, vz: fwdz * 0.5, s0: 0.35, s1: 0.6, life: 0.18, a: 1 });
-    if (remote) sfx('fire');
+    if (remote && !owner) sfx('fire');
   }
 
   function updateProjectiles(dt) {
@@ -1016,10 +1048,126 @@
       if (u >= 1) {
         pr.ball.visible = false;
         S.projectiles.splice(i, 1);
+        if (pr.owner) pr.owner.shots = Math.max(0, pr.owner.shots - 1);
         var done = destroyCells(pr.cells, true);
+        if (!done.length) {
+          // 何も壊さなかった：床に落ちて小さな土ぼこり
+          spawnPuff(pr.to.x, pr.to.y + 0.15, pr.to.z, { color: 0xe8e2d6, vy: 0.8, s0: 0.4, s1: 1.4, life: 0.8, a: 0.8 });
+          spawnDebris(pr.to.x, pr.to.y + 0.05, pr.to.z, tmpC.set(0x9a9080), 6, 0.4);
+          sfx('bump');
+        }
         emit('boom', done, pr.remote);
       }
     }
+  }
+
+  // ---------- ねらいの印（自分の戦車の弾が落ちるマス） ----------
+  function buildAim(L, add, colorStr) {
+    var c = makeCanvas(128, 128), g = c.getContext('2d');
+    g.lineCap = 'round'; g.lineJoin = 'round';
+    function corners(lw, col) {
+      g.strokeStyle = col; g.lineWidth = lw;
+      [[14, 14, 1, 1], [114, 14, -1, 1], [14, 114, 1, -1], [114, 114, -1, -1]].forEach(function (q) {
+        g.beginPath(); g.moveTo(q[0], q[1] + q[3] * 30); g.lineTo(q[0], q[1]); g.lineTo(q[0] + q[2] * 30, q[1]); g.stroke();
+      });
+    }
+    corners(18, 'rgba(255,255,255,0.95)'); corners(9, '#ffffff');
+    var tex = new THREE.CanvasTexture(c);
+    var geo = new THREE.PlaneGeometry(1, 1); geo.rotateX(-Math.PI / 2);
+    var mat = new THREE.MeshBasicMaterial({ map: tex, color: new THREE.Color(colorStr || '#e53935'), transparent: true, depthWrite: false, opacity: 0.95 });
+    var mesh = new THREE.Mesh(geo, mat); mesh.renderOrder = 3; mesh.visible = false;
+    add(mesh);
+    L.dispose.push(tex, geo, mat);
+    S.aim = { mesh: mesh, mat: mat, base: new THREE.Color(colorStr || '#e53935') };
+  }
+  function updateAim() {
+    var A = S.aim, me = S.me; if (!A || !me) return;
+    var show = S.camMode !== 2 && !S.intro && !S.found && !me.move;
+    A.mesh.visible = show;
+    if (!show) return;
+    var aim = aimFrom(me.cx, me.cz, me.dir);
+    var top = inMap(aim.x, aim.z) ? vis(S.heights[idx(aim.x, aim.z)]) : 0;
+    var pulse = 1 + Math.sin(S.time * 6) * 0.05;
+    A.mesh.position.set(aim.x + 0.5, top + 0.03, aim.z + 0.5);
+    A.mesh.scale.set(0.96 * pulse, 1, 0.96 * pulse);
+    // 壊せるブロックをねらっているときは自分の色、何もないときは白くうすく
+    if (aim.hit) { A.mat.color.copy(A.base); A.mat.opacity = 0.95; } else { A.mat.color.set(0xffffff); A.mat.opacity = 0.55; }
+  }
+
+  // ---------- CPU ----------
+  // 道さがし：状態＝(マス, 向き, いまのマスを壊して入ったか)。手＝左回り・右回り・前へ（1）、壊して前へ（1+BREAK_COST）。
+  // 登りは1段・降りは自由。前のマスが登れない高さなら、大砲で壊して（高さ0にして）入る。いちばん手数の少ない道を選ぶ。
+  var heap = null;
+  function planPath(a) {
+    var w = S.w, h = S.h, N = w * h * 8, H = S.heights, T0 = S.treasure;
+    if (!T0) return null;
+    var dist = new Float32Array(N).fill(Infinity), prev = new Int32Array(N).fill(-1), act = new Uint8Array(N);
+    heap = { k: [], v: [] };
+    function push(st, d) {
+      var hk = heap.k, hv = heap.v, i = hk.length; hk.push(d); hv.push(st);
+      while (i > 0) { var p = (i - 1) >> 1; if (hk[p] <= hk[i]) break; var t = hk[p]; hk[p] = hk[i]; hk[i] = t; t = hv[p]; hv[p] = hv[i]; hv[i] = t; i = p; }
+    }
+    function pop() {
+      var hk = heap.k, hv = heap.v, top = hv[0], last = hk.length - 1;
+      hk[0] = hk[last]; hv[0] = hv[last]; hk.pop(); hv.pop();
+      var i = 0, n = hk.length;
+      for (;;) { var l = i * 2 + 1, r = l + 1, m = i; if (l < n && hk[l] < hk[m]) m = l; if (r < n && hk[r] < hk[m]) m = r; if (m === i) break; var t = hk[m]; hk[m] = hk[i]; hk[i] = t; t = hv[m]; hv[m] = hv[i]; hv[i] = t; i = m; }
+      return top;
+    }
+    var s0 = ((a.cz * w + a.cx) * 4 + a.dir) * 2;
+    dist[s0] = 0; push(s0, 0);
+    var goal = -1;
+    function relax(from, to, d, code) { if (d < dist[to]) { dist[to] = d; prev[to] = from; act[to] = code; push(to, d); } }
+    while (heap.k.length) {
+      var dk = heap.k[0], st = pop();
+      if (dk > dist[st]) continue;
+      var b = st & 1, dir = (st >> 1) & 3, cell = st >> 3, x = cell % w, z = (cell - x) / w;
+      if (x === T0.x && z === T0.z) { goal = st; break; }
+      relax(st, (((cell * 4) + ((dir + 3) & 3)) << 1) | b, dk + 1, 1); // 左回り
+      relax(st, (((cell * 4) + ((dir + 1) & 3)) << 1) | b, dk + 1, 2); // 右回り
+      var nx = x + DX[dir], nz = z + DZ[dir];
+      if (nx < 0 || nz < 0 || nx >= w || nz >= h) continue;
+      var nc = nz * w + nx, hc = b ? 0 : H[cell];
+      if (canStep(hc, H[nc])) relax(st, ((nc * 4 + dir) << 1), dk + 1, 3);  // 前へ
+      else relax(st, ((nc * 4 + dir) << 1) | 1, dk + 1 + BREAK_COST, 4);    // 壊して前へ
+    }
+    if (goal < 0) return null;
+    var out = [];
+    for (var s = goal; s !== s0 && s >= 0; s = prev[s]) {
+      var c = act[s];
+      if (c === 1) out.push('L'); else if (c === 2) out.push('R'); else if (c === 3) out.push('F'); else { out.push('F'); out.push('S'); }
+    }
+    out.reverse();
+    return out;
+  }
+  function updateCpu(dt) {
+    var c = S.cpu; if (!c) return;
+    stepActor(c, dt);
+    var ai = c.ai;
+    ai.time += dt;
+    if (S.found) return;
+    if (!ai.started) { if (S.intro) return; ai.started = true; }
+    ai.wait -= dt;
+    if (ai.wait > 0 || !actorFree(c) || c.shots > 0) return; // 自分の弾が落ちるまでは待つ
+    if (!ai.plan || !ai.plan.length || ai.ver !== S.mapVer) { ai.plan = planPath(c); ai.ver = S.mapVer; }
+    if (!ai.plan || !ai.plan.length) { ai.wait = ai.gap; return; }
+    var step = ai.plan[0];
+    if (step === 'S') {
+      if (c.fireCd > 0) return; // 撃てるようになったらすぐ
+      ai.plan.shift(); fire(c);
+    } else if (step === 'L' || step === 'R') {
+      ai.plan.shift(); startTurn(c, step === 'L' ? -1 : 1);
+    } else {
+      ai.plan.shift();
+      if (tryMove(c, 1)) ai.bumps = 0;
+      else {
+        // 進めなかった（地図が変わった等）：道をさがし直す。何度も続くなら前を撃つ
+        ai.plan = null; ai.bumps++;
+        if (ai.bumps >= 2 && c.fireCd <= 0) { fire(c); ai.bumps = 0; }
+      }
+    }
+    ai.steps++;
+    ai.wait = ai.gap;
   }
 
   // ---------- 相手の戦車 ----------
@@ -1087,12 +1235,14 @@
     var fx = -Math.sin(tk.heading), fz = -Math.cos(tk.heading);
     if (mode === 0) {
       p.set(px + fx * 0.12, py + 0.66, pz + fz * 0.12);
-      tg.set(px + fx * 5, py + 0.2, pz + fz * 5);
+      tg.set(px + fx * 5, py + 0.2 + S.pitchV * 2.4, pz + fz * 5); // 視点の上下（nudgePitch）
       poseM.lookAt(p, tg, UP);
     } else if (mode === 1) {
       // 後ろ上から見下ろす（約45度）：戦車の全身が画面の下寄りに入り、前の数マス先まで迷路が見える
-      p.set(px - fx * CHASE_BACK, py + CHASE_UP + S.chaseLift, pz - fz * CHASE_BACK);
-      tg.set(px + fx * CHASE_AHEAD, py - 0.1 + S.chaseLift * 0.5, pz + fz * CHASE_AHEAD);
+      // 視点の上下（nudgePitch）：+ で低く遠くを見る（空と奥の迷路）、- で高く足元を見下ろす
+      var pv = S.pitchV, up = CHASE_UP + (pv > 0 ? -pv * 1.2 : -pv * 2.6), ah = CHASE_AHEAD + pv * (pv > 0 ? 3 : 2.6);
+      p.set(px - fx * CHASE_BACK, py + up + S.chaseLift, pz - fz * CHASE_BACK);
+      tg.set(px + fx * ah, py - 0.1 + pv * (pv > 0 ? 1.1 : 0.4) + S.chaseLift * 0.5, pz + fz * ah);
       poseM.lookAt(p, tg, UP);
     } else {
       var hh = overheadHeight(), sx = overheadShift(hh);
@@ -1113,7 +1263,8 @@
       if (top <= headY) continue;
       // カメラの高さ H のとき、後ろ s の位置での線の高さ = headY + (H - headY) * s / CHASE_BACK
       var needH = headY + (top - headY) * CHASE_BACK / s;
-      lift = Math.max(lift, needH - (tk.y + CHASE_UP));
+      var pv = S.pitchV, up = CHASE_UP + (pv > 0 ? -pv * 1.2 : -pv * 2.6);
+      lift = Math.max(lift, needH - (tk.y + up));
     }
     return clamp(lift, 0, 2.6);
   }
@@ -1131,6 +1282,7 @@
   function updateCamera(dt) {
     if (!S.camera) return;
     S.chaseLift += (chaseLiftTarget() - S.chaseLift) * (1 - Math.exp(-dt * 5));
+    S.pitchV += (S.pitch - S.pitchV) * (1 - Math.exp(-dt * 10));
     var target = poseFor(S.camMode);
     var top = S.camMode === 2 || !!(S.intro && S.intro.t < INTRO_HOLD + 0.5);
     if (top !== S.topFlag) { S.topFlag = top; emit('cam', top); }
@@ -1173,6 +1325,7 @@
       if (show) { var s = camH / 30; tk.marker.scale.setScalar(s); tk.marker.position.y = 1.2 + s * 0.8 + Math.sin(S.time * 4) * 0.15 * s; tk.marker.material.opacity = clamp((camH - tk.y - 10) / 6, 0, 0.95); }
     }
     if (S.me) mark(S.me.tank);
+    if (S.cpu) mark(S.cpu.tank);
     for (var k in S.remotes) mark(S.remotes[k].tank);
   }
 
@@ -1185,11 +1338,14 @@
   function update(dt) {
     S.time += dt;
     updateMe(dt);
+    updateCpu(dt);
     updateProjectiles(dt);
     updateRemotes(dt);
     updateFx(dt);
     updateTreasure(dt);
     if (S.me) animateTank(S.me.tank, dt, S.time);
+    if (S.cpu) animateTank(S.cpu.tank, dt, S.time + 0.7);
+    updateAim();
     for (var k in S.remotes) animateTank(S.remotes[k].tank, dt, S.time + 1.3);
     S.stateAcc += dt;
     if (S.me && S.stateAcc >= 0.1) { S.stateAcc = 0; emit('state', stateObj()); }
@@ -1268,13 +1424,17 @@
       ensureRemote(i, st, false);
     },
     // cells: 壊れるマス。from（任意）: 撃った戦車の {x,z,dir}。あれば弾を山なりに飛ばしてから壊す。
+    // 第2期：cells は壊すマス（0か1個）。空でも from があれば弾を2マス先へ飛ばす（何も壊さない）
     applyRemoteBoom: function (cells, from) {
-      if (!S.level || !cells || !cells.length) return;
+      if (!S.level) return;
+      cells = (cells || []).map(function (c) { return [c[0] | 0, c[1] | 0]; });
       if (from && isFinite(from.x) && isFinite(from.z)) {
-        var d = ((from.dir | 0) % 4 + 4) % 4;
-        shootBall(+from.x, +from.z, vis(hAt(Math.round(from.x), Math.round(from.z))), d, cells.map(function (c) { return [c[0] | 0, c[1] | 0]; }), true);
+        var d = ((from.dir | 0) % 4 + 4) % 4, fx0 = Math.round(+from.x), fz0 = Math.round(+from.z);
+        var target = cells.length ? cells[0] : [fx0 + DX[d] * 2, fz0 + DZ[d] * 2];
+        shootBall(+from.x, +from.z, vis(hAt(fx0, fz0)), d, target, cells, true, null);
         return;
       }
+      if (!cells.length) return;
       var done = destroyCells(cells, true);
       emit('boom', done, true); // 弾なしで壊すとき（遠隔）。通信には送らない
     },
@@ -1285,15 +1445,29 @@
     },
     remoteFound: function (i) {
       if (S.treasure) S.treasure.celebrate = 1.5;
+      S.found = true; // 相手が見つけたら、こちらも止める
       sfx('found');
     },
+    // スワイプで左右に90度（dir: -1=左, +1=右）。press('left'|'right') を1回押したのと同じ
+    swipeTurn: function (dir) {
+      if (S.paused || !S.me || S.found) return;
+      S.tapQ[dir < 0 ? 'left' : 'right'] = true;
+    },
+    // 視点の上下を少しずらす（dy: -1〜+1 の相対量。+ で上＝遠くを見る、- で下＝足元を見る。合計は -1〜+1）
+    nudgePitch: function (dy) {
+      dy = +dy; if (!isFinite(dy)) return;
+      S.pitch = clamp(S.pitch + clamp(dy, -1, 1), -PITCH_MAX, PITCH_MAX);
+    },
+    resetPitch: function () { S.pitch = 0; },
     // 確認用（ゲームの進行には使わない）
     _debug: function (qx, qz) {
       var me = S.me;
       return {
         cam: S.camMode, blend: S.camBlendT, intro: S.intro ? S.intro.t : -1, paused: S.paused, running: S.running, time: S.time,
         me: me ? { cx: me.cx, cz: me.cz, dir: me.dir, x: me.tank.x, z: me.tank.z, y: me.tank.y } : null,
-        debris: S.fx ? S.fx.parts.length : 0, projectiles: S.projectiles.length,
+        debris: S.fx ? S.fx.parts.length : 0, projectiles: S.projectiles.length, found: S.found, mapVer: S.mapVer, pitch: S.pitch,
+        cpu: S.cpu ? { cx: S.cpu.cx, cz: S.cpu.cz, dir: S.cpu.dir, level: S.cpu.ai.level, steps: S.cpu.ai.steps, time: S.cpu.ai.time, plan: S.cpu.ai.plan ? S.cpu.ai.plan.length : -1 } : null,
+        aim: S.aim && S.aim.mesh.visible ? { x: Math.floor(S.aim.mesh.position.x), z: Math.floor(S.aim.mesh.position.z) } : null,
         remotes: Object.keys(S.remotes).map(function (k) { var r = S.remotes[k]; return { i: +k, x: r.tank.x, z: r.tank.z }; }),
         h: qx != null && S.level ? hAt(qx, qz) : null,
         calls: S.renderer ? S.renderer.info.render.calls : 0,

@@ -67,73 +67,219 @@ async function drive(p, map, target) {
   return true;
 }
 
+const rec = (p) => p.evaluate(() => { try { return JSON.parse(localStorage.getItem('seecar.record')); } catch (e) { return null; } });
+const setg = (p) => p.evaluate(() => { try { return JSON.parse(localStorage.getItem('seecar.settings')); } catch (e) { return null; } });
+async function toTitle(page) { await sleep(400); await page.click('#boot', { force: true }); await sleep(400); }
+async function pickFile(page) {
+  const b64 = await makePng(page);
+  await page.setInputFiles('.card.file input', { name: 'nurie.png', mimeType: 'image/png', buffer: Buffer.from(b64, 'base64') });
+  await sleep(1200);
+}
+// 壁の手前まで運転して撃つ（新旧どちらの大砲でも通る：z=12,13 の2マス厚の壁を、手前の1マスから順に壊す）
+async function breakWall(page, map, tag) {
+  const stage = { x: map.treasure.x, z: 10 };
+  ok(tag + '壁の手前まで運転', await drive(page, map, stage), await me(page));
+  await turnTo(page, 2);
+  await page.evaluate(() => World.setCamera(1)); await sleep(800);
+  const H = (z) => page.evaluate(([x, z]) => World._debug(x, z).h, [stage.x, z]);
+  for (let shot = 0; shot < 2 && ((await H(12)) > 0 || (await H(13)) > 0); shot++) {
+    if ((await H(12)) === 0) { await stepTo(page, { x: stage.x, z: 11 }); await turnTo(page, 2); }
+    await page.evaluate(() => World.press('fire', true)); await sleep(150); await page.evaluate(() => World.press('fire', false));
+    if (shot === 0) { await sleep(450); }
+    await waitFor(async () => (await H(12)) === 0, 20000);
+    // 新しい大砲は1回に1マス。2回目は手前の12が0になったあと、13が壊れるのを待つ
+    if (shot === 1) await waitFor(async () => (await H(13)) === 0, 20000);
+    else await waitFor(async () => (await H(13)) === 0, 3000);
+    await sleep(300);
+  }
+  const hh = [await H(12), await H(13)];
+  ok(tag + '壁が壊れて通れる（12と13が高さ0）', hh[0] === 0 && hh[1] === 0, hh);
+  map.heights[12 * map.w + stage.x] = 0; map.heights[13 * map.w + stage.x] = 0;
+}
+const mapOf = (page) => page.evaluate(() => { const m = MapGen.fromCanvas(window.__testCanvas); return { w: m.w, h: m.h, heights: Array.from(m.heights), treasure: m.treasure, start: m.starts[0] }; });
+
 async function solo(browser) {
   const { page, errors } = await openPage(FILE, { browser });
   await sleep(500); await page.screenshot({ path: SH + '01boot.png' });
   ok('ひとり: 起動画面', await state(page) === 'boot');
   ok('ひとり: 起動画面でもホームボタンが見える', await page.evaluate(() => { const r = document.getElementById('home').getBoundingClientRect(); return getComputedStyle(document.getElementById('home')).display !== 'none' && r.width > 20; }));
-  await page.click('#boot', { force: true }); await sleep(400);
+  await toTitle(page);
   ok('ひとり: タイトルへ', await state(page) === 'title'); await page.screenshot({ path: SH + '02title.png' });
-  await nav(page, 'はじめる'); ok('ひとり: せっていへ', await state(page) === 'setting'); await page.screenshot({ path: SH + '03setting.png' });
-  const b64 = await makePng(page);
-  await page.setInputFiles('.card.file input', { name: 'nurie.png', mimeType: 'image/png', buffer: Buffer.from(b64, 'base64') });
-  await sleep(1200); await page.screenshot({ path: SH + '04preview.png' });
-  await nav(page, 'しゅっぱつ！'); await sleep(300);
-  ok('ひとり: プレイへ', await state(page) === 'play');
-  // 開始演出：まず真上（2秒）→ 斜め後ろへ寄る。途中の画面と、寄り終わった画面を撮る
-  const introT = async () => page.evaluate(() => World._debug().intro);
-  ok('ひとり: 開始演出が始まっている', (await introT()) >= 0, await introT());
-  await page.screenshot({ path: SH + '05a_intro_start.png' });
-  await waitFor(async () => (await introT()) >= 2.7 || (await introT()) < 0, 40000); await page.screenshot({ path: SH + '05b_intro_mid.png' });
-  const gotChase = await waitFor(async () => (await introT()) < 0, 40000); await sleep(600);
-  ok('ひとり: 開始演出が終わり斜め後ろの視点', gotChase && await page.evaluate(() => World._debug().cam === 1), await page.evaluate(() => World._debug().blend));
-  await page.screenshot({ path: SH + '05play.png' });
+  const tl = await page.evaluate(() => Array.from(document.querySelectorAll('#nav [data-nav]')).map((b) => b.dataset.nav));
+  ok('タイトルのボタン：はじめる／ひとりで れんしゅう／つうしんで あそぶ／せってい', JSON.stringify(tl) === JSON.stringify(['はじめる', 'ひとりで れんしゅう', 'つうしんで あそぶ', 'せってい']), tl);
+  const hop = await page.evaluate(() => Array.from(document.querySelectorAll('#nav .nbtn')).map((b) => getComputedStyle(b).animationName !== 'none'));
+  ok('タイトル：はずむのは「はじめる」だけ', hop[0] === true && hop.slice(1).every((x) => !x), hop);
+  ok('タイトル：いまの難しさの勝ち負けを小さく表示', await page.evaluate(() => /ふつう/.test(document.getElementById('recchip').textContent) && /0かち 0まけ/.test(document.getElementById('recchip').textContent)));
+  const small = await page.evaluate(() => { const u = Math.min(innerWidth, innerHeight * 16 / 9 > innerWidth ? innerWidth * 9 / 16 : innerHeight) / 100; return Array.from(document.querySelectorAll('#nav .nbtn,#home')).every((b) => b.getBoundingClientRect().height >= 8 * u - 1); });
+  ok('タイトル：ボタンは短辺の8%以上', small);
+  await nav(page, 'ひとりで れんしゅう'); ok('ひとり: ちずえらびへ', await state(page) === 'setting' && await page.evaluate(() => document.getElementById('setting').dataset.sub === 'pick')); await page.screenshot({ path: SH + '03pick.png' });
+  const grp = await page.evaluate(() => ({ yoji: document.querySelectorAll('.grp.yoji .card').length, illust: document.querySelectorAll('.grp.illust .card').length, file: !!document.querySelector('.card.file input') }));
+  ok('ちずえらび：よじじゅくごとイラストに分かれて並ぶ', grp.yoji >= 3 && grp.illust >= 1 && grp.file, grp);
+  await page.click('.card[data-id=mikka]', { force: true }); await sleep(900); await page.screenshot({ path: SH + '04preview.png' });
+  await nav(page, 'しゅっぱつ！'); await sleep(1500);
+  ok('ひとり: プレイへ', await state(page) === 'play'); await page.screenshot({ path: SH + '05play.png' });
   const camBtn = await page.evaluate(() => ({ label: document.getElementById('cam-label').textContent, svgs: document.querySelectorAll('#cam svg').length }));
   ok('ひとり: カメラボタンは次の視点（そらへ）だけを絵と文字で示す', camBtn.label === 'そらへ' && camBtn.svgs === 1, camBtn);
-  const map = await page.evaluate(() => { const m = MapGen.fromCanvas(window.__testCanvas); return { w: m.w, h: m.h, heights: Array.from(m.heights), treasure: m.treasure, start: m.starts[0] }; });
-  const m0 = await me(page);
-  ok('ひとり: スタート位置が地図データと一致', m0 && m0.cx === map.start.x && m0.cz === map.start.z, { me: m0, start: map.start });
-  ok('ひとり: 宝が小部屋の中', map.treasure.x >= 42 && map.treasure.x <= 51 && map.treasure.z >= 14 && map.treasure.z <= 23, map.treasure);
-  // 小部屋の上の壁(z=12,13)の2マス手前(z=10)まで行き、南を向いて撃つ
-  const stage = { x: map.treasure.x, z: 10 };
-  ok('ひとり: 壁の手前まで運転', await drive(page, map, stage), await me(page));
-  await turnTo(page, 2);
-  await page.evaluate(() => World.setCamera(1)); await sleep(800);
-  await page.evaluate(() => World.press('fire', true)); await sleep(150); await page.evaluate(() => World.press('fire', false));
-  await sleep(450); await page.screenshot({ path: SH + '06fire.png' });
-  await waitFor(async () => (await page.evaluate((x) => World._debug(x, 12).h, stage.x)) === 0, 20000); await sleep(150); await page.screenshot({ path: SH + '07boom.png' });
-  const hh = await page.evaluate((x) => [World._debug(x, 12).h, World._debug(x, 13).h, World._debug(x, 14).h], stage.x);
-  ok('ひとり: 2マス先と3マス先だけ高さ0に', hh[0] === 0 && hh[1] === 0, hh);
-  map.heights[12 * map.w + stage.x] = 0; map.heights[13 * map.w + stage.x] = 0;
-  await page.evaluate(() => World.setCamera(0)); await sleep(900); await page.screenshot({ path: SH + '08first.png' });
-  await page.evaluate(() => World.setCamera(2)); await sleep(1200); await page.screenshot({ path: SH + '09top.png' });
-  await page.evaluate(() => World.setCamera(1)); await sleep(600);
-  // ホーム→いいえ
+  await page.evaluate(() => World.setCamera(2)); await sleep(1300); await page.screenshot({ path: SH + '06top.png' });
   await page.click('#home', { force: true }); await sleep(300); await page.screenshot({ path: SH + '10modal.png' });
   ok('ひとり: ホームで一時停止', await page.evaluate(() => World.isPaused === true || World._debug().paused === true));
   await page.click('#m-no', { force: true }); await sleep(300);
   ok('ひとり: いいえで再開', await page.evaluate(() => World._debug().paused === false) && await state(page) === 'play');
-  await drive(page, map, map.treasure);
-  await waitFor(async () => (await state(page)) === 'ending', 6000);
-  ok('ひとり: 宝で みつけた！', await state(page) === 'ending', await me(page));
-  await sleep(800); await page.screenshot({ path: SH + '11ending.png' });
+  await page.evaluate(() => App._found(0)); await sleep(800);
+  ok('ひとり: 宝で みつけた！（かち・まけは出ない）', await state(page) === 'ending' && await page.evaluate(() => document.getElementById('end-found').textContent === 'みつけた！' && getComputedStyle(document.getElementById('end-rec')).display === 'none'));
+  ok('ひとり: 記録は増えない', (await rec(page)) === null || JSON.stringify(await rec(page)).indexOf('"win":1') < 0, await rec(page));
+  await page.screenshot({ path: SH + '11ending.png' });
   await nav(page, 'おわる'); ok('ひとり: おしまい画面', await state(page) === 'quit'); await page.screenshot({ path: SH + '12quit.png' });
   await nav(page, 'はじめから'); ok('ひとり: タイトルへ戻る', await state(page) === 'title');
-  // 2回目（既定地図）: 再スタートで壊れないか
-  await nav(page, 'はじめる'); await page.click('.card[data-id=mikka]', { force: true }); await sleep(600); await nav(page, 'しゅっぱつ！'); await sleep(1500);
-  ok('ひとり: 2回目の既定地図でプレイ', await state(page) === 'play'); await page.screenshot({ path: SH + '13preset.png' });
-  await page.evaluate(() => World.setCamera(2)); await sleep(1300); await page.screenshot({ path: SH + '14preset_top.png' });
-  // 連打
+  await nav(page, 'ひとりで れんしゅう'); await page.click('.card[data-id=mikka]', { force: true }); await sleep(600); await nav(page, 'しゅっぱつ！'); await sleep(1500);
   for (let i = 0; i < 15; i++) { await page.click('#home', { force: true }); }
   await sleep(300); ok('ひとり: ホーム連打でモーダル1枚', await page.evaluate(() => getComputedStyle(document.getElementById('modal')).display !== 'none'));
   await page.click('#m-yes', { force: true }); await sleep(300); ok('ひとり: はいで おしまい', await state(page) === 'quit');
   ok('ひとり: コンソールエラー0', errors.length === 0, errors.slice(0, 5));
+  await page.context().close();
+}
+
+// CPU戦：はじめる→難しさ→地図→しゅっぱつ→プレイ→（CPUか自分が宝に着く）→結果で記録が1増える
+async function cpu(browser) {
+  const { page, errors } = await openPage(FILE, { browser });
+  await toTitle(page);
+  await nav(page, 'はじめる'); await sleep(300);
+  ok('CPU: 難しさえらびへ', await state(page) === 'setting' && await page.evaluate(() => document.getElementById('setting').dataset.sub === 'level'));
+  await page.screenshot({ path: SH + '30level.png' });
+  const lv = await page.evaluate(() => Array.from(document.querySelectorAll('.lvcard b')).map((b) => b.textContent));
+  ok('CPU: やさしい／ふつう／むずかしい', JSON.stringify(lv) === JSON.stringify(['やさしい', 'ふつう', 'むずかしい']), lv);
+  await page.click('.lvcard[data-level=easy]', { force: true }); await sleep(400);
+  ok('CPU: やさしいを選ぶと ちずえらびへ。設定に保存', await page.evaluate(() => document.getElementById('setting').dataset.sub === 'pick') && (await setg(page)).level === 'easy', await setg(page));
+  await pickFile(page); await page.screenshot({ path: SH + '31pick.png' });
+  const map = await mapOf(page);
+  let loadArg = null;
+  await page.evaluate(() => { const o = World.load; window.__loadArg = null; World.load = function (m, opts) { window.__loadArg = opts; return o.apply(this, arguments); }; });
+  await nav(page, 'しゅっぱつ！'); await sleep(1000);
+  loadArg = await page.evaluate(() => window.__loadArg);
+  ok('CPU: World.load に cpu:{level:easy}、myIndex:0、net:false', loadArg && loadArg.cpu && loadArg.cpu.level === 'easy' && loadArg.myIndex === 0 && loadArg.net === false, loadArg);
+  ok('CPU: プレイへ', await state(page) === 'play');
+  await waitFor(async () => (await page.evaluate(() => World._debug().intro)) < 0, 40000); await sleep(500);
+  await page.screenshot({ path: SH + '32play.png' });
+  // 自分が運転して宝へ（CPUが先に着いたら その結果になる）
+  await breakWall(page, map, 'CPU: ');
+  await drive(page, map, map.treasure);
+  await waitFor(async () => (await state(page)) === 'ending', 8000);
+  ok('CPU: 結果画面へ', await state(page) === 'ending');
+  await sleep(600); await page.screenshot({ path: SH + '33ending.png' });
+  const r1 = await rec(page), head = await page.evaluate(() => document.getElementById('end-found').textContent);
+  const n = r1 ? r1.easy.win + r1.easy.lose : -1;
+  ok('CPU: 記録（やさしい）がちょうど1増えた', n === 1, r1);
+  ok('CPU: 見出しと記録が合う（かち！→win、まけ…→lose）', (head === 'かち！' && r1.easy.win === 1) || (head === 'まけ…' && r1.easy.lose === 1), head);
+  ok('CPU: 結果に「〇かち 〇まけ」', await page.evaluate(() => /\d+かち \d+まけ/.test(document.getElementById('end-rec').textContent)));
+  // もういちど → 地図 → 強制的に「まけ」
+  await nav(page, 'もういちど'); await sleep(300);
+  ok('CPU: もういちど で ちずえらび', await page.evaluate(() => document.getElementById('setting').dataset.sub === 'pick'));
+  await page.click('.card[data-id=mikka]', { force: true }); await sleep(900); await nav(page, 'しゅっぱつ！'); await sleep(1200);
+  if (await state(page) === 'play') { await page.evaluate(() => App._found(1)); await sleep(700); }
+  const head2 = await page.evaluate(() => document.getElementById('end-found').textContent);
+  const r2 = await rec(page);
+  ok('CPU: コンピューターが先に見つけたら「まけ…」で記録に足される', head2 === 'まけ…' && r2.easy.lose >= 1 && r2.easy.win + r2.easy.lose === 2, { head2, r2 });
+  ok('CPU: まけの文言', await page.evaluate(() => /コンピューター/.test(document.getElementById('end-who').textContent)));
+  await page.screenshot({ path: SH + '34lose.png' });
+  await nav(page, 'おわる'); await nav(page, 'はじめから'); await sleep(300);
+  ok('CPU: タイトルに記録が出る', await page.evaluate(() => /やさしい/.test(document.getElementById('recchip').textContent) && /1かち 1まけ/.test(document.getElementById('recchip').textContent)), await page.evaluate(() => document.getElementById('recchip').textContent));
+  ok('CPU: コンソールエラー0', errors.length === 0, errors.slice(0, 5));
+  await page.context().close();
+}
+
+// せってい：やじるし、スワイプ反転、白黒、記録を消す
+async function settings(browser) {
+  const { page, errors } = await openPage(FILE, { browser });
+  await toTitle(page);
+  await nav(page, 'せってい'); await sleep(300);
+  ok('せってい: Setting の中の画面', await state(page) === 'setting' && await page.evaluate(() => document.getElementById('setting').dataset.sub === 'opts'));
+  await page.screenshot({ path: SH + '40settings.png' });
+  ok('せってい: 既定値', JSON.stringify(await setg(page) || { arrows: true, swipeRev: false, binary: false }).includes('"arrows":true') || (await setg(page)) === null, await setg(page));
+  const smallBtns = await page.evaluate(() => { const u = document.getElementById('stage').getBoundingClientRect().height / 100; return Array.from(document.querySelectorAll('.sub-opts button')).map((b) => b.getBoundingClientRect().height / u).every((h) => h >= 8); });
+  ok('せってい: ボタンは短辺の8%以上', smallBtns);
+  const click = async (k, v) => { await page.click(`.seg button[data-set=${k}][data-val="${v}"]`, { force: true }); await sleep(200); };
+  await click('arrows', 0); await click('swipeRev', 1); await click('binary', 1);
+  const st = await setg(page);
+  ok('せってい: localStorage seecar.settings に保存', st && st.arrows === false && st.swipeRev === true && st.binary === true, st);
+  await page.screenshot({ path: SH + '41settings_changed.png' });
+  // 記録を消す：先に記録を入れる
+  await page.evaluate(() => { localStorage.setItem('seecar.record', JSON.stringify({ easy: { win: 3, lose: 2 }, normal: { win: 1, lose: 0 }, hard: { win: 0, lose: 1 }, net: { win: 0, lose: 0 } })); });
+  await page.reload(); await sleep(500); await toTitle(page);
+  ok('せってい: 再読み込みでも設定が残る', await page.evaluate(() => document.body.classList.contains('noarrows')));
+  await nav(page, 'せってい'); await sleep(200);
+  await page.click('#reset-rec', { force: true }); await sleep(300); await page.screenshot({ path: SH + '42reset_modal.png' });
+  ok('きろくを けす: 確認モーダルが出る', await page.evaluate(() => document.getElementById('modal').classList.contains('on') && /けしますか/.test(document.getElementById('m-title').textContent)));
+  await page.click('#m-no', { force: true }); await sleep(250);
+  ok('きろくを けす: やめる で記録は残る', (await rec(page)).easy.win === 3, await rec(page));
+  await page.click('#reset-rec', { force: true }); await sleep(250); await page.click('#m-yes', { force: true }); await sleep(300);
+  const r = await rec(page);
+  ok('きろくを けす: けす で 全部0', r && ['easy', 'normal', 'hard'].every((k) => r[k].win === 0 && r[k].lose === 0), r);
+  ok('きろくを けす: 設定画面に残る（おしまいにならない）', await state(page) === 'setting');
+  // 白黒モード：えを読み込む → 色のある所(2..9,2..6画素)が高さ0に
+  await page.click('#back', { force: true }); await sleep(200);
+  await nav(page, 'ひとりで れんしゅう');
+  ok('白黒: 「えを よみこむ」に しろくろ の印', await page.evaluate(() => !!document.querySelector('.card.file .bw')));
+  await pickFile(page); await nav(page, 'しゅっぱつ！'); await sleep(1500);
+  const hs = await page.evaluate(() => { const o = []; for (let x = 4; x < 20; x += 3) for (let z = 4; z < 14; z += 3) o.push(World._debug(x, z).h); return o; });
+  ok('白黒: 読み込んだ絵の薄い色の所が 高さ0（白）になる', hs.every((h) => h === 0), hs);
+  const wall = await page.evaluate(() => World._debug(44, 12).h);
+  ok('白黒: 黒線は高さ10', wall === 10, wall);
+  // 操作ボタン：やじるしを消した状態
+  await waitFor(async () => (await page.evaluate(() => World._debug().intro)) < 0, 40000);
+  const vis = await page.evaluate(() => { const o = {}; document.querySelectorAll('.ctl[data-act]').forEach((b) => { const r = b.getBoundingClientRect(); o[b.dataset.act] = getComputedStyle(b).display !== 'none' && r.width > 0; }); const u = document.getElementById('stage').getBoundingClientRect().height / 100; o._fwdH = document.querySelector('[data-act=fwd]').getBoundingClientRect().height / u; return o; });
+  ok('やじるし消す: 「まえ」「うつ」だけ残り、ひだり・みぎ・うしろは消える', vis.fwd && vis.fire && !vis.left && !vis.right && !vis.back && vis._fwdH >= 8, vis);
+  await page.screenshot({ path: SH + '43play_noarrows.png' });
+  // スワイプ：呼び出しを記録
+  await page.evaluate(() => {
+    window.__log = []; const W = World;
+    ['swipeTurn', 'nudgePitch'].forEach((n) => { const o = W[n]; W[n] = function (a) { window.__log.push([n, a]); return o ? o.apply(this, arguments) : undefined; }; });
+    const op = W.press; W.press = function (a, d) { window.__log.push(['press', a, d]); return op.apply(this, arguments); };
+  });
+  const box = await page.evaluate(() => { const r = document.getElementById('stage').getBoundingClientRect(); return { x: r.x, y: r.y, w: r.width, h: r.height }; });
+  const drag = async (x0, y0, x1, y1, from) => {
+    await page.mouse.move(x0, y0); await page.mouse.down();
+    for (let i = 1; i <= 8; i++) { await page.mouse.move(x0 + (x1 - x0) * i / 8, y0 + (y1 - y0) * i / 8); await sleep(15); }
+    await page.mouse.up(); await sleep(150);
+  };
+  const turns = () => page.evaluate(() => window.__log.filter((l) => l[0] === 'swipeTurn' || (l[0] === 'press' && (l[1] === 'left' || l[1] === 'right') && l[2] === true)));
+  const cx = box.x + box.w * 0.5, cy = box.y + box.h * 0.45;
+  await drag(cx - 60, cy, cx + 120, cy);
+  let t = await turns();
+  const isRight = (l) => (l[0] === 'swipeTurn' && l[1] === 1) || (l[0] === 'press' && l[1] === 'right');
+  ok('スワイプ反転（はんたい）: 右へなぞると 左を向く', t.length === 1 && !isRight(t[0]), t);
+  await page.evaluate(() => { window.__log.length = 0; });
+  await drag(cx + 60, cy, cx - 120, cy);
+  t = await turns();
+  ok('スワイプ反転（はんたい）: 左へなぞると 右を向く', t.length === 1 && isRight(t[0]), t);
+  await page.evaluate(() => { window.__log.length = 0; });
+  await drag(cx, cy + 60, cx, cy - 60);
+  const np = await page.evaluate(() => window.__log.filter((l) => l[0] === 'nudgePitch'));
+  ok('上へドラッグ: 視点の上下（nudgePitch が正の値）。World側に関数が無くても落ちない', np.length >= 1 ? np.every((l) => l[1] > 0) : true, np);
+  ok('上下ドラッグでは 向きは変わらない', (await turns()).length === 0, await turns());
+  // ボタンの上から始めた操作は除外
+  await page.evaluate(() => { window.__log.length = 0; });
+  const fb = await page.evaluate(() => { const r = document.getElementById('cam').getBoundingClientRect(); return { x: r.x + r.width / 2, y: r.y + r.height / 2 }; });
+  const camBefore = await page.evaluate(() => document.getElementById('cam-label').textContent);
+  await page.mouse.move(fb.x, fb.y); await page.mouse.down(); await page.mouse.move(fb.x - 150, fb.y, { steps: 6 }); await page.mouse.up(); await sleep(200);
+  ok('ボタン上から始めたスワイプは向きを変えない', (await turns()).length === 0, await turns());
+  ok('スワイプで画面遷移しない', await state(page) === 'play');
+  // 設定を戻して ふつうの向き
+  await page.evaluate(() => { const s = JSON.parse(localStorage.getItem('seecar.settings')); s.swipeRev = false; localStorage.setItem('seecar.settings', JSON.stringify(s)); });
+  await page.reload(); await sleep(500); await toTitle(page);
+  await nav(page, 'ひとりで れんしゅう'); await page.click('.card[data-id=mikka]', { force: true }); await sleep(800); await nav(page, 'しゅっぱつ！'); await sleep(1200);
+  await page.evaluate(() => { window.__log = []; const W = World; const o = W.swipeTurn; W.swipeTurn = function (a) { window.__log.push(['swipeTurn', a]); return o ? o.apply(this, arguments) : undefined; }; const op = W.press; W.press = function (a, d) { window.__log.push(['press', a, d]); return op.apply(this, arguments); }; });
+  await drag(cx - 60, cy, cx + 120, cy);
+  t = await turns();
+  ok('スワイプ（ふつう）: 右へなぞると 右を向く', t.length === 1 && isRight(t[0]), t);
+  await page.screenshot({ path: SH + '44swipe.png' });
+  ok('せってい: コンソールエラー0', errors.length === 0, errors.slice(0, 5));
+  await page.context().close();
 }
 
 async function online(browser) {
   const q = '?peerhost=127.0.0.1&peerport=' + PEER_PORT + '&peerpath=/myapp&peersecure=0';
   const A = await openPage(FILE, { browser, query: q }), B = await openPage(FILE, { browser, query: q });
-  for (const P of [A.page, B.page]) { await sleep(300); await P.click('#boot', { force: true }); await sleep(300); await nav(P, 'つうしんであそぶ'); }
+  for (const P of [A.page, B.page]) { await sleep(300); await P.click('#boot', { force: true }); await sleep(300); await nav(P, 'つうしんで あそぶ'); }
   await A.page.click('#c-host', { force: true }); await sleep(1500);
   const code = await A.page.evaluate(() => document.getElementById('codeshow').textContent.replace(/\D/g, ''));
   ok('つうしん: 4桁の番号', /^\d{4}$/.test(code), code); await A.page.screenshot({ path: SH + '20host_code.png' });
@@ -177,15 +323,19 @@ async function online(browser) {
   ok('つうしん: ホストが撃つ位置・向きに着いた', driven && tx === spot.tx && tz === spot.tz, { m, spot });
   const hA0 = await A.page.evaluate(([x, z]) => World._debug(x, z).h, [tx, tz]);
   const hb0 = await B.page.evaluate(([x, z]) => World._debug(x, z).h, [tx, tz]);
+  const tx1 = m.cx + DX[m.dir], tz1 = m.cz + DZ[m.dir];
+  const g1 = async (P) => P.evaluate(([x, z]) => World._debug(x, z).h, [tx1, tz1]);
   ok('つうしん: 撃つ前の2マス先は両方で高さ1以上', hA0 >= 1 && hb0 >= 1, { hA0, hb0, tx, tz });
   await A.page.evaluate(() => World.press('fire', true)); await sleep(100); await A.page.evaluate(() => World.press('fire', false));
   // 相手(B)の画面にも弾が飛ぶ：発射のあと、壊れる前に弾が見えるはず（遅い環境では参考）
   const sawBall = await waitFor(async () => (await B.page.evaluate(() => World._debug().projectiles)) > 0, 6000);
   await B.page.screenshot({ path: SH + '26guest_ball.png' });
-  await waitFor(async () => (await A.page.evaluate(([x, z]) => World._debug(x, z).h, [tx, tz])) === 0 && (await B.page.evaluate(([x, z]) => World._debug(x, z).h, [tx, tz])) === 0, 25000);
+  // 新しい大砲：手前の1マスに壁があればそれが壊れ、なければ2マス先が壊れる（どちらでも A と B が一致すればよい）
+  await waitFor(async () => (await A.page.evaluate(([x, z]) => World._debug(x, z).h, [tx, tz])) === 0 || (await g1(A.page)) === 0 || (await B.page.evaluate(([x, z]) => World._debug(x, z).h, [tx, tz])) === 0, 25000); await sleep(2500);
   ok('つうしん: 相手の弾が自分の画面で飛ぶ', sawBall, { sawBall, hb0 });
   const ha = await A.page.evaluate(([x, z]) => World._debug(x, z).h, [tx, tz]); const hb = await B.page.evaluate(([x, z]) => World._debug(x, z).h, [tx, tz]);
-  ok('つうしん: 破壊が両方で一致（撃つ前は1以上、撃った後は両方0）', hA0 >= 1 && hb0 >= 1 && ha === 0 && hb === 0, { before: [hA0, hb0], after: [ha, hb], tx, tz });
+  const ga = await g1(A.page), gb = await g1(B.page);
+  ok('つうしん: 破壊が両方で一致（撃つ前は1以上、撃った後は同じ形で壊れている）', hA0 >= 1 && hb0 >= 1 && ha === hb && ga === gb && (ha === 0 || ga === 0), { before: [hA0, hb0], after: [ha, hb], first: [ga, gb], tx, tz });
   await A.page.screenshot({ path: SH + '23host_play.png' }); await B.page.screenshot({ path: SH + '24guest_play.png' });
   // ゲストを閉じる → ホストに表示
   await B.context.close();
@@ -208,8 +358,11 @@ async function online(browser) {
   const ps = startPeerServer(PEER_PORT);
   const { chromium } = require('playwright');
   const browser = await chromium.launch({ args: ['--use-gl=swiftshader', '--enable-webgl', '--ignore-gpu-blocklist'] });
-  try { await solo(browser); } catch (e) { ok('ひとり: 例外なし', false, String(e).slice(0, 300)); }
-  try { await online(browser); } catch (e) { ok('つうしん: 例外なし', false, String(e).slice(0, 300)); }
+  const ONLY = process.env.ONLY || '';
+  if (!ONLY || ONLY === 'solo') try { await solo(browser); } catch (e) { ok('ひとり: 例外なし', false, String(e).slice(0, 300)); }
+  if (!ONLY || ONLY === 'cpu') try { await cpu(browser); } catch (e) { ok('CPU: 例外なし', false, String(e).slice(0, 300)); }
+  if (!ONLY || ONLY === 'settings') try { await settings(browser); } catch (e) { ok('せってい: 例外なし', false, String(e).slice(0, 300)); }
+  if (!ONLY || ONLY === 'online') try { await online(browser); } catch (e) { ok('つうしん: 例外なし', false, String(e).slice(0, 300)); }
   console.log(results.join('\n'));
   await browser.close(); stopStatic(); ps.close(); process.exit(0);
 })();

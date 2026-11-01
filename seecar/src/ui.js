@@ -273,9 +273,9 @@
       segs[i].setAttribute('aria-pressed', on ? 'true' : 'false');
     }
     var h = function (id, t) { $(id).textContent = t; };
-    h('hint-arrows', settings.arrows ? 'うえしたひだりみぎの ボタンを だすよ' : '「まえ」だけ のこるよ。むきは ゆびで かえるよ');
+    h('hint-arrows', settings.arrows ? 'ボタンを ぜんぶ だすよ' : '「まえ」だけ のこるよ');
     h('hint-swipeRev', settings.swipeRev ? 'みぎへ なぞると ひだりを むくよ' : 'みぎへ なぞると みぎを むくよ');
-    h('hint-binary', settings.binary ? 'よみこんだ えは しろと くろだけに なるよ' : 'よみこんだ えの いろの こさで ちずに なるよ');
+    h('hint-binary', settings.binary ? 'しろと くろの 2いろに するよ' : 'いろの こさで ちずに するよ');
     var t = { win: 0, lose: 0 }; Object.keys(record).forEach(function (k) { t.win += record[k].win; t.lose += record[k].lose; });
     h('hint-record', 'ぜんぶで ' + t.win + 'かち ' + t.lose + 'まけ');
   }
@@ -297,6 +297,22 @@
   }
 
   // ---------------- 地図えらび ----------------
+  // 見本の元の絵を小さくして カードに出す（MapGen.presetCanvas があるとき。いちど作ったら使いまわす）
+  var thumbs = {};
+  function thumb(id) {
+    if (thumbs[id] !== undefined) return thumbs[id];
+    var u = '';
+    try {
+      var cv = call('MapGen', 'presetCanvas', id);
+      if (cv && cv.width) {
+        var k = 96 / Math.max(cv.width, cv.height), t = doc.createElement('canvas');
+        t.width = Math.max(1, Math.round(cv.width * k)); t.height = Math.max(1, Math.round(cv.height * k));
+        var g = t.getContext('2d'); g.imageSmoothingQuality = 'high'; g.drawImage(cv, 0, 0, t.width, t.height);
+        u = t.toDataURL('image/png');
+      }
+    } catch (e) { u = ''; }
+    thumbs[id] = u; return u;
+  }
   function renderCards() {
     var presets = prop('MapGen', 'presets') || [];
     var grid = els.cards;
@@ -313,7 +329,8 @@
       list.forEach(function (p) {
         var c = doc.createElement('button');
         c.type = 'button'; c.tabIndex = -1; c.className = 'card ' + cls; c.setAttribute('data-id', p.id);
-        c.innerHTML = (cls === 'illust' && ILLUST[p.title] ? '<i class="ic">' + ILLUST[p.title] + '</i>' : '') + '<span class="kan"></span><span class="yomi"></span>';
+        var th = cls === 'illust' ? thumb(p.id) : '';
+        c.innerHTML = (th ? '<i class="ic"><img alt="" src="' + th + '"></i>' : (cls === 'illust' && ILLUST[p.title] ? '<i class="ic">' + ILLUST[p.title] + '</i>' : '')) + '<span class="kan"></span><span class="yomi"></span>';
         c.querySelector('.kan').textContent = p.title;
         c.querySelector('.yomi').textContent = cls === 'illust' ? '' : (p.reading || '');
         tap(c, function () { choosePreset(p); });
@@ -630,7 +647,8 @@
     } else els.endRec.style.display = 'none';
     els.endTitle.textContent = m.title || '';
     els.endTitle.style.display = m.title ? '' : 'none';
-    els.endYomi.textContent = m.reading || '';
+    els.endYomi.textContent = (m.reading && m.reading !== m.title) ? m.reading : '';
+    els.endYomi.style.display = els.endYomi.textContent ? '' : 'none';
     if (m.picture) { showEndPic(m.picture); els.endPic.style.display = ''; } else els.endPic.style.display = 'none';
     var c = els.confetti; c.innerHTML = '';
     var cols = ['#ff5d8f', '#ffd23f', '#4d9bff', '#59d27c', '#b388ff', '#ff9f1c'];
@@ -784,6 +802,8 @@
     buildLogos();
     buildKeypad();
     renderCards(); renderPreview();
+    var icos = doc.querySelectorAll('[data-ico]');
+    for (var ii = 0; ii < icos.length; ii++) icos[ii].innerHTML = SETICO[icos[ii].getAttribute('data-ico')] || '';
     renderLevels(); renderSettings(); renderRecChip();
     updateCam();
 
