@@ -681,7 +681,7 @@
     var starMat = new THREE.SpriteMaterial({ map: T.star, color: 0xfff6a0, transparent: true, depthWrite: false, blending: THREE.AdditiveBlending });
     for (var i = 0; i < 6; i++) { var s = new THREE.Sprite(starMat); s.scale.setScalar(0.2); g.add(s); sparks.push(s); }
     // 俯瞰のための大きな目じるし（光の輪）
-    var far = new THREE.Sprite(new THREE.SpriteMaterial({ map: T.soft, color: 0xff7ad0, transparent: true, depthWrite: false, depthTest: false, blending: THREE.AdditiveBlending }));
+    var far = new THREE.Sprite(new THREE.SpriteMaterial({ map: T.star, color: 0xff3fa8, transparent: true, depthWrite: false, depthTest: false }));
     far.renderOrder = 9; far.visible = false; g.add(far);
     add(g);
     S.treasure = { group: g, gem: gem, glow: glow, sparks: sparks, far: far, beam: beam, x: t.x, z: t.z, celebrate: 0 };
@@ -710,7 +710,7 @@
     // 遠くからでも見える光（カメラが高いほど大きく）
     var camH = S.camera.position.y;
     tr.far.visible = camH > 9;
-    if (tr.far.visible) { var fs = camH * 0.07; tr.far.scale.set(fs, fs, 1); tr.far.position.y = 0.8; tr.far.material.opacity = clamp((camH - 9) / 8, 0, 1) * (0.75 + 0.25 * Math.sin(t * 5)); }
+    if (tr.far.visible) { var fs = camH * 0.06 * (1 + 0.12 * Math.sin(t * 5)); tr.far.material.rotation = Math.sin(t * 2) * 0.3; tr.far.scale.set(fs, fs, 1); tr.far.position.y = 0.8; tr.far.material.opacity = clamp((camH - 9) / 8, 0, 1); }
   }
 
   // ---------- 破壊 ----------

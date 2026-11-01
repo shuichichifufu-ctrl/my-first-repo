@@ -200,7 +200,8 @@
         fail(s, 'error', m[0], m[1]);
       });
       p.on('disconnected', function () { if (!api.connected && !s.finished) fail(s, 'error', 'disconnected', MSG.server); });
-      s.timers.push(setTimeout(function () { fail(s, 'error', 'timeout', MSG.cantConnect); }, JOIN_TIMEOUT_MS));
+      // 部屋に入れたあと（settled）は時間切れにしない
+      s.timers.push(setTimeout(function () { if (!s.settled) fail(s, 'error', 'timeout', MSG.cantConnect); }, JOIN_TIMEOUT_MS));
       p.on('open', function () {
         if (s.finished || S !== s) return;
         var conn = p.connect('seecar-hoshi-' + code, { serialization: 'json', reliable: true });
