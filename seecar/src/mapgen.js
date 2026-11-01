@@ -42,7 +42,7 @@
 
   // ---------- 解析 ----------
   // 画素(pw x ph)のRGBA -> MapData（絵の部分）。picture/title/reading は呼び出し側で入れる。
-  function analyze(rgba, pw, ph, darkL) {
+  function analyze(rgba, pw, ph, darkL, binary) {
     var w = pw * BLOCK, h = ph * BLOCK, n = w * h;
     var heights = new Uint8Array(n), colors = new Uint8Array(n * 3);
     var px, pz, i, j, dx, dz;
@@ -59,6 +59,8 @@
         if (darkL) L = Math.min(L, darkL[pz * pw + px]);
         var hh = Math.round((1 - L) * 10);
         if (hh < 0) hh = 0; if (hh > 10) hh = 10;
+        // 白黒モード：明るさ0.5未満は高さ10・黒、それ以外は高さ0・白（色も白黒にそろえる）
+        if (binary) { if (L < 0.5) { hh = WALL_H; r = g = b = 0; } else { hh = 0; r = g = b = 255; } }
         for (dz = 0; dz < BLOCK; dz++) {
           for (dx = 0; dx < BLOCK; dx++) {
             i = (pz * BLOCK + dz) * w + (px * BLOCK + dx);
@@ -282,13 +284,13 @@
 
   // ---------- 共通処理 ----------
   // src: canvas か img。大きい画像でも半分ずつ縮めるので速い。
-  function build(src, sw, sh, title, reading) {
+  function build(src, sw, sh, title, reading, opts) {
     if (!(sw > 0 && sh > 0)) throw new Error(KID_ERROR);
     var pic = shrink(src, sw, sh, PIC_LONG);
     var small = shrink(pic, pic.width, pic.height, MAX_LONG);
     var pw = small.width, ph = small.height;
     var rgba = small.getContext('2d').getImageData(0, 0, pw, ph).data;
-    var map = analyze(rgba, pw, ph, darkest(src, sw, sh, pw, ph));
+    var map = analyze(rgba, pw, ph, darkest(src, sw, sh, pw, ph), !!(opts && opts.binary === true));
     map.title = title; map.reading = reading;
     map.picture = pic.toDataURL('image/jpeg', 0.82);
     return map;
@@ -318,10 +320,10 @@
     }
     return out;
   }
-  function fromCanvas(canvas, title, reading) {
-    return build(canvas, canvas.width, canvas.height, title || 'よみこんだ え', reading || 'よみこんだ え');
+  function fromCanvas(canvas, title, reading, opts) {
+    return build(canvas, canvas.width, canvas.height, title || 'よみこんだ え', reading || 'よみこんだ え', opts);
   }
-  function fromFile(file) {
+  function fromFile(file, opts) {
     return new Promise(function (resolve, reject) {
       var fail = function () { reject(new Error(KID_ERROR)); };
       if (!file || !file.size || (file.type && file.type.indexOf('image/') !== 0)) { fail(); return; }
@@ -332,7 +334,7 @@
         // 描画を一度ブラウザに返してから重い処理（固まった感じを減らす）
         setTimeout(function () {
           try {
-            var m = build(img, img.naturalWidth, img.naturalHeight, 'よみこんだ え', 'よみこんだ え');
+            var m = build(img, img.naturalWidth, img.naturalHeight, 'よみこんだ え', 'よみこんだ え', opts);
             URL.revokeObjectURL(url);
             resolve(m);
           } catch (e) { URL.revokeObjectURL(url); fail(); }
@@ -374,124 +376,129 @@
     return m;
   }
 
-  // ---------- 既定地図（四字熟語） ----------
-  var PRESETS = [ // 字の中に閉じた部分（口・日・田など）があり、小さい字でもつぶれにくい熟語
-    { id: 'jiyu', title: '自由自在', reading: 'じゆうじざい' },
-    { id: 'shiho', title: '四方八方', reading: 'しほうはっぽう' },
-    { id: 'hinkou', title: '品行方正', reading: 'ひんこうほうせい' },
-    { id: 'mikka', title: '三日坊主', reading: 'みっかぼうず' },
-    { id: 'ichinichi', title: '一日千秋', reading: 'いちじつせんしゅう' }
+  // ---------- 見本の地図（四字熟語は白黒だけ。イラストは白地に太い黒線） ----------
+  var PRESETS = [
+    // 四字熟語：字の中に閉じた部分（口・日・田など）があり、小さい字でもつぶれにくい熟語
+    { id: 'jiyu', kind: 'yoji', title: '自由自在', reading: 'じゆうじざい' },
+    { id: 'shiho', kind: 'yoji', title: '四方八方', reading: 'しほうはっぽう' },
+    { id: 'hinkou', kind: 'yoji', title: '品行方正', reading: 'ひんこうほうせい' },
+    { id: 'mikka', kind: 'yoji', title: '三日坊主', reading: 'みっかぼうず' },
+    { id: 'ichinichi', kind: 'yoji', title: '一日千秋', reading: 'いちじつせんしゅう' },
+    // イラスト：閉じた部分（窓・目・花びらなど）が複数ある単純な線画。宝は いちばん小さい閉じた部分に入る
+    { id: 'ie', kind: 'illust', title: 'いえ', reading: 'いえ' },
+    { id: 'sakana', kind: 'illust', title: 'さかな', reading: 'さかな' },
+    { id: 'kuruma', kind: 'illust', title: 'くるま', reading: 'くるま' },
+    { id: 'hana', kind: 'illust', title: 'はな', reading: 'はな' },
+    { id: 'hoshi', kind: 'illust', title: 'ほし', reading: 'ほし' },
+    { id: 'roketto', kind: 'illust', title: 'ロケット', reading: 'ろけっと' }
   ];
   var STROKE = 10;
   var THIN = { '鳥': 0, '麗': 0, '龍': 0 }; // 字ごとの太らせる量（線の多い字は細く。0=太らせない）
   var FONT = "'Hiragino Kaku Gothic ProN','Hiragino Sans','Noto Sans JP','Yu Gothic',sans-serif";
+  var S = 640;               // 見本の絵の大きさ（画素）
+  var LW = 26;               // イラストの線の太さ（画像1画素=10px の約2.6画素分。縮小しても途切れない）
 
-  function rng(seed) { // mulberry32
-    var a = seed >>> 0;
-    return function () {
-      a = (a + 0x6D2B79F5) >>> 0;
-      var t = a;
-      t = Math.imul(t ^ (t >>> 15), t | 1);
-      t ^= t + Math.imul(t ^ (t >>> 7), t | 61);
-      return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
-    };
-  }
-  // 床の色（明るい＝高さ0〜1。戦車が通れる）。できるだけ濃い色。明るさ L >= 0.86 を保つ。
-  var CRAYONS = ['#ffe45c', '#ffd0e0', '#b8ecff', '#c6f5b0', '#ffd9a0', '#e6d6ff', '#fff06e', '#ffc4d6', '#a8e8ff', '#b4f09a'];
-  // 積み木の色（やや暗い＝高さ2〜6くらい）。色つきの積み木になる。
-  var BLOCKS = ['#e84a4a', '#3f8fe8', '#4cb54c', '#ff9a2e', '#9b5de5', '#ffd23f', '#2bb5c8', '#ff6fa5'];
-  var BLOCK_RATE = 0.18;     // 落書きのうち、色の積み木になる割合（少しだけ）
-
-  function crayonStroke(g, rand, pts, width, color) {
-    // 同じ線を少しずらして3回重ね、クレヨンのかすれを出す
-    for (var pass = 0; pass < 3; pass++) {
-      g.beginPath();
-      g.globalAlpha = 0.55 + rand() * 0.3;
-      g.strokeStyle = color; g.lineWidth = width * (0.8 + rand() * 0.4);
-      g.lineCap = 'round'; g.lineJoin = 'round';
-      for (var i = 0; i < pts.length; i++) {
-        var px = pts[i][0] + (rand() - 0.5) * 6, pz = pts[i][1] + (rand() - 0.5) * 6;
-        if (i === 0) g.moveTo(px, pz); else g.lineTo(px, pz);
-      }
-      g.stroke();
-    }
-    g.globalAlpha = 1;
-  }
-  function doodle(g, rand, W, H) {
-    var kind = Math.floor(rand() * 5), block = rand() < BLOCK_RATE;
-    var color = block ? BLOCKS[Math.floor(rand() * BLOCKS.length)] : CRAYONS[Math.floor(rand() * CRAYONS.length)];
-    var cx = rand() * W, cz = rand() * H, s = 50 + rand() * 90, pts = [], i;
-    if (kind === 0) {          // ぐるぐるうず
-      for (i = 0; i < 60; i++) { var a = i * 0.45, r = 3 + i * s / 60; pts.push([cx + Math.cos(a) * r, cz + Math.sin(a) * r]); }
-      crayonStroke(g, rand, pts, 16, color);
-    } else if (kind === 1) {   // ジグザグのぬりつぶし
-      for (i = 0; i < 14; i++) pts.push([cx + (i % 2 ? s : 0), cz + i * s / 10]);
-      crayonStroke(g, rand, pts, 20, color);
-    } else if (kind === 2) {   // 星
-      for (i = 0; i <= 5; i++) { var b = -Math.PI / 2 + i * 4 * Math.PI / 5; pts.push([cx + Math.cos(b) * s, cz + Math.sin(b) * s]); }
-      crayonStroke(g, rand, pts, 16, color);
-    } else if (kind === 3) {   // まるをぬる
-      for (var ring = s; ring > 8; ring -= 14) for (i = 0; i <= 24; i++) { var c = i / 24 * Math.PI * 2; pts.push([cx + Math.cos(c) * ring, cz + Math.sin(c) * ring]); }
-      crayonStroke(g, rand, pts, 18, color);
-    } else {                   // なみ線
-      for (i = 0; i < 16; i++) pts.push([cx + i * s / 6, cz + Math.sin(i * 0.9) * s / 3]);
-      crayonStroke(g, rand, pts, 16, color);
-    }
-  }
-
-  function drawPreset(def, seed) {
-    var S = 640, c = newCanvas(S, S), g = c.getContext('2d');
+  // 四字熟語：白地に太い黒字だけ（色の落書きはしない）
+  function drawYoji(def) {
+    var c = newCanvas(S, S), g = c.getContext('2d');
     g.fillStyle = '#fff'; g.fillRect(0, 0, S, S);
-    var rand = rng(seed);
-    for (var d = 0; d < 32; d++) doodle(g, rand, S, S);
-    // 字：2x2に並べる。太く（fillText の上に strokeText を太い線で重ねる）
     var chars = def.title.split(''), size = 262, cell = S / 2;
-    function drawChars(gx) {
-      gx.font = '900 ' + size + 'px ' + FONT;
-      gx.textAlign = 'center'; gx.textBaseline = 'middle';
-      gx.fillStyle = '#000'; gx.strokeStyle = '#000'; gx.lineJoin = 'round';
-      for (var i = 0; i < 4; i++) {
-        var cx = (i % 2) * cell + cell / 2, cz = Math.floor(i / 2) * cell + cell / 2 + 6;
-        gx.fillText(chars[i], cx, cz);
-        // 線の多い字（鳥など）は太らせすぎると黒い塊につぶれるので、太らせる量を字ごとに変える
-        var lw = THIN[chars[i]] != null ? THIN[chars[i]] : STROKE;
-        if (lw > 0) { gx.lineWidth = lw; gx.strokeText(chars[i], cx, cz); }
-      }
+    g.font = '900 ' + size + 'px ' + FONT;
+    g.textAlign = 'center'; g.textBaseline = 'middle';
+    g.fillStyle = '#000'; g.strokeStyle = '#000'; g.lineJoin = 'round';
+    for (var i = 0; i < 4; i++) {
+      var cx = (i % 2) * cell + cell / 2, cz = Math.floor(i / 2) * cell + cell / 2 + 6;
+      g.fillText(chars[i], cx, cz);
+      // 線の多い字（鳥など）は太らせすぎると黒い塊につぶれるので、太らせる量を字ごとに変える
+      var lw = THIN[chars[i]] != null ? THIN[chars[i]] : STROKE;
+      if (lw > 0) { g.lineWidth = lw; g.strokeText(chars[i], cx, cz); }
     }
-    // 字だけの下書きで「字に囲まれた部分（口・日の中など）」を見つけ、そこには色の積み木をかかない（宝の部屋は低い床のまま）
-    var m = newCanvas(S, S), mg = m.getContext('2d');
-    mg.fillStyle = '#fff'; mg.fillRect(0, 0, S, S); drawChars(mg);
-    var md = mg.getImageData(0, 0, S, S).data, outside = new Uint8Array(S * S), stack = [], k;
-    // 字の線を少し太らせて見て、すきまのある囲み（縮小すると壁でつながる所）も「囲まれた部分」にする
-    var blk = new Uint8Array(S * S), blk2 = new Uint8Array(S * S), x0, z0, R = 3;
-    for (k = 0; k < S * S; k++) blk[k] = md[k * 4] < 128 ? 1 : 0;
-    for (z0 = 0; z0 < S; z0++) for (x0 = 0; x0 < S; x0++) if (blk[z0 * S + x0]) for (k = Math.max(0, x0 - R); k <= Math.min(S - 1, x0 + R); k++) blk2[z0 * S + k] = 1;
-    for (x0 = 0; x0 < S; x0++) for (z0 = 0; z0 < S; z0++) if (blk2[z0 * S + x0]) for (k = Math.max(0, z0 - R); k <= Math.min(S - 1, z0 + R); k++) blk[k * S + x0] = 1;
-    function push(i) { if (!outside[i] && !blk[i]) { outside[i] = 1; stack.push(i); } }
-    for (k = 0; k < S; k++) { push(k); push((S - 1) * S + k); push(k * S); push(k * S + S - 1); }
-    while (stack.length) {
-      var q = stack.pop(), qx = q % S;
-      if (qx > 0) push(q - 1); if (qx < S - 1) push(q + 1); if (q >= S) push(q - S); if (q < S * (S - 1)) push(q + S);
-    }
-    drawChars(g);
-    var fd = g.getImageData(0, 0, S, S), p = fd.data;
-    for (k = 0; k < S * S; k++) {
-      if (!outside[k] && md[k * 4] >= 128) { p[k * 4] = 255; p[k * 4 + 1] = 244; p[k * 4 + 2] = 196; p[k * 4 + 3] = 255; }
-    }
-    g.putImageData(fd, 0, 0);
     return c;
   }
-  function fromPreset(id) {
-    var def = null;
-    for (var i = 0; i < PRESETS.length; i++) if (PRESETS[i].id === id) def = PRESETS[i];
-    if (!def) def = PRESETS[0];
-    var canvas = drawPreset(def, 1000 + PRESETS.indexOf(def) * 37);
-    return fromCanvas(canvas, def.title, def.reading);
+
+  // イラストの道具：形を白で塗ってから黒い太線でなぞる（下にある線を隠せる）
+  function shape(g, path, white) {
+    g.beginPath(); path(g);
+    if (white !== false) { g.fillStyle = '#fff'; g.fill(); }
+    g.strokeStyle = '#000'; g.lineWidth = LW; g.lineJoin = 'round'; g.lineCap = 'round'; g.stroke();
+  }
+  function poly(pts) { return function (g) { g.moveTo(pts[0][0], pts[0][1]); for (var i = 1; i < pts.length; i++) g.lineTo(pts[i][0], pts[i][1]); g.closePath(); }; }
+  function circle(x, z, r) { return function (g) { g.arc(x, z, r, 0, Math.PI * 2); }; }
+  function ellipse(x, z, rx, rz, rot) { return function (g) { g.ellipse(x, z, rx, rz, rot || 0, 0, Math.PI * 2); }; }
+  function line(g, x0, z0, x1, z1) { g.beginPath(); g.moveTo(x0, z0); g.lineTo(x1, z1); g.strokeStyle = '#000'; g.lineWidth = LW; g.lineCap = 'round'; g.stroke(); }
+
+  var ILLUST = {
+    ie: function (g) { // いえ：やね・けむりだし・かべ・ドア・まど
+      shape(g, poly([[372, 150], [452, 150], [452, 260], [372, 260]]));     // えんとつ
+      shape(g, poly([[170, 300], [470, 300], [470, 530], [170, 530]]));     // かべ
+      shape(g, poly([[135, 305], [320, 140], [505, 305]]));                 // やね
+      shape(g, poly([[215, 400], [315, 400], [315, 530], [215, 530]]));     // ドア
+      shape(g, poly([[372, 360], [446, 360], [446, 434], [372, 434]]));     // まど
+    },
+    sakana: function (g) { // さかな：しっぽ・ひれ・からだ・め
+      shape(g, poly([[420, 320], [545, 215], [545, 425]]));                 // しっぽ
+      shape(g, poly([[250, 235], [320, 150], [385, 240]]));                 // せびれ
+      shape(g, poly([[300, 380], [350, 470], [405, 380]]));                 // はらびれ
+      shape(g, ellipse(290, 320, 175, 112));                                // からだ
+      shape(g, circle(205, 290, 36));                                       // め
+    },
+    kuruma: function (g) { // くるま：からだ・うえの へや・まど2つ・タイヤ2つ
+      shape(g, poly([[185, 300], [245, 190], [405, 190], [465, 300]]));     // うえの へや
+      line(g, 325, 195, 325, 300);                                          // まどの しきり
+      shape(g, poly([[90, 300], [550, 300], [550, 430], [90, 430]]));       // からだ
+      shape(g, circle(210, 430, 62));                                       // タイヤ
+      shape(g, circle(430, 430, 62));
+    },
+    hana: function (g) { // はな：はなびら5つ・まんなか・くき・は2まい
+      line(g, 320, 340, 320, 560);                                          // くき
+      shape(g, function (g) { g.moveTo(320, 500); g.quadraticCurveTo(250, 380, 140, 420); g.quadraticCurveTo(190, 540, 320, 500); }); // は
+      shape(g, function (g) { g.moveTo(320, 450); g.quadraticCurveTo(390, 330, 500, 370); g.quadraticCurveTo(450, 490, 320, 450); });
+      for (var i = 0; i < 5; i++) {                                         // はなびら
+        var a = -Math.PI / 2 + i * Math.PI * 2 / 5;
+        shape(g, circle(320 + Math.cos(a) * 98, 220 + Math.sin(a) * 98, 56));
+      }
+      shape(g, circle(320, 220, 52));                                       // まんなか
+    },
+    hoshi: function (g) { // ほし：5つの とがりと まんなか
+      var pts = [];
+      for (var i = 0; i < 5; i++) { var a = -Math.PI / 2 + i * Math.PI * 4 / 5; pts.push([320 + Math.cos(a) * 250, 340 + Math.sin(a) * 250]); }
+      g.beginPath(); g.moveTo(pts[0][0], pts[0][1]);
+      for (var k = 1; k < 5; k++) g.lineTo(pts[k][0], pts[k][1]);
+      g.closePath(); g.strokeStyle = '#000'; g.lineWidth = LW; g.lineJoin = 'round'; g.lineCap = 'round'; g.stroke();
+    },
+    roketto: function (g) { // ロケット：ほのお・はね2つ・からだ・まど
+      shape(g, poly([[265, 450], [375, 450], [320, 560]]));                 // ほのお
+      shape(g, poly([[240, 300], [130, 450], [250, 430]]));                 // はね
+      shape(g, poly([[400, 300], [510, 450], [390, 430]]));
+      shape(g, function (g) { g.moveTo(320, 70); g.quadraticCurveTo(460, 200, 420, 450); g.lineTo(220, 450); g.quadraticCurveTo(180, 200, 320, 70); }); // からだ
+      shape(g, circle(320, 250, 52));                                       // まど
+    }
+  };
+  function drawIllust(def) {
+    var c = newCanvas(S, S), g = c.getContext('2d');
+    g.fillStyle = '#fff'; g.fillRect(0, 0, S, S);
+    ILLUST[def.id](g);
+    return c;
+  }
+
+  function findPreset(id) {
+    for (var i = 0; i < PRESETS.length; i++) if (PRESETS[i].id === id) return PRESETS[i];
+    return PRESETS[0];
+  }
+  // 見本の元の絵（canvas）。確認用にも使う。
+  function presetCanvas(id) {
+    var def = findPreset(id);
+    return def.kind === 'illust' ? drawIllust(def) : drawYoji(def);
+  }
+  function fromPreset(id, opts) {
+    var def = findPreset(id);
+    return fromCanvas(presetCanvas(def.id), def.title, def.reading, opts);
   }
 
   window.MapGen = {
-    presets: PRESETS.map(function (p) { return { id: p.id, title: p.title, reading: p.reading }; }),
+    presets: PRESETS.map(function (p) { return { id: p.id, title: p.title, reading: p.reading, kind: p.kind }; }),
     fromPreset: fromPreset,
+    presetCanvas: presetCanvas,
     fromFile: fromFile,
     fromCanvas: fromCanvas,
     encode: encode,
