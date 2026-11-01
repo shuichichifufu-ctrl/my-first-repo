@@ -262,11 +262,16 @@
 
   // ---------- 既定地図（四字熟語） ----------
   var PRESETS = [
+    { id: 'jiyu', title: '自由自在', reading: 'じゆうじざい' },
+    { id: 'shiho', title: '四方八方', reading: 'しほうはっぽう' },
+    { id: 'hinkou', title: '品行方正', reading: 'ひんこうほうせい' },
     { id: 'nisshin', title: '日進月歩', reading: 'にっしんげっぽ' },
+    { id: 'ikudoon', title: '異口同音', reading: 'いくどうおん' },
     { id: 'isseki', title: '一石二鳥', reading: 'いっせきにちょう' },
-    { id: 'shikuhakku', title: '四苦八苦', reading: 'しくはっく' },
-    { id: 'ikudoon', title: '異口同音', reading: 'いくどうおん' }
+    { id: 'ichinichi', title: '一日千秋', reading: 'いちじつせんしゅう' },
+    { id: 'roujaku', title: '老若男女', reading: 'ろうにゃくなんにょ' }
   ];
+  var STROKE = 10;
   var FONT = "'Hiragino Kaku Gothic ProN','Hiragino Sans','Noto Sans JP','Yu Gothic',sans-serif";
 
   function rng(seed) { // mulberry32
@@ -280,7 +285,7 @@
     };
   }
   // 淡い色（明るい＝低い段）。ほとんど1段、ときどき2段になる明るさ。
-  var CRAYONS = ['#ffc9d6', '#fff3a8', '#bfe3ff', '#c9f0c0', '#ffd9a8', '#e3d1ff', '#ffb870', '#a9dc98', '#ffa9bf', '#9fd4f5'];
+  var CRAYONS = ['#ffc9d6', '#fff3a8', '#bfe3ff', '#c9f0c0', '#ffe0b0', '#e3d1ff', '#ffe98a', '#cfeec3', '#ffd0dc', '#c4e6fb', '#ffc08a', '#b5e3a5'];
 
   function crayonStroke(g, rand, pts, width, color) {
     // 同じ線を少しずらして3回重ね、クレヨンのかすれを出す
@@ -327,7 +332,7 @@
     var chars = def.title.split(''), size = 262, cell = S / 2;
     g.font = '900 ' + size + 'px ' + FONT;
     g.textAlign = 'center'; g.textBaseline = 'middle';
-    g.fillStyle = '#000'; g.strokeStyle = '#000'; g.lineJoin = 'round'; g.lineWidth = 14;
+    g.fillStyle = '#000'; g.strokeStyle = '#000'; g.lineJoin = 'round'; g.lineWidth = STROKE;
     for (var i = 0; i < 4; i++) {
       var cx = (i % 2) * cell + cell / 2, cz = Math.floor(i / 2) * cell + cell / 2 + 6;
       g.fillText(chars[i], cx, cz);
