@@ -1,0 +1,5 @@
+<!doctype html><meta charset="utf-8"><title>net test</title>
+<script src="https://unpkg.com/peerjs@1.5.4/dist/peerjs.min.js"></script>
+<script src="../src/net.js"></script>
+<script src="../src/sfx.js"></script>
+<script>window.LOG=[];['open','data','close','error'].forEach(function(n){Net.on(n,function(a){LOG.push([n,n==='data'?(a&&a.t==='big'?{t:'big',len:a.s.length}:a):a]);});});</script>
