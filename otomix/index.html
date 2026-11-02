@@ -24,7 +24,10 @@ input[type=number]{width:74px}
 input[type=range]{accent-color:var(--accent);cursor:pointer}
 label{display:inline-flex;align-items:center;gap:6px;color:var(--sub)}
 #app{display:flex;flex-direction:column;height:100%}
-#top{display:flex;flex-wrap:wrap;align-items:center;gap:8px 6px;padding:8px 8px;background:var(--panel);border-bottom:1px solid var(--line)}
+button.rec{color:#ff8a8a;min-width:74px}
+button.rec.on{background:#7a1f1f;border-color:#ff4d4d;color:#fff;font-weight:600;animation:recb 1.2s infinite}
+@keyframes recb{50%{border-color:#7a1f1f}}
+#top{display:flex;flex-wrap:wrap;align-items:center;gap:8px 4px;padding:8px 6px;background:var(--panel);border-bottom:1px solid var(--line)}
 .grp{display:flex;align-items:center;gap:6px}
 .brand b{font-size:16px;letter-spacing:.04em}
 @media (max-width:1560px){.brand{display:none}}
@@ -32,7 +35,7 @@ label{display:inline-flex;align-items:center;gap:6px;color:var(--sub)}
 .brand small{color:var(--sub);margin-left:4px}
 .play{width:80px;padding-left:6px;padding-right:6px;font-weight:600}
 .play.on{background:#1f5f3c;border-color:var(--ok)}
-.clock{font-variant-numeric:tabular-nums;background:#0e1014;border:1px solid var(--line);border-radius:8px;padding:2px 10px;flex-direction:column;align-items:flex-start;gap:0;min-width:104px}
+.clock{font-variant-numeric:tabular-nums;background:#0e1014;border:1px solid var(--line);border-radius:8px;padding:2px 10px;flex-direction:column;align-items:flex-start;gap:0;min-width:96px}
 #clkTime{font-size:17px;font-weight:600;letter-spacing:.02em}
 #clkBar{font-size:11px;color:var(--sub)}
 #meter{background:#0e1014;border:1px solid var(--line);border-radius:4px}
@@ -122,6 +125,7 @@ label{display:inline-flex;align-items:center;gap:6px;color:var(--sub)}
     <div class="grp brand"><b>おとミックス</b></div>
     <div class="grp">
       <button id="bAdd" class="primary" title="音声ファイルを追加します（MP3・WAV・M4A・OGG・FLAC、動画ファイルの音声も可）。画面へのドラッグでも追加できます">＋ 音声を追加</button>
+      <button id="bRec" class="rec" title="パソコンで鳴っている音（ブラウザのタブ・画面）やマイクを録音して、新しいトラックにします">● 録音</button>
     </div>
     <div class="grp">
       <button id="bHome" title="先頭へ戻る（Homeキー）">⏮</button>
@@ -130,7 +134,7 @@ label{display:inline-flex;align-items:center;gap:6px;color:var(--sub)}
       <button id="bLoop" class="tog" title="ループ再生（Lキー）。上の目盛りをドラッグすると範囲を決められます">⟲ ループ</button>
       <button id="bMetro" class="tog" title="メトロノーム（Mキー）。拍に合っているかの確認用で、書き出しには入りません" aria-label="メトロノーム">♩</button>
     </div>
-    <div class="grp"><span class="seg"><button data-tool="move" class="on" title="移動ツール（Vキー）：帯をドラッグして動かす">✋ 移動</button><button data-tool="range" title="範囲ツール（Rキー）：ドラッグで範囲を選ぶ。移動ツールのままでも Shift＋ドラッグで選べます">⌶ 範囲</button></span>
+    <div class="grp"><span class="seg"><button data-tool="move" class="on" title="移動ツール（Vキー）：帯をドラッグして動かす" aria-label="移動ツール">✋</button><button data-tool="range" title="範囲ツール（Rキー）：ドラッグで範囲を選ぶ。移動ツールのままでも Shift＋ドラッグで選べます" aria-label="範囲ツール">⌶ 範囲</button></span>
     </div>
     <div class="grp clock" title="上：時間（分:秒.ミリ秒）　下：小節.拍.16分"><div id="clkTime">00:00.000</div><div id="clkBar">小節 1.1.1</div></div>
     <div class="grp">
@@ -149,8 +153,8 @@ label{display:inline-flex;align-items:center;gap:6px;color:var(--sub)}
       <button id="bHelp" title="使い方とショートカット">？</button>
     </div>
     <div class="grp">
-      <label title="全体の音量（ダブルクリックで0dB）">音量 <input id="iMaster" type="range" min="-60" max="12" step="0.5" value="0" style="width:56px"></label>
-      <canvas id="meter" width="64" height="22" title="出力レベル（赤くなったら音割れの恐れ）"></canvas>
+      <label title="全体の音量（ダブルクリックで0dB）">音量 <input id="iMaster" type="range" min="-60" max="12" step="0.5" value="0" style="width:42px"></label>
+      <canvas id="meter" width="44" height="22" title="出力レベル（赤くなったら音割れの恐れ）"></canvas>
     </div>
   </header>
   <div id="banner"><span>前回の作業が自動保存されています。</span><button id="bRestore" class="primary">続きから再開</button><button id="bDiscard">新しく始める</button></div>
@@ -167,7 +171,7 @@ label{display:inline-flex;align-items:center;gap:6px;color:var(--sub)}
     <div id="empty"><div class="card">
       <h2>音声ファイルをここにドラッグ</h2>
       <p>MP3・WAV・M4A・OGG・FLAC など。動画ファイルからも音声を取り込めます。<br>複数のファイルをまとめて入れると、1ファイルずつ別のトラックになります。</p>
-      <div class="btns"><button class="primary" id="bAdd3">＋ 音声ファイルを選ぶ</button><button id="bDemo">サンプル音で試す</button></div>
+      <div class="btns"><button class="primary" id="bAdd3">＋ 音声ファイルを選ぶ</button><button id="bDemo">サンプル音で試す</button><button id="bRec2">● 録音する</button></div>
       <ol><li>音声を入れる</li><li>帯（クリップ）をドラッグして位置を合わせる</li><li>帯をクリックすると、下の欄で速さ・高さ・音量を調整</li><li>「書き出し」で WAV ファイルに保存</li></ol>
     </div></div>
   </div>
@@ -190,6 +194,14 @@ label{display:inline-flex;align-items:center;gap:6px;color:var(--sub)}
   <div class="act"><button id="eCancel">やめる</button><button id="eGo" class="primary">書き出す</button></div>
 </div></div>
 
+<div class="modalBg" id="mRec"><div class="modal">
+  <h3>録音する</h3>
+  <div class="row2"><span>録る音</span><select id="rKind" style="flex:1"><option value="screen">パソコンで鳴っている音（ブラウザのタブ・画面の音）</option><option value="mic">マイク</option></select></div>
+  <div class="row2"><span>同時に再生</span><label style="color:var(--text)"><input type="checkbox" id="rPlay"> 今あるトラックを再生しながら録る（合わせて歌う・弾くとき）</label></div>
+  <div id="rHelp" class="small" style="font-size:12.5px;line-height:1.7"></div>
+  <p class="small">録った音は、赤い線（再生位置）から始まる新しいトラックになります。録った音の使い方は、元の音の利用規約・著作権に従ってください。</p>
+  <div class="act"><button id="rCancel">やめる</button><button id="rGo" class="primary">● 録音を始める</button></div>
+</div></div>
 <div class="modalBg" id="mHelp"><div class="modal">
   <h3>使い方</h3>
   <p class="small" style="font-size:13px">音声ファイルを画面にドラッグすると、トラック（横一列）が作られます。帯（クリップ）をドラッグすると位置が動き、左右の端をドラッグすると前後を切り詰められます。上の角の白い四角をドラッグするとフェード（だんだん大きく／小さく）になります。帯をクリックすると、下の欄で速さ・音の高さ・音量・位置を数値で調整できます。</p>
@@ -202,6 +214,7 @@ label{display:inline-flex;align-items:center;gap:6px;color:var(--sub)}
     <tr><td>S</td><td>再生位置（赤い線）でクリップを分割</td></tr>
     <tr><td>Ctrl + D</td><td>クリップを複製（すぐ後ろに並べる）</td></tr>
     <tr><td>Delete</td><td>クリップを削除</td></tr>
+    <tr><td>● 録音</td><td>パソコンで鳴っている音（タブ・画面）やマイクを録音して新しいトラックにする</td></tr>
     <tr><td>L / M</td><td>ループ／メトロノームの切り替え</td></tr>
     <tr><td>Ctrl + Z / Ctrl + Y</td><td>元に戻す／やり直し</td></tr>
     <tr><td>Ctrl + S / Ctrl + E</td><td>作業を保存／WAVに書き出し</td></tr>
@@ -880,6 +893,7 @@ function frame(){
   $('#clkTime').textContent=fmtTime(p);$('#clkBar').textContent='小節 '+fmtBar(p);
   const ph=$('#playhead');ph.style.left=(HW+p*pps)+'px';
   if(play){const x=p*pps,sl=tl.scrollLeft,vw=viewW()-HW;if(x>sl+vw-30||x<sl)tl.scrollLeft=Math.max(0,x-40);}
+  if(rec){const t=(performance.now()-rec.t0)/1000;$('#bRec').title='録音を止める';$('#bRec').textContent='■ '+String(Math.floor(t/60)).padStart(2,'0')+':'+String(Math.floor(t%60)).padStart(2,'0');}
   drawMeter();requestAnimationFrame(frame);
 }
 function drawMeter(){
@@ -1322,6 +1336,73 @@ async function loadDemo(){
 $('#bAdd').onclick=$('#bAdd2').onclick=$('#bAdd3').onclick=()=>$('#fileIn').click();
 $('#fileIn').onchange=e=>{addFiles(e.target.files);e.target.value='';};
 $('#bDemo').onclick=()=>{ac();loadDemo();};
+// ================= 録音 =================
+let rec=null;
+const recHelp={
+  screen:'次に出る共有の画面で：<br>① 「Chrome タブ」（Edge は「タブ」）を選び、音を録りたいタブをクリック<br>② 下の「タブの音声も共有する」をオンにして「共有」<br>Windows では「画面全体」を選んで「システムの音声も共有する」をオンにすると、パソコン全体の音を録れます。Mac は画面全体の音を録れないので、タブを選んでください。<br>録音中は、録りたい音をそのタブで再生してください。止めるときは上の赤い「■」ボタンを押します。',
+  mic:'ブラウザがマイクの使用許可を求めたら「許可」を押してください。イヤホンを使うと、再生中の音がマイクに入りません。止めるときは上の赤い「■」ボタンを押します。'};
+function openRec(){
+  if(rec){stopRecording();return;}
+  const k=$('#rKind');$('#rHelp').innerHTML=recHelp[k.value];$('#rPlay').checked=k.value==='mic'&&hasClips();
+  $('#mRec').style.display='flex';
+}
+$('#rKind').onchange=()=>{$('#rHelp').innerHTML=recHelp[$('#rKind').value];$('#rPlay').checked=$('#rKind').value==='mic'&&hasClips();};
+$('#bRec').onclick=$('#bRec2').onclick=openRec;$('#rCancel').onclick=()=>$('#mRec').style.display='none';
+$('#rGo').onclick=()=>{$('#mRec').style.display='none';startRecording($('#rKind').value,$('#rPlay').checked);};
+async function startRecording(kind,withPlay){
+  if(!window.MediaRecorder||!navigator.mediaDevices){toast('このブラウザは録音に対応していません。パソコンの Chrome か Edge でお使いください','error',7000);return;}
+  if(kind==='screen'&&!navigator.mediaDevices.getDisplayMedia){toast('このブラウザはパソコンの音の録音に対応していません。パソコンの Chrome か Edge でお使いください','error',7000);return;}
+  ac();let stream;
+  const ac0={echoCancellation:false,noiseSuppression:false,autoGainControl:false};
+  try{
+    stream=kind==='screen'?await navigator.mediaDevices.getDisplayMedia({video:true,audio:ac0,systemAudio:'include',selfBrowserSurface:'exclude'})
+                          :await navigator.mediaDevices.getUserMedia({audio:ac0});
+  }catch(e){
+    console.warn(e);
+    toast(e&&e.name==='NotAllowedError'?'録音が許可されませんでした（共有を取り消したか、ブラウザの設定でオフになっています）':e&&e.name==='NotFoundError'?'マイクが見つかりませんでした':'録音を始められませんでした','error',7000);return;
+  }
+  const at=stream.getAudioTracks();
+  if(!at.length){stream.getTracks().forEach(t=>t.stop());toast('音声が共有されていません。もう一度「● 録音」から始め、共有の画面で「タブの音声も共有する」をオンにしてください','error',9000);return;}
+  const mime=['audio/webm;codecs=opus','audio/webm','audio/mp4','audio/ogg;codecs=opus'].find(m=>MediaRecorder.isTypeSupported&&MediaRecorder.isTypeSupported(m))||'';
+  let mr;
+  try{mr=new MediaRecorder(new MediaStream(at),mime?{mimeType:mime,audioBitsPerSecond:256000}:undefined);}
+  catch(e){stream.getTracks().forEach(t=>t.stop());toast('録音を始められませんでした','error');return;}
+  const chunks=[];
+  rec={mr,stream,t0:performance.now(),at:playhead,kind,withPlay,chunks};
+  mr.ondataavailable=e=>{if(e.data&&e.data.size)chunks.push(e.data);};
+  mr.onstop=()=>finishRecording(chunks,mr.mimeType||mime||'audio/webm',rec0);
+  const rec0=rec;
+  at[0].addEventListener('ended',()=>{if(rec===rec0)stopRecording();});
+  mr.start(1000);
+  if(withPlay&&hasClips()){playFrom=playhead;startPlay(playhead);}
+  updateRecUI();
+  toast(kind==='screen'?'録音中です。録りたい音を再生してください。止めるときは上の赤い「■」ボタン':'録音中です。止めるときは上の赤い「■」ボタン','info',5000);
+}
+function stopRecording(){
+  if(!rec)return;const r=rec;rec=null;
+  try{if(r.mr.state!=='inactive')r.mr.stop();}catch(e){}
+  r.stream.getTracks().forEach(t=>t.stop());
+  if(r.withPlay&&play)pausePlay();
+  updateRecUI();
+}
+async function finishRecording(chunks,mime,r){
+  const blob=new Blob(chunks,{type:mime});
+  if(blob.size<200){toast('録音された音がありませんでした','error');return;}
+  const d=new Date(),hm=`${String(d.getHours()).padStart(2,'0')}${String(d.getMinutes()).padStart(2,'0')}${String(d.getSeconds()).padStart(2,'0')}`;
+  const ext=/mp4/.test(mime)?'m4a':/ogg/.test(mime)?'ogg':'webm';
+  const name=(r.kind==='screen'?'パソコンの音':'マイク')+'_録音_'+hm+'.'+ext;
+  try{
+    const bytes=await blob.arrayBuffer();
+    const src=await createSource(name,bytes,mime);
+    let pk=0;for(let c=0;c<src.buffer.numberOfChannels;c++){const x=src.buffer.getChannelData(c);for(let i=0;i<x.length;i+=7){const v=Math.abs(x[i]);if(v>pk)pk=v;}}
+    const wasEmpty=!hasClips();
+    const tr=addTrack(baseName(name));const c=newClip(src,r.at);tr.clips.push(c);selId=c.id;
+    if(wasEmpty)fitZoom();checkpoint();renderAll();
+    if(pk<0.001)toast('録音できましたが、ほとんど無音でした。共有の画面で「タブの音声も共有する」がオンだったか、録りたい音を再生していたか確認してください','error',9000);
+    else toast(`録音を追加しました（${src.buffer.duration.toFixed(1)}秒）`,'ok');
+  }catch(e){console.warn(e);toast('録音したデータを読み込めませんでした','error');}
+}
+function updateRecUI(){const b=$('#bRec');b.classList.toggle('on',!!rec);if(!rec){b.textContent='● 録音';b.title='パソコンで鳴っている音（ブラウザのタブ・画面）やマイクを録音して、新しいトラックにします';}}
 $('#bPlay').onclick=()=>togglePlay();
 $('#bStop').onclick=()=>{if(play)stopPlay();else{playhead=playFrom=0;updateTransport();scrollToPlayhead();}};
 $('#bHome').onclick=()=>{seek(0);tl.scrollLeft=0;};
