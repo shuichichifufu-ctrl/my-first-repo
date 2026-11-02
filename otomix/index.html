@@ -149,7 +149,7 @@ label{display:inline-flex;align-items:center;gap:6px;color:var(--sub)}
       <button id="bHelp" title="使い方とショートカット">？</button>
     </div>
     <div class="grp">
-      <label title="全体の音量（ダブルクリックで0dB）">全体 <input id="iMaster" type="range" min="-60" max="12" step="0.5" value="0" style="width:56px"></label>
+      <label title="全体の音量（ダブルクリックで0dB）">音量 <input id="iMaster" type="range" min="-60" max="12" step="0.5" value="0" style="width:56px"></label>
       <canvas id="meter" width="64" height="22" title="出力レベル（赤くなったら音割れの恐れ）"></canvas>
     </div>
   </header>
@@ -184,7 +184,7 @@ label{display:inline-flex;align-items:center;gap:6px;color:var(--sub)}
   <div class="row2"><span>範囲</span><select id="eRange"><option value="all">全体（先頭から最後のクリップの終わりまで）</option><option value="loop">ループ範囲だけ</option><option value="sel">選んだ範囲だけ</option></select></div>
   <div class="row2"><span>形式</span><select id="eBits"><option value="16">WAV 16ビット（CDと同じ・標準）</option><option value="24">WAV 24ビット（高音質）</option><option value="32">WAV 32ビット浮動小数</option></select></div>
   <div class="row2"><span>サンプリング周波数</span><select id="eSr"><option value="44100">44100 Hz（標準）</option><option value="48000">48000 Hz（動画向け）</option></select></div>
-  <div class="row2"><span>音割れ防止</span><label style="color:var(--text)"><input type="checkbox" id="eNorm" checked> 大きすぎるときだけ、ピークが −1 dB になるよう全体を下げる</label></div>
+  <div class="row2"><span>音割れ防止</span><label style="color:var(--text)"><input type="checkbox" id="eNorm" checked> 大きすぎるときだけ、ピークが −1 dB になるよう全体を下げる（そのときは再生より少し小さくなります）</label></div>
   <div class="row2"><span>ファイル名</span><input type="text" id="eName" style="flex:1" value="mix" title="英数字の名前をおすすめします（ブラウザによっては日本語名が無視されるため）"></div>
   <div id="eMsg" class="small"></div>
   <div class="act"><button id="eCancel">やめる</button><button id="eGo" class="primary">書き出す</button></div>
@@ -233,7 +233,7 @@ function findOnsets(mono,sr){
     lin[f]=s/win;linh[f]=sh/win;if(linh[f]>mxh)mxh=linh[f];e[f]=Math.log(1e-10+lin[f]);eh[f]=Math.log(1e-12+linh[f]);}
   var fl=new Float32Array(n);
   for(var f=2;f<n;f++){var a1=e[f]-Math.max(e[f-1],e[f-2]),a2=eh[f]-Math.max(eh[f-1],eh[f-2]);fl[f]=Math.max(0,a1,a2*0.8);}
-  var res=[],last=-1e9,W=Math.round(0.25*sr/hop),minGap=0.05*sr;
+  var res=[],last=-1e9,W=Math.round(0.25*sr/hop),minGap=0.02*sr;
   for(var f=2;f<n-1;f++){
     if(fl[f]<fl[f-1]||fl[f]<fl[f+1])continue;
     if(Math.max(lin[f],lin[f+1])<1e-4&&Math.max(linh[f],linh[f+1])<mxh*1e-3)continue; // 小さすぎる音は無視
@@ -267,9 +267,10 @@ function wsola(chans,sr,r,prog){
   for(var k=0;k<nF;k++){
     var o=k*Hs,ideal=Math.round(k*Ha),best=ideal,anch=false;
     while(oi<ons.length&&ons[oi]*r<o)oi++;
-    if(oi<ons.length&&ons[oi]*r<o+N){
-      // この枠は打音を含む：打音が正しい時刻に来る位置に固定する
-      var T=ons[oi];best=T-Math.round(T*r)+o;anch=true;
+    var bj=-1,bdd=1e18;for(var j=oi;j<ons.length&&ons[j]*r<o+N;j++){var dd=Math.abs(ons[j]*r-(o+Hs));if(dd<bdd){bdd=dd;bj=j;}}
+    if(bj>=0){
+      // この枠は打音を含む：枠の中心に近い打音が正しい時刻に来る位置に固定する
+      var T=ons[bj];best=T-Math.round(T*r)+o;anch=true;
     }else if(k>0){
       var nat=prev+Hs,natD=Math.round(nat/D),idD=Math.round(ideal/D),bs=0,bd=0;
       for(var q=0;q<=2*tolD;q++){
@@ -300,10 +301,26 @@ function wsola(chans,sr,r,prog){
   return res;
 }
 // 窓付きsincによる高品質な再標本化（p倍速で読む）
-function resampleCh(chans,p,outLen,prog){
-  var fc=Math.min(1,1/p),A=8,half=Math.ceil(A/fc),TB=512;
+function sincTable(p){
+  var fc=Math.min(1,1/p)*(p>1.0001?0.97:1),A=12,half=Math.ceil(A/fc),TB=512;
   var tl=half*TB+2,tab=new Float32Array(tl);
   for(var i=0;i<tl;i++){var t=i/TB,u=t/(A/fc);var w=u>=1?0:(0.42+0.5*Math.cos(Math.PI*u)+0.08*Math.cos(2*Math.PI*u));var x=Math.PI*fc*t;var s=t===0?1:Math.sin(x)/x;tab[i]=fc*s*w;}
+  return {tab:tab,tl:tl,half:half,TB:TB};
+}
+// x を pos0 から step 刻みで count 個読む（整数位置・等倍ならそのまま写す）
+function resampleAt(x,pos0,step,count,K){
+  var y=new Float32Array(count),ip=Math.round(pos0),L=x.length;
+  if(Math.abs(step-1)<1e-12&&Math.abs(pos0-ip)<1e-4){for(var n=0;n<count;n++){var i=ip+n;y[n]=(i>=0&&i<L)?x[i]:0;}return y;}
+  var tab=K.tab,tl=K.tl,half=K.half,TB=K.TB;
+  for(var n=0;n<count;n++){
+    var pos=pos0+n*step,i0=Math.floor(pos),fr=pos-i0,acc=0;
+    for(var j=-half+1;j<=half;j++){var idx=i0+j;if(idx<0||idx>=L)continue;var t=Math.abs(j-fr)*TB,ti=t|0;if(ti>=tl-1)continue;acc+=x[idx]*(tab[ti]+(tab[ti+1]-tab[ti])*(t-ti));}
+    y[n]=acc;
+  }
+  return y;
+}
+function resampleCh(chans,p,outLen,prog){
+  var K=sincTable(p),tab=K.tab,tl=K.tl,half=K.half,TB=K.TB;
   var res=[];
   for(var c=0;c<chans.length;c++){
     var x=chans[c],L=x.length,y=new Float32Array(outLen);
@@ -324,6 +341,8 @@ function resampleCh(chans,p,outLen,prog){
   return res;
 }
 function processAudio(m,prog){
+  if(m.kind==='resample'){var K=sincTable(m.step);return m.chans.map(function(x){return resampleAt(x,m.pos0,m.step,m.count,K);});}
+  if(m.kind==='tape')return resampleCh(m.chans,m.speed,Math.max(1,Math.round(m.chans[0].length/m.speed)),prog);
   var p=Math.pow(2,m.semis/12),r=p/m.speed,y=m.chans,doW=Math.abs(r-1)>1e-6,doR=Math.abs(p-1)>1e-6;
   var wW=doR?0.6:1;
   if(doW)y=wsola(y,m.sr,r,function(v){prog(v*wW);});
@@ -442,7 +461,7 @@ async function addFiles(files,trackId,at){
 // ================= 速さ・高さの処理 =================
 const procCache=new Map();
 function procKey(c){
-  if(c.mode==='tape')return null;
+  if(c.mode==='tape')return Math.abs(c.speed-1)<1e-9?null:c.srcId+'|tape|'+c.speed.toFixed(5);
   const p=c.semis+c.cents/100;
   if(Math.abs(c.speed-1)<1e-9&&Math.abs(p)<1e-9)return null;
   return c.srcId+'|'+c.speed.toFixed(5)+'|'+p.toFixed(3);
@@ -464,9 +483,12 @@ function runFallback(msg){
     if(!dspFb)dspFb=new Function('self',$('#dspSrc').textContent+';return processAudio;')({});
     res(dspFb(msg,()=>{}));}catch(e){rej(e);}},20));
 }
-function runDSP(buf,speed,semis,onp){
+function runDSP(buf,speed,semis,onp,kind){
   const chans=[];for(let i=0;i<buf.numberOfChannels;i++)chans.push(buf.getChannelData(i).slice());
-  const msg={chans,sr:buf.sampleRate,speed,semis};
+  return runJob({chans,sr:buf.sampleRate,speed,semis,kind:kind||'stretch'},onp);
+}
+function runJob(msg,onp){
+  onp=onp||(()=>{});
   const w=getWorker();
   if(!w)return runFallback(msg);
   return new Promise((res,rej)=>{const id=++jobSeq;msg.id=id;jobs.set(id,{res,rej,onp,msg});
@@ -477,7 +499,7 @@ function ensureProcessed(c){
   let e=procCache.get(k);if(e)return e.promise;
   const src=sources.get(c.srcId);if(!src)return Promise.resolve();
   e={state:'pending',progress:0};procCache.set(k,e);
-  e.promise=runDSP(src.buffer,c.speed,c.semis+c.cents/100,p=>{e.progress=p;updateBusy();}).then(chs=>{
+  e.promise=runDSP(src.buffer,c.speed,c.semis+c.cents/100,p=>{e.progress=p;updateBusy();},c.mode==='tape'?'tape':'stretch').then(chs=>{
     const b=ac().createBuffer(chs.length,chs[0].length,src.buffer.sampleRate);
     chs.forEach((d,i)=>b.copyToChannel(d,i));e.buffer=b;e.state='done';updateBusy();
     if(play&&play.waiting){restartIfPlaying();}
@@ -494,7 +516,7 @@ function pruneCache(){
 function playable(c){
   const src=sources.get(c.srcId);if(!src)return null;
   const k=procKey(c);
-  if(!k)return {buffer:src.buffer,rate:c.mode==='tape'?c.speed:1,scale:1};
+  if(!k)return {buffer:src.buffer,rate:1,scale:1};
   const e=procCache.get(k);
   if(e&&e.state==='done')return {buffer:e.buffer,rate:1,scale:1/c.speed};
   ensureProcessed(c);
@@ -528,7 +550,9 @@ function detectBPM(buf,from,dur){
   }
   // 細かく詰める
   let fb=best,fs=-1;for(let bpm=best-0.6;bpm<=best+0.6;bpm+=0.05){const lag=60/bpm/0.01;const sc=ac_(lag)+0.5*ac_(lag*2)+0.25*ac_(lag*4);if(sc>fs){fs=sc;fb=bpm;}}
-  return Math.round(fb*10)/10;
+  let fb2=fb,fs2=-1;for(let bpm=fb-0.06;bpm<=fb+0.06;bpm+=0.005){const lag=60/bpm/0.01;const sc=ac_(lag)+0.5*ac_(lag*2)+0.25*ac_(lag*4)+0.25*ac_(lag*8);if(sc>fs2){fs2=sc;fb2=bpm;}}
+  const ri=Math.round(fb2);if(Math.abs(fb2-ri)<0.2)return ri;
+  return Math.round(fb2*100)/100;
 }
 
 // ================= 再生 =================
@@ -555,12 +579,15 @@ function contNeighbor(cl,side){
   }
   return false;
 }
-function applyClipGain(param,cl,a,b,w){
+function clipEnv(cl){
   const G=dbToLin(cl.gain),T=clipLen(cl);let fi=Math.min(cl.fadeIn,T),fo=Math.min(cl.fadeOut,T);
   const sd=sources.get(cl.srcId);if(T>0.02&&sd){if(cl.offset>1e-6&&!contNeighbor(cl,-1))fi=Math.max(fi,0.003);if(cl.offset+cl.dur<sd.buffer.duration-1e-6&&!contNeighbor(cl,1))fo=Math.max(fo,0.003);}
   if(fi+fo>T){const k=T/(fi+fo);fi*=k;fo*=k;}
   const cs=cl.start,ce=cs+T;
-  const g=t=>{let v=1;if(fi>0)v=Math.min(v,(t-cs)/fi);if(fo>0)v=Math.min(v,(ce-t)/fo);return G*clamp(v,0,1);};
+  return {fi,fo,cs,ce,g:t=>{let v=1;if(fi>0)v=Math.min(v,(t-cs)/fi);if(fo>0)v=Math.min(v,(ce-t)/fo);return G*clamp(v,0,1);}};
+}
+function applyClipGain(param,cl,a,b,w){
+  const {fi,fo,cs,ce,g}=clipEnv(cl);
   param.setValueAtTime(g(a),w(a));
   const pts=[cs+fi,ce-fo,b].filter(x=>x>a+1e-6&&x<=b+1e-9).sort((x,y)=>x-y);
   for(const x of pts)param.linearRampToValueAtTime(g(x),w(x));
@@ -580,7 +607,8 @@ function scheduleSegment(c,nodes,from,to,when,set,metro){
       applyClipGain(g.gain,cl,a,b,W);
       const bufPos=pl.scale*(cl.offset+(a-cs)*cl.speed);
       if(bufPos>=pl.buffer.duration)continue;
-      s.start(W(a),Math.max(0,bufPos));s.stop(W(b));
+      const csr=c.sampleRate,bsr=pl.buffer.sampleRate;
+      s.start(Math.round(W(a)*csr)/csr,Math.round(Math.max(0,bufPos)*bsr)/bsr);s.stop(Math.round(W(b)*csr)/csr);
       set.add(s);s.onended=()=>{set.delete(s);try{g.disconnect();}catch(e){}};
     }
   }
@@ -1117,8 +1145,11 @@ function renderRangeInspector(){
     <div class="line"><button data-r="del" title="削除して後ろを詰める（Delete）">削除（詰める）</button><button data-r="sil" title="無音にする。位置はずらさない（Ctrl+L）">無音にする</button><button data-r="split" title="範囲の両端でクリップを分ける">両端で分割</button><button data-r="loop" title="この範囲をループ再生">ループにする</button><button data-r="exp" class="primary" title="この範囲だけWAVに書き出す">この範囲を書き出し</button><button data-r="clear" title="選択を解除（Esc）">選択解除</button></div>
   </div>`;
   const ia=insp.querySelector('[data-r=a]'),ib=insp.querySelector('[data-r=b]');ia.value=a.toFixed(3);ib.value=b.toFixed(3);
-  const upd=()=>{let x=parseFloat(ia.value),y=parseFloat(ib.value);if(!isFinite(x)||!isFinite(y))return;if(x<0){x=0;toast('開始は0秒以上です');}if(y<=x){toast('終わりは開始より後にしてください','error');renderRangeInspector();return;}rsel.a=x;rsel.b=y;renderRangeInspector();draw();};
-  ia.onchange=upd;ib.onchange=upd;
+  const upd=which=>{const v=parseFloat(which==='a'?ia.value:ib.value);if(!isFinite(v)){renderRangeInspector();return;}
+    let x=rsel.a,y=rsel.b;if(which==='a'){x=Math.max(0,v);if(v<0)toast('開始は0秒以上です');if(x>=y){y=x+(rsel.b-rsel.a);toast('終わりも同じ長さだけ後ろにずらしました');}}
+    else{y=v;if(y<=x){toast('終わりは開始より後にしてください','error');renderRangeInspector();return;}}
+    rsel.a=x;rsel.b=y;renderRangeInspector();draw();};
+  ia.onchange=()=>upd('a');ib.onchange=()=>upd('b');
   const act={cut:cutRange,copy:()=>copyRange(),paste:()=>pasteClip(false),pasteo:()=>pasteClip(true),del:()=>deleteRange(),sil:silenceRange,split:splitRange,loop:rangeToLoop,exp:()=>openExport('sel'),clear:clearRange};
   insp.querySelectorAll('button[data-r]').forEach(bt=>bt.onclick=()=>act[bt.dataset.r]());
 }
@@ -1159,13 +1190,27 @@ function download(blob,name){const a=document.createElement('a');a.href=URL.crea
 function safeName(s){return (s||'mix').replace(/[\\/:*?"<>|]/g,'_').slice(0,80);}
 async function renderMix(from,to,sr){
   await Promise.all(allClips().map(ensureProcessed));
-  const len=Math.max(1,Math.ceil((to-from)*sr));
-  const oc=new OfflineAudioContext(2,len,sr);
-  const mg=oc.createGain();mg.gain.value=dbToLin(project.master);mg.connect(oc.destination);
-  const nodes=buildTrackNodes(oc,mg);
-  scheduleSegment(oc,nodes,from,to,0,new Set(),false);
-  const rb=await oc.startRendering();
-  return [rb.getChannelData(0),rb.getChannelData(1)];
+  const len=Math.max(1,Math.ceil((to-from)*sr-1e-7));
+  const out=[new Float32Array(len),new Float32Array(len)],M=dbToLin(project.master),tasks=[];
+  for(const t of project.tracks){
+    if(!trackAudible(t))continue;const tv=dbToLin(t.vol)*M;if(tv===0)continue;const [bl,br]=balance(t.pan);
+    for(const cl of t.clips){
+      const cs=cl.start,ce=clipEnd(cl),a=Math.max(cs,from),b=Math.min(ce,to);if(b-a<1e-5)continue;
+      const pl=playable(cl);if(!pl||pl.temp)continue;
+      const B=pl.buffer,Bsr=B.sampleRate;
+      const n0=Math.max(0,Math.ceil((a-from)*sr-1e-7)),n1=Math.min(len,Math.ceil((b-from)*sr-1e-7));if(n1<=n0)continue;
+      const step=Bsr/sr,pos0=(pl.scale*cl.offset+(from+n0/sr-cs))*Bsr;
+      const lo=Math.max(0,Math.floor(pos0)-200),hi=Math.min(B.length,Math.ceil(pos0+(n1-n0)*step)+200);if(hi<=lo)continue;
+      const chans=[];for(let i=0;i<B.numberOfChannels;i++)chans.push(B.getChannelData(i).slice(lo,hi));
+      const env=clipEnv(cl);
+      tasks.push(runJob({kind:'resample',chans,pos0:pos0-lo,step,count:n1-n0,sr:Bsr}).then(ys=>{
+        const yL=ys[0],yR=ys[1]||ys[0],gl=tv*bl,gr=tv*br,oL=out[0],oR=out[1];
+        for(let n=0;n<n1-n0;n++){const g=env.g(from+(n0+n)/sr);oL[n0+n]+=yL[n]*g*gl;oR[n0+n]+=yR[n]*g*gr;}
+      }));
+    }
+  }
+  await Promise.all(tasks);
+  return out;
 }
 function openExport(mode){
   if(!hasClips()){toast('書き出すクリップがありません。まず音声ファイルを追加してください');return;}
@@ -1212,8 +1257,9 @@ function saveProject(){
 }
 async function openProjectFile(file){
   try{
-    const txt=await file.text();let data;try{data=JSON.parse(txt);}catch(e){throw new Error('形式が違います');}
-    if(!data||data.app!=='otomix'||!data.project||!Array.isArray(data.project.tracks))throw new Error('おとミックスの作業ファイルではありません');
+    if(/\.(wav|mp3|m4a|aac|ogg|oga|opus|flac|webm|mp4|aif|aiff|caf)$/i.test(file.name)){toast('「開く」は保存した作業ファイル（.otomix）用です。音声ファイルを入れるので「＋ 音声を追加」で読み込みます','info',6000);addFiles([file]);return;}
+    const txt=await file.text();let data;try{data=JSON.parse(txt);}catch(e){throw new Error('おとミックスの作業ファイル（.otomix）を選んでください。音声は「＋ 音声を追加」から入れます');}
+    if(!data||data.app!=='otomix'||!data.project||!Array.isArray(data.project.tracks))throw new Error('おとミックスの作業ファイル（.otomix）ではありません');
     await loadProjectData(data.project,data.sources.map(s=>({id:s.id,name:s.name,mime:s.mime,bytes:fromB64(s.data)})));
     toast('作業ファイルを開きました','ok');
   }catch(e){toast('開けませんでした：'+e.message,'error',6000);}
