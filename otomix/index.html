@@ -198,6 +198,8 @@ button.rec.on{background:#7a1f1f;border-color:#ff4d4d;color:#fff;font-weight:600
   <h3>録音する</h3>
   <div class="row2"><span>録る音</span><select id="rKind" style="flex:1"><option value="screen">パソコンで鳴っている音（ブラウザのタブ・画面の音）</option><option value="mic">マイク</option></select></div>
   <div class="row2"><span>同時に再生</span><label style="color:var(--text)"><input type="checkbox" id="rPlay"> 今あるトラックを再生しながら録る（合わせて歌う・弾くとき）</label></div>
+  <div class="row2"><span>自動で止める</span><label style="color:var(--text)">音が止まって <select id="rAuto"><option value="0">止めない</option><option value="2">2秒</option><option value="3" selected>3秒</option><option value="5">5秒</option><option value="10">10秒</option></select> たったら録音を止める</label></div>
+  <div class="row2"><span>無音の切り詰め</span><label style="color:var(--text)"><input type="checkbox" id="rTrim" checked> 録音の最初と最後の無音を切り詰める</label></div>
   <div id="rHelp" class="small" style="font-size:12.5px;line-height:1.7"></div>
   <p class="small">録った音は、赤い線（再生位置）から始まる新しいトラックになります。録った音の使い方は、元の音の利用規約・著作権に従ってください。</p>
   <div class="act"><button id="rCancel">やめる</button><button id="rGo" class="primary">● 録音を始める</button></div>
@@ -1339,17 +1341,18 @@ $('#bDemo').onclick=()=>{ac();loadDemo();};
 // ================= 録音 =================
 let rec=null;
 const recHelp={
-  screen:'次に出る共有の画面で：<br>① 「Chrome タブ」（Edge は「タブ」）を選び、音を録りたいタブをクリック<br>② 下の「タブの音声も共有する」をオンにして「共有」<br>Windows では「画面全体」を選んで「システムの音声も共有する」をオンにすると、パソコン全体の音を録れます。Mac は画面全体の音を録れないので、タブを選んでください。<br>録音中は、録りたい音をそのタブで再生してください。止めるときは上の赤い「■」ボタンを押します。',
+  screen:'YouTube などの再生が終わって音が止まると、自動で録音が止まります（下の「自動で止める」）。YouTube の「自動再生」はオフにしておくと確実です。<br>次に出る共有の画面で：<br>① 「Chrome タブ」（Edge は「タブ」）を選び、音を録りたいタブをクリック<br>② 下の「タブの音声も共有する」をオンにして「共有」<br>Windows では「画面全体」を選んで「システムの音声も共有する」をオンにすると、パソコン全体の音を録れます。Mac は画面全体の音を録れないので、タブを選んでください。<br>録音中は、録りたい音をそのタブで再生してください。止めるときは上の赤い「■」ボタンを押します。',
   mic:'ブラウザがマイクの使用許可を求めたら「許可」を押してください。イヤホンを使うと、再生中の音がマイクに入りません。止めるときは上の赤い「■」ボタンを押します。'};
 function openRec(){
   if(rec){stopRecording();return;}
-  const k=$('#rKind');$('#rHelp').innerHTML=recHelp[k.value];$('#rPlay').checked=k.value==='mic'&&hasClips();
+  const k=$('#rKind');$('#rHelp').innerHTML=recHelp[k.value];$('#rPlay').checked=k.value==='mic'&&hasClips();recDefaults();
   $('#mRec').style.display='flex';
 }
-$('#rKind').onchange=()=>{$('#rHelp').innerHTML=recHelp[$('#rKind').value];$('#rPlay').checked=$('#rKind').value==='mic'&&hasClips();};
+function recDefaults(){const m=$('#rKind').value==='mic';$('#rAuto').value=m?'0':'3';$('#rTrim').checked=!m;}
+$('#rKind').onchange=()=>{$('#rHelp').innerHTML=recHelp[$('#rKind').value];$('#rPlay').checked=$('#rKind').value==='mic'&&hasClips();recDefaults();};
 $('#bRec').onclick=$('#bRec2').onclick=openRec;$('#rCancel').onclick=()=>$('#mRec').style.display='none';
-$('#rGo').onclick=()=>{$('#mRec').style.display='none';startRecording($('#rKind').value,$('#rPlay').checked);};
-async function startRecording(kind,withPlay){
+$('#rGo').onclick=()=>{$('#mRec').style.display='none';startRecording($('#rKind').value,$('#rPlay').checked,+$('#rAuto').value,$('#rTrim').checked);};
+async function startRecording(kind,withPlay,autoSec,trim){
   if(!window.MediaRecorder||!navigator.mediaDevices){toast('このブラウザは録音に対応していません。パソコンの Chrome か Edge でお使いください','error',7000);return;}
   if(kind==='screen'&&!navigator.mediaDevices.getDisplayMedia){toast('このブラウザはパソコンの音の録音に対応していません。パソコンの Chrome か Edge でお使いください','error',7000);return;}
   ac();let stream;
@@ -1368,7 +1371,16 @@ async function startRecording(kind,withPlay){
   try{mr=new MediaRecorder(new MediaStream(at),mime?{mimeType:mime,audioBitsPerSecond:256000}:undefined);}
   catch(e){stream.getTracks().forEach(t=>t.stop());toast('録音を始められませんでした','error');return;}
   const chunks=[];
-  rec={mr,stream,t0:performance.now(),at:playhead,kind,withPlay,chunks};
+  rec={mr,stream,t0:performance.now(),at:playhead,kind,withPlay,chunks,trim:!!trim,auto:false};
+  // 音の大きさを見張り、音が止まって autoSec 秒たったら自動で止める
+  if(autoSec>0){try{
+    const c=ac(),srcN=c.createMediaStreamSource(new MediaStream(at)),an=c.createAnalyser();an.fftSize=2048;srcN.connect(an);
+    const buf=new Float32Array(an.fftSize),r0=rec;r0.heard=false;r0.last=performance.now();
+    r0.mon=setInterval(()=>{if(rec!==r0)return;an.getFloatTimeDomainData(buf);let pk=0;for(let i=0;i<buf.length;i++){const v=Math.abs(buf[i]);if(v>pk)pk=v;}
+      const now=performance.now();if(pk>0.003){r0.heard=true;r0.last=now;}
+      else if(r0.heard&&now-r0.last>autoSec*1000){r0.auto=true;stopRecording();}},100);
+    r0.monNodes=[srcN,an];
+  }catch(e){console.warn(e);}}
   mr.ondataavailable=e=>{if(e.data&&e.data.size)chunks.push(e.data);};
   mr.onstop=()=>finishRecording(chunks,mr.mimeType||mime||'audio/webm',rec0);
   const rec0=rec;
@@ -1380,6 +1392,7 @@ async function startRecording(kind,withPlay){
 }
 function stopRecording(){
   if(!rec)return;const r=rec;rec=null;
+  if(r.mon)clearInterval(r.mon);if(r.monNodes)r.monNodes.forEach(n=>{try{n.disconnect();}catch(e){}});
   try{if(r.mr.state!=='inactive')r.mr.stop();}catch(e){}
   r.stream.getTracks().forEach(t=>t.stop());
   if(r.withPlay&&play)pausePlay();
@@ -1397,9 +1410,15 @@ async function finishRecording(chunks,mime,r){
     let pk=0;for(let c=0;c<src.buffer.numberOfChannels;c++){const x=src.buffer.getChannelData(c);for(let i=0;i<x.length;i+=7){const v=Math.abs(x[i]);if(v>pk)pk=v;}}
     const wasEmpty=!hasClips();
     const tr=addTrack(baseName(name));const c=newClip(src,r.at);tr.clips.push(c);selId=c.id;
+    let trimmed=false;
+    if(r.trim&&pk>=0.001){
+      const b=src.buffer,sr=b.sampleRate,n=b.length,th=0.003;let first=n,last=-1;
+      for(let ch=0;ch<b.numberOfChannels;ch++){const x=b.getChannelData(ch);for(let i=0;i<n;i++)if(Math.abs(x[i])>th){if(i<first)first=i;break;}for(let i=n-1;i>=0;i--)if(Math.abs(x[i])>th){if(i>last)last=i;break;}}
+      if(last>first){const a=Math.max(0,first/sr-0.05),e=Math.min(b.duration,last/sr+0.3);if(a>0.02||b.duration-e>0.02){c.offset=a;c.dur=e-a;trimmed=true;}}
+    }
     if(wasEmpty)fitZoom();checkpoint();renderAll();
     if(pk<0.001)toast('録音できましたが、ほとんど無音でした。共有の画面で「タブの音声も共有する」がオンだったか、録りたい音を再生していたか確認してください','error',9000);
-    else toast(`録音を追加しました（${src.buffer.duration.toFixed(1)}秒）`,'ok');
+    else toast((r.auto?'音が止まったので録音を自動で止めました。':'')+`録音を追加しました（${clipLen(c).toFixed(1)}秒）`+(trimmed?'。最初と最後の無音は切り詰めました（帯の端をドラッグすると戻せます）':''),'ok',7000);
   }catch(e){console.warn(e);toast('録音したデータを読み込めませんでした','error');}
 }
 function updateRecUI(){const b=$('#bRec');b.classList.toggle('on',!!rec);if(!rec){b.textContent='● 録音';b.title='パソコンで鳴っている音（ブラウザのタブ・画面）やマイクを録音して、新しいトラックにします';}}
