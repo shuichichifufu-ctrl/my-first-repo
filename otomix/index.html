@@ -223,23 +223,25 @@ label{display:inline-flex;align-items:center;gap:6px;color:var(--sub)}
 <script id="dspSrc" type="text/plain">
 // ===== 音声処理（別スレッドで動く） =====
 function hannWin(N){var w=new Float32Array(N);for(var i=0;i<N;i++)w[i]=0.5-0.5*Math.cos(2*Math.PI*i/N);return w;}
-// 打音（音の立ち上がり）の位置を見つける
+// 打音（音の立ち上がり）の位置を見つける。持続音に埋もれないよう、高い音域の変化を重く見る
 function findOnsets(mono,sr){
-  var hop=256,win=512,n=Math.floor((mono.length-win)/hop);
+  var L=mono.length,hop=256,win=512,n=Math.floor((L-win)/hop);
   if(n<8)return [];
-  var e=new Float32Array(n),lin=new Float32Array(n);
-  for(var f=0;f<n;f++){var s=0,a=f*hop;for(var i=0;i<win;i++){var v=mono[a+i];s+=v*v;}lin[f]=s/win;e[f]=Math.log(1e-10+s/win);}
+  var hp=new Float32Array(L);for(var i=2;i<L;i++)hp[i]=mono[i]-2*mono[i-1]+mono[i-2];
+  var e=new Float32Array(n),eh=new Float32Array(n),lin=new Float32Array(n),linh=new Float32Array(n),mxh=0;
+  for(var f=0;f<n;f++){var s=0,sh=0,a=f*hop;for(var i=0;i<win;i++){var v=mono[a+i],w=hp[a+i];s+=v*v;sh+=w*w;}
+    lin[f]=s/win;linh[f]=sh/win;if(linh[f]>mxh)mxh=linh[f];e[f]=Math.log(1e-10+lin[f]);eh[f]=Math.log(1e-12+linh[f]);}
   var fl=new Float32Array(n);
-  for(var f=2;f<n;f++){fl[f]=Math.max(0,e[f]-Math.max(e[f-1],e[f-2]));}
+  for(var f=2;f<n;f++){var a1=e[f]-Math.max(e[f-1],e[f-2]),a2=eh[f]-Math.max(eh[f-1],eh[f-2]);fl[f]=Math.max(0,a1,a2*0.8);}
   var res=[],last=-1e9,W=Math.round(0.25*sr/hop),minGap=0.05*sr;
   for(var f=2;f<n-1;f++){
     if(fl[f]<fl[f-1]||fl[f]<fl[f+1])continue;
-    if(lin[f]<1e-4)continue; // −40dBより小さい音は無視
+    if(Math.max(lin[f],lin[f+1])<1e-4&&Math.max(linh[f],linh[f+1])<mxh*1e-3)continue; // 小さすぎる音は無視
     var m=0,c=0;for(var j=Math.max(0,f-W);j<Math.min(n,f+W);j++){m+=fl[j];c++;}m/=c;
-    if(fl[f]>1.2&&fl[f]>m*2.5){
-      // 64サンプル単位で立ち上がりの位置を詰める
-      var a0=Math.max(0,(f-2)*hop),a1=Math.min(mono.length-64,f*hop+win),bj=-1,bv=-1,pe=-1;
-      for(var p=a0;p<a1;p+=64){var s=0;for(var i=0;i<64;i++){var v=mono[p+i];s+=v*v;}var le=Math.log(1e-10+s/64);if(pe>-1e9&&p>a0){var d=le-pe;if(d>bv){bv=d;bj=p;}}pe=le;}
+    if(fl[f]>0.9&&fl[f]>m*2.2){
+      // 64サンプル単位で、高い音域の立ち上がりの位置を詰める
+      var a0=Math.max(0,(f-2)*hop),a1=Math.min(L-64,f*hop+win),bj=-1,bv=-1e9,pe=-1e9;
+      for(var p=a0;p<a1;p+=64){var s=0;for(var i=0;i<64;i++){var v=hp[p+i];s+=v*v;}var le=Math.log(1e-12+s/64);if(p>a0){var d=le-pe;if(d>bv){bv=d;bj=p;}}pe=le;}
       var T=bj>=0?bj:f*hop;
       if(T-last>minGap){res.push(T);last=T;}
     }
@@ -374,7 +376,8 @@ function ac(){
 }
 
 function toast(msg,type='info',ms=4200){
-  const box=$('#toasts');box.style.bottom=(insp.offsetHeight+12)+'px';
+  const box=$('#toasts'),modal=document.querySelector('.modalBg[style*="flex"]');
+  if(modal){box.style.bottom='auto';box.style.top='14px';}else{box.style.top='auto';box.style.bottom=(insp.offsetHeight+12)+'px';}
   while(box.children.length>=3)box.firstChild.remove();
   const d=document.createElement('div');d.className='toast '+type;d.textContent=msg;box.appendChild(d);
   setTimeout(()=>{d.style.transition='opacity .3s';d.style.opacity='0';setTimeout(()=>d.remove(),320);},ms);
@@ -494,7 +497,9 @@ function playable(c){
   if(!k)return {buffer:src.buffer,rate:c.mode==='tape'?c.speed:1,scale:1};
   const e=procCache.get(k);
   if(e&&e.state==='done')return {buffer:e.buffer,rate:1,scale:1/c.speed};
-  ensureProcessed(c);return null;
+  ensureProcessed(c);
+  // 処理が終わるまでは、長さだけ合わせた仮の音（テープ方式）で鳴らす
+  return {buffer:src.buffer,rate:c.speed,scale:1,temp:true};
 }
 let procTimer=null;
 function scheduleProcessing(){clearTimeout(procTimer);procTimer=setTimeout(()=>{for(const c of allClips())ensureProcessed(c);restartIfPlaying();},280);}
@@ -540,9 +545,19 @@ function buildTrackNodes(c,dest){
   }
   return m;
 }
+// 素材の上で切れ目なくつながっている隣のクリップがあるか（分割しただけの切れ目では音を変えない）
+function contNeighbor(cl,side){
+  const f=findClip(cl.id);if(!f)return false;
+  for(const o of f.track.clips){
+    if(o===cl||o.srcId!==cl.srcId||Math.abs(o.speed-cl.speed)>1e-9||o.semis!==cl.semis||o.cents!==cl.cents||o.mode!==cl.mode)continue;
+    if(side<0&&Math.abs(clipEnd(o)-cl.start)<0.0005&&Math.abs(o.offset+o.dur-cl.offset)<0.0005)return true;
+    if(side>0&&Math.abs(clipEnd(cl)-o.start)<0.0005&&Math.abs(cl.offset+cl.dur-o.offset)<0.0005)return true;
+  }
+  return false;
+}
 function applyClipGain(param,cl,a,b,w){
   const G=dbToLin(cl.gain),T=clipLen(cl);let fi=Math.min(cl.fadeIn,T),fo=Math.min(cl.fadeOut,T);
-  const sd=sources.get(cl.srcId);if(T>0.02&&sd){if(cl.offset>1e-6)fi=Math.max(fi,0.003);if(cl.offset+cl.dur<sd.buffer.duration-1e-6)fo=Math.max(fo,0.003);}
+  const sd=sources.get(cl.srcId);if(T>0.02&&sd){if(cl.offset>1e-6&&!contNeighbor(cl,-1))fi=Math.max(fi,0.003);if(cl.offset+cl.dur<sd.buffer.duration-1e-6&&!contNeighbor(cl,1))fo=Math.max(fo,0.003);}
   if(fi+fo>T){const k=T/(fi+fo);fi*=k;fo*=k;}
   const cs=cl.start,ce=cs+T;
   const g=t=>{let v=1;if(fi>0)v=Math.min(v,(t-cs)/fi);if(fo>0)v=Math.min(v,(ce-t)/fo);return G*clamp(v,0,1);};
@@ -558,6 +573,7 @@ function scheduleSegment(c,nodes,from,to,when,set,metro){
       const cs=cl.start,ce=clipEnd(cl),a=Math.max(cs,from),b=Math.min(ce,to);
       if(b-a<1e-4)continue;
       const pl=playable(cl);if(!pl){missing=true;continue;}
+      if(pl.temp){if(c instanceof OfflineAudioContext)continue;missing=true;}
       const s=c.createBufferSource();s.buffer=pl.buffer;s.playbackRate.value=pl.rate;
       const g=c.createGain();s.connect(g);g.connect(tn.g);
       const W=x=>when+(x-from);
@@ -593,7 +609,7 @@ function startPlay(pos){
   play.waiting=scheduleSegment(c,nodes,pos,Lc?Lc.end:end,t0,play.set,project.metro);
   if(Lc)play.next=t0+play.firstLen;
   play.timer=setInterval(tick,40);
-  if(play.waiting)toast('速さ・高さの処理が終わったクリップから順に鳴ります','info',2500);
+  if(play.waiting&&!startPlay.warned){startPlay.warned=true;toast('速さ・高さの処理中のクリップは、終わるまで仮の音（高さも一緒に変わる簡易版）で鳴らします','info',5000);}
   updateTransport();
 }
 function tick(){
@@ -916,7 +932,7 @@ function clipPointerDown(e,c,el){
   const up=()=>{window.removeEventListener('pointermove',mv);window.removeEventListener('pointerup',up);window.removeEventListener('pointercancel',up);
     el.classList.remove('drag');hideTip();
     if(moved){layout();checkpoint();restartIfPlaying();renderInspector();}
-    else if(kind==='move'&&!play){playhead=clamp(laneTime({clientX:sx}),c.start,clipEnd(c));updateTransport();}};
+    else if(kind==='move'){lastClick={id:c.id,t:clamp(laneTime({clientX:sx}),c.start,clipEnd(c))};}};
   window.addEventListener('pointermove',mv);window.addEventListener('pointerup',up);window.addEventListener('pointercancel',up);
 }
 // 目盛り：クリックで位置、ドラッグでループ範囲
@@ -1011,10 +1027,13 @@ function rangeToLoop(){if(!needRange())return;project.loop={on:true,start:rsel.a
 function selectAll(){if(!hasClips())return;rsel={a:0,b:projEnd(),tids:project.tracks.map(t=>t.id)};selId=null;refreshSel();renderInspector();draw();}
 function clearRange(){if(rsel){rsel=null;renderInspector();draw();}}
 function nudge(d){const f=selClip();if(!f){toast('先にクリップをクリックして選んでください');return;}f.clip.start=Math.max(0,f.clip.start+d);positionClips();draw();renderInspectorValues();checkpoint();restartIfPlaying();}
+let lastClick=null;
 function splitSel(){
   const f=selClip();if(!f){toast('分割するクリップをクリックして選んでください');return;}
-  const c=f.clip,t=curPos();
-  if(t<=c.start+0.005||t>=clipEnd(c)-0.005){toast('赤い線（再生位置）をクリップの上に置いてから分割してください');return;}
+  const c=f.clip;let t=curPos();
+  const inside=x=>x>c.start+0.005&&x<clipEnd(c)-0.005;
+  if(!inside(t)&&lastClick&&lastClick.id===c.id&&inside(lastClick.t))t=lastClick.t;
+  if(!inside(t)){toast('赤い線（再生位置）をクリップの上に置くか、分けたい所でクリップをクリックしてから分割してください');return;}
   const b=splitAt(f.track,c,t);selId=b.id;checkpoint();renderAll();restartIfPlaying();
 }
 function duplicateSel(){const f=selClip();if(!f){toast('複製するクリップを選んでください');return;}const c=f.clip,L=clipLen(c);let st=clipEnd(c);
@@ -1067,8 +1086,8 @@ function renderInspector(){
   onNum('centsR',v=>{c.cents=v;changed(true);});
   onNum('cents',(v,fin)=>{if(fin&&(v<-100||v>100))toast('セントは −100〜+100 の範囲です（それ以上は半音で調整してください）','error');c.cents=Math.round(clamp(v,-100,100));changed(true);});
   onNum('gainR',v=>{c.gain=v;changed();});
-  onNum('fadeIn',v=>{c.fadeIn=clamp(v,0,clipLen(c));changed();});
-  onNum('fadeOut',v=>{c.fadeOut=clamp(v,0,clipLen(c));changed();});
+  onNum('fadeIn',(v,fin)=>{if(fin&&v>clipLen(c))toast(`フェードはクリップの長さ（${clipLen(c).toFixed(2)}秒）までです`);if(fin&&v<0)toast('フェードは0秒以上です');c.fadeIn=clamp(v,0,clipLen(c));changed();});
+  onNum('fadeOut',(v,fin)=>{if(fin&&v>clipLen(c))toast(`フェードはクリップの長さ（${clipLen(c).toFixed(2)}秒）までです`);if(fin&&v<0)toast('フェードは0秒以上です');c.fadeOut=clamp(v,0,clipLen(c));changed();});
   q('[data-k=gainR]').ondblclick=()=>{c.gain=0;changed();checkpoint();};
   q('[data-k=speedR]').ondblclick=()=>{c.speed=1;changed(true);checkpoint();};
   q('[data-k=semisR]').ondblclick=()=>{c.semis=0;changed(true);checkpoint();};
@@ -1161,7 +1180,12 @@ async function doExport(){
     if(to-from<0.01){toast('書き出す範囲が空です','error');return;}
     $('#eMsg').textContent='書き出し中…（速さ・高さの処理を待っています）';
     const sr=+$('#eSr').value,bits=+$('#eBits').value;
-    if(to-from>3*3600||(to-from)*sr*2*(bits/8)>1.9e9){$('#eMsg').textContent='';toast(`書き出す長さが ${fmtTime(to-from)} あり、長すぎます（3時間・約2GBまで）。遠くに置かれたクリップがないか確認するか、範囲を選んで書き出してください`,'error',9000);return;}
+    const hms=t=>t>=3600?`${Math.floor(t/3600)}時間${Math.floor(t%3600/60)}分`:t>=60?`${Math.floor(t/60)}分${Math.round(t%60)}秒`:`${t.toFixed(1)}秒`;
+    if(to-from>3*3600||(to-from)*sr*2*(bits/8)>1.9e9){$('#eMsg').textContent='';toast(`書き出す長さが ${hms(to-from)} あり、長すぎます（3時間・約2GBまで）。遠くに置かれたクリップがないか確認するか、範囲を選んで書き出してください`,'error',9000);return;}
+    if(to-from>600){let sound=0;const iv=allClips().map(c=>[Math.max(from,c.start),Math.min(to,clipEnd(c))]).filter(x=>x[1]>x[0]).sort((a,b)=>a[0]-b[0]);let ce=-1;for(const [a,b] of iv){if(b<=ce)continue;sound+=b-Math.max(a,ce);ce=b;}
+      const mb=Math.round((to-from)*sr*2*(bits/8)/1048576);
+      if(!confirm(`書き出す長さは ${hms(to-from)}（約${mb}MB）です。そのうち音がある部分は ${hms(sound)} です。\n時間がかかることがあります。このまま書き出しますか？`)){$('#eMsg').textContent='';return;}}
+    $('#eMsg').textContent=`書き出し中…（長さ ${hms(to-from)}。終わるまでお待ちください）`;await new Promise(r=>setTimeout(r,50));
     const chs=await renderMix(from,to,sr);
     let pk=0;for(const ch of chs)for(let i=0;i<ch.length;i++){const a=Math.abs(ch[i]);if(a>pk)pk=a;}
     let note='';
@@ -1230,15 +1254,15 @@ function synthDemo(){
   const add=(t,fn,dur)=>{const s=Math.round(t*sr),n=Math.round(dur*sr);for(let i=0;i<n&&s+i<len;i++)d[s+i]+=fn(i/sr);};
   for(let b=0;b<16;b++){
     const t=b*q;
-    if(b%2===0)add(t,x=>Math.sin(2*Math.PI*(50+90*Math.exp(-x*30))*x)*Math.exp(-x*9)*0.9,0.4);
-    if(b%2===1)add(t,x=>((Math.random()*2-1)*0.5+Math.sin(2*Math.PI*190*x)*0.3)*Math.exp(-x*16),0.25);
-    for(let h=0;h<2;h++)add(t+h*q/2,x=>(Math.random()*2-1)*0.18*Math.exp(-x*60),0.06);
+    if(b%2===0)add(t,x=>Math.sin(2*Math.PI*(50+90*Math.exp(-x*30))*x)*Math.exp(-x*9)*0.55,0.4);
+    if(b%2===1)add(t,x=>((Math.random()*2-1)*0.3+Math.sin(2*Math.PI*190*x)*0.18)*Math.exp(-x*16),0.25);
+    for(let h=0;h<2;h++)add(t+h*q/2,x=>(Math.random()*2-1)*0.11*Math.exp(-x*60),0.06);
   }
   // メロディ 90BPM（あえてテンポ違い）
   const bpm2=90,q2=60/bpm2,len2=Math.round(q2*16*sr),m=[new Float32Array(len2),new Float32Array(len2)];
   const notes=[57,60,64,69,67,64,60,64,55,59,62,67,65,62,59,62];
   notes.forEach((n,i)=>{const f=440*Math.pow(2,(n-69)/12),s=Math.round(i*q2*sr),dur=Math.round(q2*0.95*sr);
-    for(let j=0;j<dur&&s+j<len2;j++){const x=j/sr;const env=Math.min(1,x*80)*Math.exp(-x*2.2);const v=(Math.sin(2*Math.PI*f*x)+0.35*Math.sin(4*Math.PI*f*x)+0.15*Math.sin(6*Math.PI*f*x))*env*0.32;m[0][s+j]+=v*0.8;m[1][s+j]+=v;}});
+    for(let j=0;j<dur&&s+j<len2;j++){const x=j/sr;const env=Math.min(1,x*80)*Math.exp(-x*2.2);const v=(Math.sin(2*Math.PI*f*x)+0.35*Math.sin(4*Math.PI*f*x)+0.15*Math.sin(6*Math.PI*f*x))*env*0.22;m[0][s+j]+=v*0.8;m[1][s+j]+=v;}});
   return [{name:'サンプル_ドラム_100BPM.wav',bytes:encodeWav([d,d],sr,16),bpm:100},{name:'サンプル_メロディ_90BPM.wav',bytes:encodeWav(m,sr,16),bpm:90}];
 }
 async function loadDemo(){
