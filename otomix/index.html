@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>おとミックス</title>
+<title>おとミックス — 音を重ねて合わせる</title>
 <style>
 :root{
   --bg:#14161b; --panel:#1d2027; --panel2:#252932; --line:#2f3440; --text:#e8eaf0; --sub:#9aa1b2;
@@ -24,22 +24,25 @@ input[type=number]{width:74px}
 input[type=range]{accent-color:var(--accent);cursor:pointer}
 label{display:inline-flex;align-items:center;gap:6px;color:var(--sub)}
 #app{display:flex;flex-direction:column;height:100%}
-#top{display:flex;flex-wrap:wrap;align-items:center;gap:8px 14px;padding:8px 12px;background:var(--panel);border-bottom:1px solid var(--line)}
+#top{display:flex;flex-wrap:wrap;align-items:center;gap:8px 8px;padding:8px 12px;background:var(--panel);border-bottom:1px solid var(--line)}
 .grp{display:flex;align-items:center;gap:6px}
 .brand b{font-size:16px;letter-spacing:.04em}
+@media (max-width:1560px){.brand{display:none}}
+#iBpm{width:62px}
 .brand small{color:var(--sub);margin-left:4px}
 .play{min-width:90px;font-weight:600}
 .play.on{background:#1f5f3c;border-color:var(--ok)}
-.clock{font-variant-numeric:tabular-nums;background:#0e1014;border:1px solid var(--line);border-radius:8px;padding:2px 10px;flex-direction:column;align-items:flex-start;gap:0;min-width:120px}
+.clock{font-variant-numeric:tabular-nums;background:#0e1014;border:1px solid var(--line);border-radius:8px;padding:2px 10px;flex-direction:column;align-items:flex-start;gap:0;min-width:112px}
 #clkTime{font-size:17px;font-weight:600;letter-spacing:.02em}
 #clkBar{font-size:11px;color:var(--sub)}
 #meter{background:#0e1014;border:1px solid var(--line);border-radius:4px}
-#iZoom{width:110px}
+#iZoom{width:96px;min-width:0}
+#corner button{min-height:26px;padding:2px 8px}
 #main{flex:1;position:relative;min-height:0}
 #tl{position:absolute;inset:0;overflow:auto;background:#111318}
 #tlInner{position:relative;min-height:100%}
 #rulerRow{position:sticky;top:0;height:36px;z-index:6;background:#181b21;border-bottom:1px solid var(--line)}
-#corner{position:sticky;left:0;width:var(--hw);height:36px;background:var(--panel);border-right:1px solid var(--line);z-index:7;display:flex;align-items:center;padding:0 10px;color:var(--sub);font-size:12px}
+#corner{position:sticky;left:0;width:var(--hw);height:36px;background:var(--panel);border-right:1px solid var(--line);z-index:7;display:flex;align-items:center;gap:4px;padding:0 6px;color:var(--sub);font-size:12px}
 #ruler{position:absolute;top:0;height:36px;cursor:pointer}
 #rows{position:relative}
 .row{display:flex;border-bottom:1px solid var(--line);position:relative}
@@ -93,7 +96,7 @@ label{display:inline-flex;align-items:center;gap:6px;color:var(--sub)}
 .seg button{border:0;border-radius:0;background:transparent}
 .seg button.on{background:#16365f;color:#cfe3ff}
 .small{font-size:11.5px;color:var(--sub)}
-#toasts{position:fixed;right:14px;bottom:14px;display:flex;flex-direction:column;gap:8px;z-index:100;max-width:420px}
+#toasts{position:fixed;right:14px;top:60px;display:flex;flex-direction:column;gap:8px;z-index:100;max-width:420px}
 .toast{background:#2a2f3a;border:1px solid var(--line);border-left:4px solid var(--accent);border-radius:8px;padding:10px 12px;box-shadow:0 6px 20px rgba(0,0,0,.4);animation:tin .2s}
 .toast.error{border-left-color:var(--danger)}
 .toast.ok{border-left-color:var(--ok)}
@@ -121,42 +124,36 @@ label{display:inline-flex;align-items:center;gap:6px;color:var(--sub)}
     <div class="grp">
       <button id="bHome" title="先頭へ戻る（Homeキー）">⏮</button>
       <button id="bPlay" class="play" title="再生／一時停止（スペースキー）">▶ 再生</button>
-      <button id="bStop" title="停止して、再生を始めた位置に戻る">■ 停止</button>
+      <button id="bStop" title="停止して、再生を始めた位置に戻る" aria-label="停止">■</button>
       <button id="bLoop" class="tog" title="ループ再生（Lキー）。上の目盛りをドラッグすると範囲を決められます">⟲ ループ</button>
-      <button id="bMetro" class="tog" title="メトロノーム（Mキー）。拍に合っているかの確認用で、書き出しには入りません">♩ メトロノーム</button>
+      <button id="bMetro" class="tog" title="メトロノーム（Mキー）。拍に合っているかの確認用で、書き出しには入りません">♩ メトロ</button>
     </div>
     <div class="grp clock" title="上：時間（分:秒.ミリ秒）　下：小節.拍.16分"><div id="clkTime">00:00.000</div><div id="clkBar">小節 1.1.1</div></div>
     <div class="grp">
       <label title="曲のテンポ。目盛りとスナップの基準になります">BPM <input id="iBpm" type="number" min="20" max="300" step="0.1" value="120"></label>
-      <label>拍子 <select id="iSig"><option value="2">2拍子</option><option value="3">3拍子</option><option value="4" selected>4拍子</option><option value="5">5拍子</option><option value="6">6拍子</option><option value="7">7拍子</option></select></label>
+      <label title="拍子"><select id="iSig"><option value="2">2拍子</option><option value="3">3拍子</option><option value="4" selected>4拍子</option><option value="5">5拍子</option><option value="6">6拍子</option><option value="7">7拍子</option></select></label>
       <label title="クリップを動かしたときに吸い付く間隔。Altキーを押しながらドラッグすると一時的に無効">スナップ <select id="iSnap"><option value="off">なし</option><option value="bar">1小節</option><option value="beat" selected>1拍</option><option value="half">1/2拍</option><option value="quarter">1/4拍</option></select></label>
     </div>
     <div class="grp">
-      <button id="bZoomOut" title="縮小（−キー）">−</button>
-      <input id="iZoom" type="range" min="0" max="1000" value="300" title="横方向の拡大・縮小（Ctrl＋ホイールでも可）">
-      <button id="bZoomIn" title="拡大（＋キー）">＋</button>
-      <button id="bFit" title="全体が見えるように表示">全体表示</button>
-    </div>
-    <div class="grp">
-      <button id="bUndo" title="元に戻す（Ctrl+Z）">↶ 元に戻す</button>
-      <button id="bRedo" title="やり直し（Ctrl+Shift+Z / Ctrl+Y）">↷ やり直し</button>
+      <button id="bUndo" title="元に戻す（Ctrl+Z）" aria-label="元に戻す">↶</button>
+      <button id="bRedo" title="やり直し（Ctrl+Shift+Z / Ctrl+Y）" aria-label="やり直し">↷</button>
     </div>
     <div class="grp">
       <button id="bSave" title="作業内容をファイルに保存（Ctrl+S）。音声も中に含まれます">保存</button>
       <button id="bOpen" title="保存した作業ファイルを開く">開く</button>
       <button id="bExport" class="primary" title="ミックスを WAV ファイルに書き出す（Ctrl+E）">書き出し</button>
-      <button id="bHelp" title="使い方とショートカット">？ 使い方</button>
+      <button id="bHelp" title="使い方とショートカット">？</button>
     </div>
     <div class="grp">
-      <label title="全体の音量">全体 <input id="iMaster" type="range" min="-60" max="12" step="0.5" value="0" style="width:90px"></label>
-      <canvas id="meter" width="130" height="22" title="出力レベル（赤くなったら音割れの恐れ）"></canvas>
+      <label title="全体の音量（ダブルクリックで0dB）">全体 <input id="iMaster" type="range" min="-60" max="12" step="0.5" value="0" style="width:70px"></label>
+      <canvas id="meter" width="90" height="22" title="出力レベル（赤くなったら音割れの恐れ）"></canvas>
     </div>
   </header>
   <div id="banner"><span>前回の作業が自動保存されています。</span><button id="bRestore" class="primary">続きから再開</button><button id="bDiscard">新しく始める</button></div>
   <div id="main">
     <div id="tl">
       <div id="tlInner">
-        <div id="rulerRow"><div id="corner">トラック</div><canvas id="ruler"></canvas></div>
+        <div id="rulerRow"><div id="corner"><button id="bZoomOut" title="縮小（−キー）">−</button><input id="iZoom" type="range" min="0" max="1000" value="300" title="横方向の拡大・縮小（Ctrl＋ホイールでも可）"><button id="bZoomIn" title="拡大（＋キー）">＋</button><button id="bFit" title="全体が見えるように表示">全体</button></div><canvas id="ruler"></canvas></div>
         <div id="rows"></div>
         <div id="addRow"><button id="bAdd2">＋ 音声を追加</button></div>
         <div id="loopShade"></div>
@@ -184,7 +181,7 @@ label{display:inline-flex;align-items:center;gap:6px;color:var(--sub)}
   <div class="row2"><span>形式</span><select id="eBits"><option value="16">WAV 16ビット（CDと同じ・標準）</option><option value="24">WAV 24ビット（高音質）</option><option value="32">WAV 32ビット浮動小数</option></select></div>
   <div class="row2"><span>サンプリング周波数</span><select id="eSr"><option value="44100">44100 Hz（標準）</option><option value="48000">48000 Hz（動画向け）</option></select></div>
   <div class="row2"><span>音割れ防止</span><label style="color:var(--text)"><input type="checkbox" id="eNorm" checked> 大きすぎるときだけ、ピークが −1 dB になるよう全体を下げる</label></div>
-  <div class="row2"><span>ファイル名</span><input type="text" id="eName" style="flex:1" value="ミックス"></div>
+  <div class="row2"><span>ファイル名</span><input type="text" id="eName" style="flex:1" value="mix" title="英数字の名前をおすすめします（ブラウザによっては日本語名が無視されるため）"></div>
   <div id="eMsg" class="small"></div>
   <div class="act"><button id="eCancel">やめる</button><button id="eGo" class="primary">書き出す</button></div>
 </div></div>
@@ -216,39 +213,71 @@ label{display:inline-flex;align-items:center;gap:6px;color:var(--sub)}
 <script id="dspSrc" type="text/plain">
 // ===== 音声処理（別スレッドで動く） =====
 function hannWin(N){var w=new Float32Array(N);for(var i=0;i<N;i++)w[i]=0.5-0.5*Math.cos(2*Math.PI*i/N);return w;}
-// WSOLA: 音の高さを保ったまま長さを r 倍にする
+// 打音（音の立ち上がり）の位置を見つける
+function findOnsets(mono,sr){
+  var hop=256,win=512,n=Math.floor((mono.length-win)/hop);
+  if(n<8)return [];
+  var e=new Float32Array(n),lin=new Float32Array(n);
+  for(var f=0;f<n;f++){var s=0,a=f*hop;for(var i=0;i<win;i++){var v=mono[a+i];s+=v*v;}lin[f]=s/win;e[f]=Math.log(1e-10+s/win);}
+  var fl=new Float32Array(n);
+  for(var f=2;f<n;f++){fl[f]=Math.max(0,e[f]-Math.max(e[f-1],e[f-2]));}
+  var res=[],last=-1e9,W=Math.round(0.25*sr/hop),minGap=0.05*sr;
+  for(var f=2;f<n-1;f++){
+    if(fl[f]<fl[f-1]||fl[f]<fl[f+1])continue;
+    if(lin[f]<1e-4)continue; // −40dBより小さい音は無視
+    var m=0,c=0;for(var j=Math.max(0,f-W);j<Math.min(n,f+W);j++){m+=fl[j];c++;}m/=c;
+    if(fl[f]>1.2&&fl[f]>m*2.5){
+      // 64サンプル単位で立ち上がりの位置を詰める
+      var a0=Math.max(0,(f-2)*hop),a1=Math.min(mono.length-64,f*hop+win),bj=-1,bv=-1,pe=-1;
+      for(var p=a0;p<a1;p+=64){var s=0;for(var i=0;i<64;i++){var v=mono[p+i];s+=v*v;}var le=Math.log(1e-10+s/64);if(pe>-1e9&&p>a0){var d=le-pe;if(d>bv){bv=d;bj=p;}}pe=le;}
+      var T=bj>=0?bj:f*hop;
+      if(T-last>minGap){res.push(T);last=T;}
+    }
+  }
+  return res;
+}
+// WSOLA: 音の高さを保ったまま長さを r 倍にする（打音は位置を固定して守る）
 function wsola(chans,sr,r,prog){
   var L=chans[0].length,nc=chans.length;
   var outLen=Math.max(1,Math.round(L*r));
   var N=1<<Math.round(Math.log2(sr*0.046));
   var Hs=N>>1,Ha=Hs/r,D=4;
-  var tol=Math.round(sr*0.012),tolD=Math.floor(tol/D);
+  var tol=Math.round(sr*0.010),tolD=Math.floor(tol/D);
   var mono=new Float32Array(L);
   for(var c=0;c<nc;c++){var x=chans[c];for(var i=0;i<L;i++)mono[i]+=x[i];}
   var Ld=Math.floor(L/D),md=new Float32Array(Ld);
   for(var i=0;i<Ld;i++){var s=0;for(var j=0;j<D;j++)s+=mono[i*D+j];md[i]=s;}
+  var ons=findOnsets(mono,sr),oi=0;
   var win=hannWin(N),Nd=N/D|0;
   var out=[];for(var c=0;c<nc;c++)out.push(new Float32Array(outLen+N));
   var wsum=new Float32Array(outLen+N);
   var nF=Math.ceil(outLen/Hs)+1,prev=0;
   for(var k=0;k<nF;k++){
-    var ideal=Math.round(k*Ha),best=ideal;
-    if(k>0){
-      var nat=prev+Hs,natD=Math.round(nat/D),idD=Math.round(ideal/D),bs=-Infinity,bd=0;
-      for(var d=-tolD;d<=tolD;d++){
-        var p=idD+d,s=0;
+    var o=k*Hs,ideal=Math.round(k*Ha),best=ideal,anch=false;
+    while(oi<ons.length&&ons[oi]*r<o)oi++;
+    if(oi<ons.length&&ons[oi]*r<o+N){
+      // この枠は打音を含む：打音が正しい時刻に来る位置に固定する
+      var T=ons[oi];best=T-Math.round(T*r)+o;anch=true;
+    }else if(k>0){
+      var nat=prev+Hs,natD=Math.round(nat/D),idD=Math.round(ideal/D),bs=0,bd=0;
+      for(var q=0;q<=2*tolD;q++){
+        var d=(q&1)?((q+1)>>1):-(q>>1),p=idD+d,s=0;
         for(var i=0;i<Nd;i+=2){var a=p+i,b=natD+i;if(a<0||b<0||a>=Ld||b>=Ld)continue;s+=md[a]*md[b];}
-        if(s>bs){bs=s;bd=d;}
+        if(s>bs*1.0000001+1e-12){bs=s;bd=d;}
       }
-      var c0=ideal+bd*D;bs=-Infinity;best=c0;
-      for(var d=-D;d<=D;d++){
-        var p=c0+d,s=0;
-        for(var i=0;i<N;i+=2){var a=p+i,b=nat+i;if(a<0||b<0||a>=L||b>=L)continue;s+=mono[a]*mono[b];}
-        if(s>bs){bs=s;best=p;}
+      var c0=ideal+bd*D;bs=0;best=c0;
+      for(var q=0;q<=2*D;q++){
+        var d=(q&1)?((q+1)>>1):-(q>>1),p=c0+d,s=0;
+        for(var i=0;i<N;i++){var a=p+i,b=nat+i;if(a<0||b<0||a>=L||b>=L)continue;s+=mono[a]*mono[b];}
+        if(s>bs*1.0000001+1e-12){bs=s;best=p;}
       }
       if(best<ideal-tol)best=ideal-tol;if(best>ideal+tol)best=ideal+tol;
     }
-    var o=k*Hs;
+    if(!anch){
+      // 固定していない枠に打音が入ると二重に鳴るので、打音をよける
+      if(oi>0){var Tp=ons[oi-1];if(best<=Tp&&best+N>Tp)best=Tp+1;}
+      if(oi<ons.length){var Tn=ons[oi];if(best<=Tn&&best+N>Tn)best=Tn-N;}
+    }
     for(var c=0;c<nc;c++){var x=chans[c],y=out[c];for(var i=0;i<N;i++){var a=best+i;if(a>=0&&a<L)y[o+i]+=x[a]*win[i];}}
     for(var i=0;i<N;i++)wsum[o+i]+=win[i];
     prev=best;
@@ -490,7 +519,7 @@ function trackAudible(t){const solo=project.tracks.some(x=>x.solo);return !t.mut
 function buildTrackNodes(c,dest){
   const m=new Map();
   for(const t of project.tracks){
-    const g=c.createGain();let p=null;
+    const g=c.createGain();g.channelCount=2;g.channelCountMode='explicit';g.channelInterpretation='speakers';let p=null;
     if(c.createStereoPanner){p=c.createStereoPanner();p.pan.value=t.pan/100;g.connect(p);p.connect(dest);}else g.connect(dest);
     g.gain.value=trackAudible(t)?dbToLin(t.vol):0;m.set(t.id,{g,p});
   }
@@ -599,7 +628,7 @@ function contentW(){return Math.max(viewW()-HW,(Math.max(projEnd(),loopRange()?p
 function zoomToSlider(p){return Math.round(Math.log(p/4)/Math.log(12000/4)*1000);}
 function sliderToZoom(v){return 4*Math.pow(12000/4,v/1000);}
 function setZoom(p,anchorX){
-  const ax=anchorX==null?(viewW()-HW)/2:anchorX;
+  let ax=anchorX;if(ax==null){const px=curPos()*pps-tl.scrollLeft;ax=(px>=0&&px<=viewW()-HW)?px:(viewW()-HW)/2;}
   const tAt=(tl.scrollLeft+ax)/pps;
   pps=clamp(p,4,12000);
   const maxW=15e6;if((projEnd()+30)*pps>maxW)pps=maxW/(projEnd()+30);
@@ -622,7 +651,7 @@ function renderTracks(){
       <label class="knob" title="トラックの音量（ダブルクリックで0dB）"><span>音量</span><input type="range" class="vol" min="-60" max="12" step="0.5"><output></output></label>
       <label class="knob" title="左右の位置（ダブルクリックで中央）"><span>左右</span><input type="range" class="pan" min="-100" max="100" step="1"><output></output></label>
     </div><div class="lane"><canvas></canvas></div>`;
-    const nm=r.querySelector('.tname');nm.value=t.name;
+    const nm=r.querySelector('.tname');nm.value=t.name;nm.title=t.name+'（クリックで名前を変更）';
     nm.onchange=()=>{t.name=nm.value.trim()||t.name;nm.value=t.name;checkpoint();};
     const vol=r.querySelector('.vol'),vo=vol.nextElementSibling;vol.value=t.vol;vo.textContent=fmtDb(t.vol);
     vol.oninput=()=>{t.vol=+vol.value;vo.textContent=fmtDb(t.vol);applyTrackLive();};vol.onchange=checkpoint;
@@ -856,7 +885,8 @@ function clipPointerDown(e,c,el){
   };
   const up=()=>{window.removeEventListener('pointermove',mv);window.removeEventListener('pointerup',up);window.removeEventListener('pointercancel',up);
     el.classList.remove('drag');hideTip();
-    if(moved){layout();checkpoint();restartIfPlaying();renderInspector();}};
+    if(moved){layout();checkpoint();restartIfPlaying();renderInspector();}
+    else if(kind==='move'&&!play){playhead=clamp(laneTime({clientX:sx}),c.start,clipEnd(c));updateTransport();}};
   window.addEventListener('pointermove',mv);window.addEventListener('pointerup',up);window.addEventListener('pointercancel',up);
 }
 // 目盛り：クリックで位置、ドラッグでループ範囲
@@ -902,7 +932,7 @@ function renderInspector(){
     <div class="line"><button data-a="tobeat" title="開始位置を一番近い拍に合わせる">近い拍にそろえる</button><button data-a="toplay" title="開始位置を赤い線（再生位置）に合わせる">再生位置に置く</button></div>
   </div>
   <div class="box"><h4>速さ</h4>
-    <div class="line"><input type="range" data-k="speedR" min="50" max="200" step="0.5"><input type="number" data-k="speed" min="25" max="400" step="0.1"> %</div>
+    <div class="line"><input type="range" data-k="speedR" min="50" max="200" step="0.5" title="つまみは50〜200%。それ以外は右の欄に数値で（25〜400%）"><input type="number" data-k="speed" min="25" max="400" step="0.1" title="25〜400%"> %</div>
     <div class="line"><label title="この素材のもとのテンポ">元のBPM <input type="number" data-k="srcBpm" min="30" max="300" step="0.1" placeholder="未設定"></label><button data-a="detect" title="素材のテンポを自動で推定します（目安）">自動検出</button><button data-a="match" class="primary" title="曲のBPMに合うよう速さを変えます">曲のBPMに合わせる</button></div>
     <div class="line"><span class="small">方式</span><span class="seg"><button data-mode="keep" title="音の高さはそのまま、速さだけ変える">高さを保つ</button><button data-mode="tape" title="レコードやテープのように、速くすると高く、遅くすると低くなる">テープ方式</button></span></div>
   </div>
@@ -924,9 +954,9 @@ function renderInspector(){
   const q=s=>insp.querySelector(s);
   const onNum=(k,fn)=>{const el=q(`[data-k=${k}]`);el.addEventListener('input',()=>{const v=parseFloat(el.value);if(!isFinite(v))return;fn(v,false);});el.addEventListener('change',()=>{const v=parseFloat(el.value);if(isFinite(v))fn(v,true);else renderInspectorValues();checkpoint();});};
   const changed=(reproc)=>{positionClips();draw();renderInspectorValues(true);if(reproc){updateBusy();scheduleProcessing();}else restartSoon();};
-  onNum('start',(v)=>{c.start=Math.max(0,v);layout();changed();});
-  onNum('speedR',v=>{c.speed=v/100;changed(true);});
-  onNum('speed',(v,fin)=>{if(fin)v=clamp(v,25,400);if(v<25||v>400)return;c.speed=v/100;changed(true);});
+  onNum('start',(v,fin)=>{if(v>36000){if(fin)toast('開始位置は10時間（36000秒）までです','error');v=36000;}c.start=Math.max(0,v);layout();changed();});
+  onNum('speedR',v=>{c.speed=v/100;c.bpmSync=false;changed(true);});
+  onNum('speed',(v,fin)=>{if(fin&&(v<25||v>400)){toast(`速さは 25〜400% の範囲です。${v<25?25:400}% にしました`,'error');v=clamp(v,25,400);}if(v<25||v>400)return;c.speed=v/100;c.bpmSync=false;changed(true);});
   onNum('srcBpm',(v,fin)=>{if(fin&&(v<30||v>300)){toast('BPMは30〜300の範囲で入れてください');c.srcBpm=null;}else c.srcBpm=v;});
   onNum('semisR',v=>{c.semis=v;changed(true);});
   onNum('semis',(v,fin)=>{v=Math.round(clamp(v,-24,24));c.semis=v;changed(true);});
@@ -953,7 +983,7 @@ function renderInspector(){
     else if(a==='match'){
       if(!c.srcBpm){toast('先に「元のBPM」を入れるか「自動検出」を押してください');return;}
       const sp=project.bpm/c.srcBpm;if(sp<0.25||sp>4){toast('テンポの差が大きすぎます（4倍以内にしてください）','error');return;}
-      c.speed=sp;if(c.mode==='tape'){}changed(true);checkpoint();toast(`速さを ${(sp*100).toFixed(1)}% にしました（${c.srcBpm} → ${project.bpm} BPM）`,'ok');}
+      c.speed=sp;c.bpmSync=true;changed(true);checkpoint();toast(`速さを ${(sp*100).toFixed(1)}% にしました（${c.srcBpm} → ${project.bpm} BPM）`,'ok');}
   });
 }
 let rsTimer=null;function restartSoon(){clearTimeout(rsTimer);rsTimer=setTimeout(restartIfPlaying,120);}
@@ -990,7 +1020,7 @@ function encodeWav(chs,sr,bits){
   return ab;
 }
 function download(blob,name){const a=document.createElement('a');a.href=URL.createObjectURL(blob);a.download=name;document.body.appendChild(a);a.click();setTimeout(()=>{URL.revokeObjectURL(a.href);a.remove();},4000);}
-function safeName(s){return (s||'ミックス').replace(/[\\/:*?"<>|]/g,'_').slice(0,80);}
+function safeName(s){return (s||'mix').replace(/[\\/:*?"<>|]/g,'_').slice(0,80);}
 async function renderMix(from,to,sr){
   await Promise.all(allClips().map(ensureProcessed));
   const len=Math.max(1,Math.ceil((to-from)*sr));
@@ -1003,7 +1033,7 @@ async function renderMix(from,to,sr){
 }
 function openExport(){
   if(!hasClips()){toast('書き出すクリップがありません。まず音声ファイルを追加してください');return;}
-  const L=loopRange();$('#eRange').value=L?$('#eRange').value:'all';$('#eRange').options[1].disabled=!L;$('#eMsg').textContent='';
+  const L=loopRange();$('#eRange').value='all';$('#eRange').options[1].disabled=!L;$('#eNorm').checked=true;$('#eMsg').textContent='';const d=new Date();$('#eName').value=`mix-${d.getFullYear()}${String(d.getMonth()+1).padStart(2,'0')}${String(d.getDate()).padStart(2,'0')}-${String(d.getHours()).padStart(2,'0')}${String(d.getMinutes()).padStart(2,'0')}`;
   $('#mExport').style.display='flex';
 }
 let exporting=false;
@@ -1035,7 +1065,7 @@ function saveProject(){
   if(!project.tracks.length){toast('保存する内容がありません');return;}
   const data={app:'otomix',version:1,project,sources:usedSources().map(s=>({id:s.id,name:s.name,mime:s.mime,data:toB64(s.bytes)}))};
   const d=new Date(),stamp=`${d.getFullYear()}${String(d.getMonth()+1).padStart(2,'0')}${String(d.getDate()).padStart(2,'0')}-${String(d.getHours()).padStart(2,'0')}${String(d.getMinutes()).padStart(2,'0')}`;
-  download(new Blob([JSON.stringify(data)],{type:'application/json'}),`おとミックス作業-${stamp}.otomix`);
+  download(new Blob([JSON.stringify(data)],{type:'application/json'}),`otomix-project-${stamp}.otomix`);
   toast('作業ファイルを保存しました（音声も中に入っています）','ok');
 }
 async function openProjectFile(file){
@@ -1058,19 +1088,20 @@ let idb=null;
 function idbOpen(){return new Promise(res=>{try{const r=indexedDB.open('otomix',1);r.onupgradeneeded=()=>{const d=r.result;d.createObjectStore('kv');d.createObjectStore('src');};r.onsuccess=()=>{idb=r.result;res(idb);};r.onerror=()=>res(null);}catch(e){res(null);}});}
 function idbReq(store,mode,fn){return new Promise(res=>{if(!idb)return res(null);try{const tx=idb.transaction(store,mode);const r=fn(tx.objectStore(store));tx.oncomplete=()=>res(r&&r.result);tx.onerror=()=>res(null);}catch(e){res(null);}});}
 function idbPutSource(s){idbReq('src','readwrite',st=>st.put({id:s.id,name:s.name,mime:s.mime,bytes:s.bytes},s.id));}
-let asTimer=null;
-function scheduleAutosave(){clearTimeout(asTimer);asTimer=setTimeout(()=>{idbReq('kv','readwrite',st=>st.put(JSON.stringify(project),'project'));},800);}
+let asTimer=null,autosaveOn=false;
+function scheduleAutosave(){if(!autosaveOn)return;clearTimeout(asTimer);asTimer=setTimeout(()=>{idbReq('kv','readwrite',st=>st.put(JSON.stringify(project),'project'));},800);}
 async function checkRestore(){
   await idbOpen();if(!idb)return;
   const pj=await idbReq('kv','readonly',st=>st.get('project'));
-  if(!pj)return;let p;try{p=JSON.parse(pj);}catch(e){return;}
-  if(!p.tracks||!p.tracks.some(t=>t.clips&&t.clips.length))return;
-  if(hasClips())return;
+  const enable=()=>{autosaveOn=true;scheduleAutosave();};
+  if(!pj)return enable();let p;try{p=JSON.parse(pj);}catch(e){return enable();}
+  if(!p.tracks||!p.tracks.some(t=>t.clips&&t.clips.length))return enable();
+  if(hasClips())return enable();
   $('#banner').style.display='flex';
   $('#bRestore').onclick=async()=>{$('#banner').style.display='none';
     const all=await idbReq('src','readonly',st=>st.getAll())||[];
-    await loadProjectData(p,all);toast('前回の作業を開きました','ok');};
-  $('#bDiscard').onclick=()=>{$('#banner').style.display='none';idbReq('kv','readwrite',st=>st.clear());idbReq('src','readwrite',st=>st.clear());};
+    autosaveOn=true;await loadProjectData(p,all);toast('前回の作業を開きました','ok');};
+  $('#bDiscard').onclick=async()=>{$('#banner').style.display='none';await idbReq('kv','readwrite',st=>st.clear());await idbReq('src','readwrite',st=>st.clear());for(const s of sources.values())idbPutSource(s);enable();};
 }
 
 // ================= サンプル音 =================
@@ -1114,7 +1145,11 @@ function toggleLoop(){
   L.on=!L.on;checkpoint();layout();updateTransport();restartIfPlaying();
 }
 function toggleMetro(){project.metro=!project.metro;updateTransport();restartIfPlaying();scheduleAutosave();}
-$('#iBpm').onchange=()=>{const v=parseFloat($('#iBpm').value);if(!isFinite(v)||v<20||v>300){toast('BPMは20〜300の範囲で入れてください','error');$('#iBpm').value=project.bpm;return;}project.bpm=Math.round(v*100)/100;checkpoint();draw();renderInspectorValues();restartIfPlaying();};
+$('#iBpm').onchange=()=>{const v=parseFloat($('#iBpm').value);if(!isFinite(v)||v<20||v>300){toast('BPMは20〜300の範囲で入れてください','error');$('#iBpm').value=project.bpm;return;}
+  const old=project.bpm,nb=Math.round(v*100)/100;if(nb===old)return;project.bpm=nb;let n=0;
+  for(const c of allClips()){if(c.bpmSync&&c.srcBpm){const sp=nb/c.srcBpm;if(sp>=0.25&&sp<=4){c.speed=sp;c.start=c.start*old/nb;n++;}}}
+  checkpoint();layout();draw();renderInspector();updateBusy();scheduleProcessing();restartIfPlaying();
+  if(n)toast(`BPMに合わせてあった ${n} 個のクリップの速さと位置を、新しいBPM（${nb}）に合わせ直しました`,'ok',6000);};
 $('#iSig').onchange=()=>{project.sig=+$('#iSig').value;checkpoint();draw();restartIfPlaying();};
 $('#iSnap').onchange=()=>{project.snap=$('#iSnap').value;checkpoint();};
 $('#iZoom').oninput=()=>setZoom(sliderToZoom(+$('#iZoom').value));
@@ -1168,7 +1203,7 @@ document.addEventListener('keydown',e=>{
   else if(e.key==='-')setZoom(pps/1.5);
 });
 document.addEventListener('keydown',e=>{if((e.ctrlKey||e.metaKey)&&(e.key==='ArrowLeft'||e.key==='ArrowRight')){const tg=e.target;if(tg.tagName==='INPUT'&&tg.type!=='range')return;e.preventDefault();e.stopImmediatePropagation();if(selId)nudge((e.key==='ArrowLeft'?-1:1)*(gridSec()||spb()));}},true);
-window.addEventListener('beforeunload',()=>{idbReq('kv','readwrite',st=>st.put(JSON.stringify(project),'project'));});
+window.addEventListener('beforeunload',()=>{if(autosaveOn)idbReq('kv','readwrite',st=>st.put(JSON.stringify(project),'project'));});
 
 // ================= 開始 =================
 renderAll();syncTopControls();checkpoint();updateUndo();layout();draw();requestAnimationFrame(frame);
