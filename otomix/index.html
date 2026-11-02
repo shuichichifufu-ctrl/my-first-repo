@@ -31,7 +31,9 @@ button.rec.on{background:#7a1f1f;border-color:#ff4d4d;color:#fff;font-weight:600
 .grp{display:flex;align-items:center;gap:6px}
 .brand b{font-size:16px;letter-spacing:.04em}
 @media (max-width:1560px){.brand{display:none}}
-#iBpm{width:54px}
+#iBpm{width:52px}
+#iSnap{width:104px}#iSig{width:66px}
+#top button{padding-left:8px;padding-right:8px}
 .brand small{color:var(--sub);margin-left:4px}
 .play{width:80px;padding-left:6px;padding-right:6px;font-weight:600}
 .play.on{background:#1f5f3c;border-color:var(--ok)}
@@ -154,7 +156,15 @@ button.rec.on{background:#7a1f1f;border-color:#ff4d4d;color:#fff;font-weight:600
 .cards span{color:var(--sub);font-size:14px;line-height:1.5}
 #easyHome .foot{text-align:center;margin-top:22px;color:var(--sub);font-size:14px}
 #easyHome .foot button{font-size:14px}
-body.easy #top,body.easy #insp,body.easy #corner>*,body.easy #empty,body.easy #banner{display:none!important}
+body.easy #top,body.easy #insp,body.easy #corner>*,body.easy #empty{display:none!important}
+body.easy #banner{font-size:16px;padding:12px 16px}body.easy #banner button{min-height:44px;font-size:15px}
+body.easy.home #ePlay,body.easy.home #eUndo{display:none}
+body.easy .th .xbtn{display:none!important}
+body.easy #toasts{top:76px!important;bottom:auto!important}
+#eLevel{height:14px;background:#0e1014;border:1px solid var(--line);border-radius:7px;overflow:hidden;width:min(420px,80vw)}#eLevel i{display:block;height:100%;width:0;background:linear-gradient(90deg,#3ecf8e,#ffc53d 75%,#ff4d4d)}
+#easyPanel details{margin:8px 0}#easyPanel summary{cursor:pointer;color:#cfe3ff;font-size:15px;padding:6px 0}
+#easyPanel button.pick small{font-size:14px}
+@media (max-width:1200px){#easyBar{gap:6px;padding:8px 10px}#easyBar button{padding:6px 10px;font-size:14px}.steps span{font-size:13px;padding:3px 9px}#easyBar .eTitle{font-size:15px}}
 body.easy #easyBar{display:flex}
 body.easy #easyPanel{display:block}
 body.easy .knob.panK,body.easy .th .mbtn,body.easy .th .sbtn,body.easy .trim,body.easy .fh,body.easy #addRow{display:none!important}
@@ -165,7 +175,7 @@ body.easy.home #easyPanel{display:none}
 body.easy .knob{display:none!important}
 #easyPanel .nav{position:sticky;bottom:-16px;background:var(--panel);padding-bottom:6px;z-index:2}
 #easyPanel .pair{display:grid;grid-template-columns:repeat(auto-fit,minmax(340px,1fr));gap:10px}
-.cards{grid-template-columns:repeat(auto-fit,minmax(190px,1fr))}
+.cards{grid-template-columns:repeat(auto-fit,minmax(168px,1fr))}
 
 #tip{position:fixed;z-index:90;background:#000c;color:#fff;font-size:12px;padding:3px 8px;border-radius:5px;pointer-events:none;display:none;font-variant-numeric:tabular-nums}
 </style>
@@ -191,7 +201,7 @@ body.easy .knob{display:none!important}
     <div class="grp">
       <label title="曲のテンポ。目盛りとスナップの基準になります">BPM <input id="iBpm" type="number" min="20" max="300" step="0.1" value="120"></label>
       <label title="拍子"><select id="iSig"><option value="2">2拍子</option><option value="3">3拍子</option><option value="4" selected>4拍子</option><option value="5">5拍子</option><option value="6">6拍子</option><option value="7">7拍子</option></select></label>
-      <label title="スナップ：クリップや範囲が吸い付く間隔。Altキーを押しながらドラッグすると一時的に無効"><select id="iSnap"><option value="off">スナップなし</option><option value="bar">スナップ 1小節</option><option value="beat" selected>スナップ 1拍</option><option value="half">スナップ 1/2拍</option><option value="quarter">スナップ 1/4拍</option></select></label>
+      <label title="スナップ：クリップや範囲が吸い付く間隔。Altキーを押しながらドラッグすると一時的に無効"><select id="iSnap"><option value="off">スナップなし</option><option value="bar">スナップ:小節</option><option value="beat" selected>スナップ:拍</option><option value="half">スナップ:½拍</option><option value="quarter">スナップ:¼拍</option></select></label>
     </div>
     <div class="grp">
       <button id="bUndo" title="元に戻す（Ctrl+Z）" aria-label="元に戻す">↶</button>
@@ -202,10 +212,10 @@ body.easy .knob{display:none!important}
       <button id="bOpen" title="保存した作業ファイルを開く">開く</button>
       <button id="bExport" class="primary" title="ミックスを WAV ファイルに書き出す（Ctrl+E）">書き出し</button>
       <button id="bHelp" title="使い方とショートカット">？</button>
-      <button id="bToEasy" title="やりたいことを選んで進む、初めての人向けの画面に切り替えます">かんたん</button>
+      <button id="bToEasy" style="padding:6px 8px" title="やりたいことを選んで進む、初めての人向けの画面に切り替えます">かんたん</button>
     </div>
     <div class="grp">
-      <label title="全体の音量（ダブルクリックで0dB）">音量 <input id="iMaster" type="range" min="-60" max="12" step="0.5" value="0" style="width:42px"></label>
+      <label title="全体の音量（ダブルクリックで0dB）"><input id="iMaster" type="range" min="-60" max="12" step="0.5" value="0" style="width:42px"></label>
       <canvas id="meter" width="44" height="22" title="出力レベル（赤くなったら音割れの恐れ）"></canvas>
     </div>
   </header>
@@ -954,14 +964,14 @@ function drawRuler(w,x0){
   g.font='11px system-ui,sans-serif';g.textBaseline='top';
   for(let k=Math.floor(t0/gi.bar);k*gi.bar<=t1;k++){
     const x=Math.round(k*gi.bar*pps-x0)+.5;
-    if(k%gi.barEvery===0){g.fillStyle='#8f97a8';g.fillRect(x,12,1,24);g.fillStyle='#d6dae3';g.fillText(String(k+1),x+3,13);}
-    if(gi.beatVis)for(let b=1;b<project.sig;b++){const xb=Math.round((k*gi.bar+b*gi.q)*pps-x0)+.5;g.fillStyle='#4b5262';g.fillRect(xb,26,1,10);}
+    if(!easy.on&&k%gi.barEvery===0){g.fillStyle='#8f97a8';g.fillRect(x,12,1,24);g.fillStyle='#d6dae3';g.fillText(String(k+1),x+3,13);}
+    if(gi.beatVis&&!easy.on)for(let b=1;b<project.sig;b++){const xb=Math.round((k*gi.bar+b*gi.q)*pps-x0)+.5;g.fillStyle='#4b5262';g.fillRect(xb,26,1,10);}
   }
   // 秒の目盛り
   const steps=[0.001,0.005,0.01,0.05,0.1,0.5,1,2,5,10,30,60,120,300];let st=steps.find(s=>s*pps>=70)||600;
   g.fillStyle='#69707f';g.font='10px system-ui,sans-serif';
   for(let k=Math.floor(t0/st);k*st<=t1;k++){const x=Math.round(k*st*pps-x0);const tt=k*st;
-    const lab=st<1?tt.toFixed(st<0.01?3:st<0.1?2:1)+'s':(tt>=60?Math.floor(tt/60)+':'+String(Math.round(tt%60)).padStart(2,'0'):Math.round(tt)+'s');
+    const U=easy.on?'秒':'s';const lab=st<1?tt.toFixed(st<0.01?3:st<0.1?2:1)+U:(tt>=60?Math.floor(tt/60)+(easy.on?'分':':')+String(Math.round(tt%60)).padStart(2,'0')+(easy.on?'秒':''):Math.round(tt)+U);
     g.fillRect(x,33,1,3);g.fillText(lab,x+2,24);}
 }
 // ---- 時計・メーター ----
@@ -970,7 +980,7 @@ function frame(){
   $('#clkTime').textContent=fmtTime(p);$('#clkBar').textContent='小節 '+fmtBar(p);
   const ph=$('#playhead');ph.style.left=(HW+p*pps)+'px';
   if(play){const x=p*pps,sl=tl.scrollLeft,vw=viewW()-HW;if(x>sl+vw-30||x<sl)tl.scrollLeft=Math.max(0,x-40);}
-  if(rec){const t=(performance.now()-rec.t0)/1000;const er=document.getElementById('eRecStop');if(er)er.textContent='■ 録音を止める '+String(Math.floor(t/60)).padStart(2,'0')+':'+String(Math.floor(t%60)).padStart(2,'0');$('#bRec').title='録音を止める';$('#bRec').textContent='■ '+String(Math.floor(t/60)).padStart(2,'0')+':'+String(Math.floor(t%60)).padStart(2,'0');}
+  if(rec){const lv=document.querySelector('#eLevel i');if(lv)lv.style.width=Math.min(100,Math.sqrt(rec.level||0)*130)+'%';const t=(performance.now()-rec.t0)/1000;const er=document.getElementById('eRecStop');if(er)er.textContent='■ 録音を止める '+String(Math.floor(t/60)).padStart(2,'0')+':'+String(Math.floor(t%60)).padStart(2,'0');$('#bRec').title='録音を止める';$('#bRec').textContent='■ '+String(Math.floor(t/60)).padStart(2,'0')+':'+String(Math.floor(t%60)).padStart(2,'0');}
   drawMeter();requestAnimationFrame(frame);
 }
 function drawMeter(){
@@ -996,6 +1006,7 @@ function syncTopControls(){$('#iBpm').value=project.bpm;$('#iSig').value=project
 function gridSec(){const q=spb();return {bar:q*project.sig,beat:q,half:q/2,quarter:q/4}[project.snap]||0;}
 function snapTime(t,e,exclude){
   if(e&&e.altKey)return t;
+  if(easy.on)return Math.max(0,t);
   // 他のクリップの端・再生位置へ吸い付く（6px以内）
   const lim=6/pps;let best=null,bd=lim;
   const cand=[playhead];for(const c of allClips()){if(c.id===exclude)continue;cand.push(c.start,clipEnd(c));}
@@ -1439,10 +1450,11 @@ async function startRecording(kind,withPlay,autoSec,trim){
                           :await navigator.mediaDevices.getUserMedia({audio:ac0});
   }catch(e){
     console.warn(e);
-    toast(e&&e.name==='NotAllowedError'?'録音が許可されませんでした（共有を取り消したか、ブラウザの設定でオフになっています）':e&&e.name==='NotFoundError'?'マイクが見つかりませんでした':'録音を始められませんでした','error',7000);return;
+    const btn=easy.on?(kind==='screen'?'「💻 パソコンの音を録る」':'「🎙️ マイクで録る」'):'「● 録音」';
+    toast(e&&e.name==='NotAllowedError'?(kind==='mic'?`マイクが許可されていません。アドレスバーの左にある鍵のマーク（🔒）を押して「マイク」を「許可」にしてから、もう一度 ${btn} を押してください`:`共有が取り消されました。もう一度 ${btn} を押して、録りたいタブを選び「共有」を押してください`):e&&e.name==='NotFoundError'?'マイクが見つかりませんでした。マイクがつながっているか確かめてください':'録音を始められませんでした。パソコンの Chrome か Edge でお試しください','error',9000);return;
   }
   const at=stream.getAudioTracks();
-  if(!at.length){stream.getTracks().forEach(t=>t.stop());toast('音声が共有されていません。もう一度「● 録音」から始め、共有の画面で「タブの音声も共有する」をオンにしてください','error',9000);return;}
+  if(!at.length){stream.getTracks().forEach(t=>t.stop());toast(`音が共有されていません。もう一度 ${easy.on?'「💻 パソコンの音を録る」':'「● 録音」'} を押し、共有の画面で「タブの音声も共有する」をオンにしてください`,'error',9000);return;}
   const mime=['audio/webm;codecs=opus','audio/webm','audio/mp4','audio/ogg;codecs=opus'].find(m=>MediaRecorder.isTypeSupported&&MediaRecorder.isTypeSupported(m))||'';
   let mr;
   try{mr=new MediaRecorder(new MediaStream(at),mime?{mimeType:mime,audioBitsPerSecond:256000}:undefined);}
@@ -1450,13 +1462,13 @@ async function startRecording(kind,withPlay,autoSec,trim){
   const chunks=[];
   rec={mr,stream,t0:performance.now(),at:playhead,kind,withPlay,chunks,trim:!!trim,auto:false};
   // 音の大きさを見張り、音が止まって autoSec 秒たったら自動で止める
-  if(autoSec>0){try{
-    const c=ac(),srcN=c.createMediaStreamSource(new MediaStream(at)),an=c.createAnalyser();an.fftSize=2048;srcN.connect(an);
+  {try{
+    const c=ac(),srcN=c.createMediaStreamSource(new MediaStream(at)),an=c.createAnalyser(),z=c.createGain();an.fftSize=2048;z.gain.value=0;srcN.connect(an);an.connect(z);z.connect(c.destination);
     const buf=new Float32Array(an.fftSize),r0=rec;r0.heard=false;r0.last=performance.now();
     r0.mon=setInterval(()=>{if(rec!==r0)return;an.getFloatTimeDomainData(buf);let pk=0;for(let i=0;i<buf.length;i++){const v=Math.abs(buf[i]);if(v>pk)pk=v;}
-      const now=performance.now();if(pk>0.003){r0.heard=true;r0.last=now;}
-      else if(r0.heard&&now-r0.last>autoSec*1000){r0.auto=true;stopRecording();}},100);
-    r0.monNodes=[srcN,an];
+      r0.level=Math.max(pk,(r0.level||0)*0.8);const now=performance.now();if(pk>0.003){r0.heard=true;r0.last=now;}
+      else if(autoSec>0&&r0.heard&&now-r0.last>autoSec*1000){r0.auto=true;stopRecording();}},100);
+    r0.monNodes=[srcN,an,z];
   }catch(e){console.warn(e);}}
   mr.ondataavailable=e=>{if(e.data&&e.data.size)chunks.push(e.data);};
   mr.onstop=()=>finishRecording(chunks,mr.mimeType||mime||'audio/webm',rec0);
@@ -1485,8 +1497,9 @@ async function finishRecording(chunks,mime,r){
     const bytes=await blob.arrayBuffer();
     const src=await createSource(name,bytes,mime);
     let pk=0;for(let c=0;c<src.buffer.numberOfChannels;c++){const x=src.buffer.getChannelData(c);for(let i=0;i<x.length;i+=7){const v=Math.abs(x[i]);if(v>pk)pk=v;}}
+    if(easy.on&&easy.recReplace){project.tracks=[];selId=null;rsel=null;}
     const wasEmpty=!hasClips();
-    const tr=addTrack(baseName(name));const c=newClip(src,r.at);tr.clips.push(c);selId=c.id;
+    const tr=addTrack(easy.on?(r.kind==='screen'?'録音した音':'マイクの声'):baseName(name));if(easy.on){easy.recDone=true;}const c=newClip(src,easy.on&&easy.recReplace?0:r.at);if(easy.on)c.name=tr.name;tr.clips.push(c);selId=c.id;
     let trimmed=false;
     if(r.trim&&pk>=0.001){
       const b=src.buffer,sr=b.sampleRate,n=b.length,th=0.003;let first=n,last=-1;
@@ -1552,7 +1565,7 @@ document.addEventListener('keydown',e=>{
   const typing=(tag==='INPUT'&&!['range','checkbox','radio','button'].includes(tg.type))||tag==='TEXTAREA'||tag==='SELECT';
   if(typing){if(e.key==='Enter')tg.blur();return;}
   const mod=e.ctrlKey||e.metaKey,k=e.key.toLowerCase();
-  if(e.code==='Space'){e.preventDefault();togglePlay();}
+  if(e.code==='Space'){e.preventDefault();if(easy.on&&document.body.classList.contains('home'))return;togglePlay();}
   else if(mod&&k==='z'){e.preventDefault();e.shiftKey?redo():undo();}
   else if(mod&&k==='y'){e.preventDefault();redo();}
   else if(mod&&k==='d'){e.preventDefault();duplicateSel();}
@@ -1582,47 +1595,73 @@ window.addEventListener('beforeunload',()=>{if(autosaveOn)idbReq('kv','readwrite
 
 
 // ================= かんたんモード =================
-const easy={on:false,task:null,step:0,saved:null,prevTool:'move'};
+const easy={on:false,task:null,step:0,ask:false,saved:null,nameEdited:false,savedName:'',recReplace:false,recDone:false,cutDone:false,lastTask:null,lastStep:0};
 const TASKS={
   speed:{name:'速さを変える',steps:['音を入れる','速さを決める','保存する']},
   pitch:{name:'高さ（キー）を変える',steps:['音を入れる','高さを決める','保存する']},
-  mix:{name:'2つの音を重ねる',steps:['1つ目の音','2つ目の音','重ね方を決める','保存する']},
+  mix:{name:'2つの音を重ねる',steps:['最初の音','重ねる音','重ね方を決める','保存する']},
   rec:{name:'録音する',steps:['録音する','保存する']},
   cut:{name:'一部分だけ切り取る',steps:['音を入れる','残す部分を選ぶ','保存する']}
 };
 function lsGet(k){try{return localStorage.getItem(k);}catch(e){return null;}}
 function lsSet(k,v){try{localStorage.setItem(k,v);}catch(e){}}
 function setMode(m,silent){
+  const wasEasy=easy.on;
+  if(wasEasy&&m==='pro'){easy.lastTask=easy.task;easy.lastStep=easy.step;}
   easy.on=m==='easy';lsSet('otomix.mode',m);
   document.body.classList.toggle('easy',easy.on);
-  if(easy.on){easy.prevTool=tool;goHome();}
-  else{document.body.classList.remove('home');easy.task=null;setTool('move');renderAll();layout();draw();if(!silent)toast('くわしいモードにしました。作業内容はそのままです。「かんたん」ボタンでいつでも戻れます','info',5000);}
+  if(easy.on){
+    if(easy.lastTask&&hasClips()){const t=easy.lastTask,st=easy.lastStep;easy.lastTask=null;resumeTask(t,st);toast('かんたんモードに戻りました。さっきの続きです','info',4000);}
+    else goHome();
+  }else{document.body.classList.remove('home');easy.task=null;setTool('move');renderAll();if(!silent)toast('くわしいモードにしました。作業内容はそのままです。右上の「かんたん」でいつでも戻れます','info',5000);}
   setTimeout(()=>{layout();draw();},30);
 }
+function resetTaskState(){easy.saved=null;easy.nameEdited=false;easy.savedName='';easy.recDone=false;easy.cutDone=false;easy.ask=false;}
 function goHome(){
-  easy.task=null;easy.step=0;easy.saved=null;easy.savedName='';setTool('move');clearRange();
+  if(rec){toast('録音中です。先に録音を止めてください');return;}
+  easy.task=null;easy.step=0;resetTaskState();setTool('move');clearRange();
   document.body.classList.add('home');
   $('#eTaskName').textContent='おとミックス（かんたんモード）';$('#eSteps').innerHTML='';
-  $('#eHomeFoot').innerHTML=(hasClips()?'いま入っている音は消えずに残っています。カードを選ぶと、その音を使って続けられます。<br>':'')+'すべての機能を使いたいときは <button id="eHomePro">くわしいモード</button> へ';
+  const c=firstClip();
+  $('#eHomeFoot').innerHTML=(c?`いま「${escapeHtml(c.name)}」${project.tracks.filter(t=>t.clips.length).length>1?'など':''}が入っています。カードを選ぶと、この音を使うか、新しく始めるかを選べます。<br>`:'')+'すべての機能を使いたいときは <button id="eHomePro">くわしいモード</button> へ';
   $('#eHomePro').onclick=()=>setMode('pro');
   renderEasy();
 }
+function resumeTask(t,st){easy.task=t;easy.step=st;resetTaskState();document.body.classList.remove('home');setTool(t==='cut'?'range':'move');renderEasy();layout();fitZoom();}
 function startTask(t){
-  easy.task=t;easy.step=0;easy.saved=null;easy.savedName='';document.body.classList.remove('home');
-  if(t==='cut')setTool('range');else setTool('move');
-  // 「重ねる」以外で音がすでにあるなら、そのまま調整へ
-  if(hasClips()&&t!=='rec'&&t!=='mix')easy.step=1;
-  if(hasClips()&&t==='mix')easy.step=project.tracks.length>=2?2:1;
+  easy.task=t;easy.step=0;resetTaskState();document.body.classList.remove('home');
+  setTool(t==='cut'?'range':'move');
+  for(const tr of project.tracks)tr.solo=false;
+  if(hasClips())easy.ask=true;       // 今の音を使うか、新しく始めるかを聞く
   renderEasy();layout();fitZoom();
 }
-function easyNext(){easy.step=Math.min(TASKS[easy.task].steps.length-1,easy.step+1);easy.saved=null;renderEasy();}
-function easyBack(){if(easy.step===0){goHome();return;}easy.step--;easy.saved=null;renderEasy();}
+function useCurrent(){
+  easy.ask=false;const n=project.tracks.filter(t=>t.clips.length).length;
+  if(easy.task==='mix')easy.step=n>=2?2:1;
+  else{
+    if(n>1){ // 1つの音だけを使う作業：重なっている音は1つにまとめずに注意だけ出す
+      toast('いま音が2つ以上入っています。この作業では全部の音に同じ変更がかかります','info',6000);}
+    easy.step=1;
+  }
+  renderEasy();
+}
+function startFresh(){
+  easy.ask=false;clearProject();easy.step=0;renderEasy();
+  toast('新しく始めます。前の音は「↶ 1つ戻る」で戻せます','info',5000);
+}
+function easyNext(){
+  if(easy.task==='mix'&&easy.step===2&&project.tracks.some(t=>t.solo)){project.tracks.forEach(t=>t.solo=false);applyTrackLive();renderTracks();toast('「この音だけ聴く」を解除して、両方の音が入るようにしました','info',5000);}
+  easy.step=Math.min(TASKS[easy.task].steps.length-1,easy.step+1);easy.saved=null;renderEasy();
+}
+function easyBack(){if(rec){toast('録音中です。先に録音を止めてください');return;}if(easy.step===0||easy.ask){goHome();return;}easy.step--;easy.saved=null;renderEasy();}
 function fmtSec(t){t=Math.max(0,t);const m=Math.floor(t/60),s=t-m*60;return m?`${m}分${s.toFixed(1)}秒`:`${s.toFixed(1)}秒`;}
 function easySteps(){
   const T=TASKS[easy.task];$('#eTaskName').textContent=T.name;
-  $('#eSteps').innerHTML=T.steps.map((n,i)=>`<span class="${i===easy.step?'cur':i<easy.step?'done':''}">${i<easy.step?'✓':(i+1)} ${n}</span>`).join('');
+  $('#eSteps').innerHTML=T.steps.map((n,i)=>`<span class="${!easy.ask&&i===easy.step?'cur':!easy.ask&&i<easy.step?'done':''}">${!easy.ask&&i<easy.step?'✓ ':''}${n}</span>`).join('');
 }
 function firstClip(){const c=allClips();return c.length?c[0]:null;}
+function pitchName(v){if(v===0)return '元の高さ';const a=Math.abs(v),oc=a===12?'（1オクターブ）':'';return v>0?`元より ${a}${oc} 高い`:`元より ${a}${oc} 低い`;}
+function settingsText(c){const a=[];if(Math.abs(c.speed-1)>1e-6)a.push(`速さ ${Math.round(c.speed*100)}%`);if(c.semis)a.push(pitchName(c.semis));if(c.gain)a.push('音量を変更');return a.join('・');}
 function busyText(){
   let pend=0,prog=0;for(const c of allClips()){const k=procKey(c);if(!k)continue;const e=procCache.get(k);if(!e||e.state!=='done'){pend++;prog+=e?e.progress:0;}}
   return pend?`<span class="warn">⏳ 音を準備しています… ${Math.round(prog/pend*100)}%（終わるまで少しお待ちください）</span>`:'';
@@ -1631,83 +1670,101 @@ function updateEasyBusy(){const el=document.getElementById('eBusy');if(el)el.inn
 function navHtml(nextLabel,nextOk){
   return `<div class="nav"><button data-e="back">◀ 戻る</button>${nextLabel?`<button data-e="next" class="primary big" ${nextOk?'':'disabled'}>${nextLabel} ▶</button>`:''}</div>`;
 }
-function stepAdd(title,desc){
-  const c=firstClip();
+function stepAdd(title,desc,btnLabel){
   return `<h2>${title}</h2><p>${desc}</p>
-  <div class="row"><button class="primary big" data-e="file">📂 音のファイルを選ぶ</button><button data-e="rec">🎙️ 録音して入れる</button><button data-e="demo">お試しの音を使う</button></div>
-  <p class="note">ファイルは、この画面のどこかにドラッグして入れることもできます（MP3・WAV・M4A など。動画ファイルからも音だけ取り出せます）。</p>
-  ${c?`<div class="card2"><span class="ok">✓ 「${escapeHtml(c.name)}」が入っています</span>（長さ ${fmtSec(clipLen(c))}）　<button data-e="clear">別の音にする</button></div>`:''}`;
+  <div class="row"><button class="primary big" data-e="file">📂 ${btnLabel||'音のファイルを選ぶ'}</button><button data-e="recAdd">🎙️ 録音して入れる</button><button data-e="demo">お試しの音を使う</button></div>
+  <p class="note">ファイルを、この画面のどこかにドラッグして入れることもできます（MP3・WAV・M4A など。動画ファイルからも音だけ取り出せます）。</p>`;
+}
+function recPanel(forTask){
+  if(rec)return `<div class="card2"><b class="warn">● 録音しています… ${rec.kind==='screen'?'録りたい音を再生してください。':'話したり、歌ったりしてください。'}</b>
+    <div class="row"><span class="note">入ってくる音の大きさ：</span><div id="eLevel"><i></i></div></div>
+    <div class="row"><button class="big" data-e="recStop">■ 録音を止める</button>${rec.kind==='screen'?'<span class="note">音が止まって3秒たつと自動で止まります。</span>':''}</div></div>`;
+  return `<div class="row"><button class="primary big" data-e="recScreen">💻 パソコンの音を録る</button><button class="big" data-e="recMic">🎙️ マイクで録る</button></div>
+  <details><summary>「パソコンの音を録る」のやり方</summary><p class="note" style="line-height:1.8">① ボタンを押すと「共有」の画面が出ます。<br>② 「タブ」を選び、録りたい音のタブ（YouTube など）をクリックします。<br>③ 下にある「タブの音声も共有する」をオンにして「共有」を押します。<br>④ そのタブで音を再生します。音が止まって3秒たつと、自動で録音が止まります。</p></details>
+  <p class="note">録った音の使い方は、元の音の決まり（利用規約・著作権）を守ってください。</p>`;
 }
 function renderEasy(){
   const P=$('#easyPanel');if(!easy.on)return;
-  if(!easy.task){P.innerHTML='<p class="note">上の画面から、やりたいことを選んでください。</p>';return;}
+  if(!easy.task){P.innerHTML='';return;}
   easySteps();
   const t=easy.task,st=easy.step,T=TASKS[t],last=st===T.steps.length-1;
   let h='';
-  if(last){h=easySaveHtml();}
+  if(easy.ask){
+    const c=firstClip(),n=project.tracks.filter(x=>x.clips.length).length,set=c?settingsText(c):'';
+    h=`<h2>いま入っている音があります</h2><div class="card2">「${escapeHtml(c?c.name:'')}」${n>1?` ほか ${n-1}つ`:''}（長さ ${fmtSec(projEnd())}）${set?`<br><span class="note">この音には、前に変えた設定がかかっています：${set}</span>`:''}</div>`+
+      (t==='rec'?`<p>録音すると、いま入っている音は新しい録音に入れ替わります（あとで「↶ 1つ戻る」で戻せます）。</p><div class="row"><button class="primary big" data-e="fresh">新しく録音する</button><button class="big" data-e="home">🏠 やめてホームに戻る</button></div>`
+       :`<p>この音を使って続けますか？</p><div class="row"><button class="primary big" data-e="use">${t==='mix'?'この音を最初の音にする':'この音を使う'}</button><button class="big" data-e="fresh">新しい音で始める</button></div>`);
+  }
+  else if(last){h=easySaveHtml();}
   else if(t==='speed'&&st===0){h=stepAdd('① 速さを変えたい音を入れる','ゆっくりにしたい曲や、速くしたい曲を選んでください。')+navHtml('次へ：速さを決める',hasClips());}
   else if(t==='pitch'&&st===0){h=stepAdd('① 高さを変えたい音を入れる','キーを変えたい曲を選んでください。')+navHtml('次へ：高さを決める',hasClips());}
   else if(t==='cut'&&st===0){h=stepAdd('① 切り取りたい音を入れる','一部分だけ使いたい曲を選んでください。')+navHtml('次へ：残す部分を選ぶ',hasClips());}
-  else if(t==='mix'&&st===0){h=stepAdd('① 1つ目の音を入れる','土台になる音（曲やBGMなど）を選んでください。')+navHtml('次へ：2つ目の音',hasClips());}
+  else if(t==='mix'&&st===0){h=stepAdd('① 最初の音を入れる','土台になる音（曲やBGMなど）を選んでください。')+navHtml('次へ：重ねる音',hasClips());}
   else if(t==='mix'&&st===1){
     const n=project.tracks.filter(x=>x.clips.length).length;
-    h=`<h2>② 2つ目の音を入れる</h2><p>重ねたい音（声、効果音、別の曲など）を選んでください。</p>
-    <div class="row"><button class="primary big" data-e="file2">📂 2つ目の音のファイルを選ぶ</button><button data-e="rec">🎙️ 録音して入れる</button></div>
-    ${n>=2?`<div class="card2"><span class="ok">✓ 2つの音が入りました</span></div>`:`<p class="note">いま入っている音：${n}つ</p>`}`+navHtml('次へ：重ね方を決める',n>=2);}
+    h=`<h2>② 重ねる音を入れる</h2><p>重ねたい音（声、効果音、別の曲など）を選んでください。</p>
+    <div class="row"><button class="primary big" data-e="file2">📂 重ねる音のファイルを選ぶ</button><button data-e="recAdd">🎙️ 録音して重ねる</button></div>
+    ${rec?recPanel():''}
+    ${n>=2?`<div class="card2"><span class="ok">✓ 2つの音が入りました</span></div>`:''}`+navHtml('次へ：重ね方を決める',n>=2&&!rec);}
   else if(t==='speed'){
     const c=firstClip(),v=Math.round(c.speed*100);
     const opts=[[70,'とてもゆっくり'],[80,'ゆっくり'],[90,'少しゆっくり'],[100,'元の速さ'],[110,'少し速く'],[120,'速く'],[130,'とても速く']];
-    h=`<h2>② 速さを決める</h2><p>ボタンを押して、<b>▶ 聴いてみる</b>で確かめてください。声や楽器の高さは変わりません。</p>
+    h=`<h2>② 速さを決める</h2><p>ボタンを押して、上の <b>▶ 聴いてみる</b> で確かめてください。声や楽器の高さは変わりません。</p>
     <div class="row">${opts.map(([p,l])=>`<button class="pick ${v===p?'on':''}" data-speed="${p}">${l}<br><small>${p}%</small></button>`).join('')}</div>
-    <div class="row"><span>今の速さ：</span><span class="now">${v===100?'元の速さ':v+'%'}</span><button data-sp="-1">少しだけ遅く（−1%）</button><button data-sp="1">少しだけ速く（＋1%）</button></div>
-    <div id="eBusy">${busyText()}</div><p class="note">長さ：${fmtSec(projEnd())}（元は ${fmtSec(c.dur)}）</p>`+navHtml('次へ：保存する',true);}
+    <div class="row"><span>今の速さ：</span><span class="now">${v===100?'元の速さ':v+'%'}</span><span class="note">（長さ ${fmtSec(projEnd())}）</span></div>
+    <details><summary>もっと細かく調整する</summary><div class="row"><button data-sp="-1">少しだけ遅く（−1%）</button><button data-sp="1">少しだけ速く（＋1%）</button></div></details>
+    ${c.semis?`<div class="card2 note">高さが「${pitchName(c.semis)}」になっています（前に変えた設定）。<button data-ptv="0">高さを元に戻す</button></div>`:''}
+    <div id="eBusy">${busyText()}</div>`+navHtml('次へ：保存する',true);}
   else if(t==='pitch'){
     const c=firstClip(),v=c.semis;
-    const lab=v===0?'元の高さ':(v>0?`元より ${v} つ高い`:`元より ${-v} つ低い`);
-    h=`<h2>② 高さ（キー）を決める</h2><p>「1つ」はピアノのとなりの鍵盤1つ分です。ボタンを押して、<b>▶ 聴いてみる</b>で確かめてください。速さは変わりません。</p>
-    <div class="row"><button class="big" data-pt="-1">▼ 1つ低く</button><span class="now" style="min-width:200px;text-align:center">${lab}</span><button class="big" data-pt="1">▲ 1つ高く</button></div>
-    <div class="row"><span class="note">すぐ選ぶ：</span>${[-5,-4,-3,-2,-1,0,1,2,3,4,5].map(k=>`<button class="${v===k?'on':''}" data-ptv="${k}" style="min-width:52px">${k>0?'+'+k:k===0?'元':k}</button>`).join('')}</div>
+    h=`<h2>② 高さ（キー）を決める</h2><p>「1つ」はピアノのとなりの鍵盤1つ分です。ボタンを押して、上の <b>▶ 聴いてみる</b> で確かめてください。速さは変わりません。</p>
+    <div class="row"><button class="big" data-pt="-1">▼ 1つ低く</button><span class="now" style="min-width:260px;text-align:center">${pitchName(v)}</span><button class="big" data-pt="1">▲ 1つ高く</button><button data-ptv="0">元の高さに戻す</button></div>
+    <details><summary>数字で選ぶ</summary><div class="row">${[-5,-4,-3,-2,-1,0,1,2,3,4,5].map(k=>`<button class="${v===k?'on':''}" data-ptv="${k}" style="min-width:52px">${k>0?'+'+k:k===0?'元':k}</button>`).join('')}</div></details>
+    ${Math.abs(c.speed-1)>1e-6?`<div class="card2 note">速さが ${Math.round(c.speed*100)}% になっています（前に変えた設定）。<button data-speed="100">速さを元に戻す</button></div>`:''}
     <div id="eBusy">${busyText()}</div>`+navHtml('次へ：保存する',true);}
   else if(t==='mix'){
     const trs=project.tracks.filter(x=>x.clips.length).slice(0,2);
-    const volLab=db=>db<=-60?'消音':db===0?'ふつう':db>0?'大きめ'+'＋'.repeat(Math.min(4,Math.round(db/3))):'小さめ'+'−'.repeat(Math.min(6,Math.round(-db/3)));
-    h=`<h2>③ 重ね方を決める</h2><p><b>▶ 聴いてみる</b>で確かめながら、音の大きさと、2つ目の音が始まる位置を合わせてください。</p>`+
-    '<div class="pair">'+trs.map((tr,i)=>`<div class="card2"><b>${i+1}つ目：${escapeHtml(tr.name)}</b>　大きさ：<b>${volLab(tr.vol)}</b>
-      <div class="row"><button data-vol="${tr.id}" data-d="-3">🔉 小さく</button><button data-vol="${tr.id}" data-d="3">🔊 大きく</button><button data-vol="${tr.id}" data-d="0">ふつうに戻す</button>
+    const volLab=db=>db<=-60?'消音':Math.abs(db)<0.01?'ふつう':db>0?'大きめ'+'＋'.repeat(Math.min(4,Math.round(db/3))):'小さめ'+'−'.repeat(Math.min(6,Math.round(-db/3)));
+    h=`<h2>③ 重ね方を決める</h2><p>上の <b>▶ 聴いてみる</b> で確かめながら、大きさと、重ねる音が始まる位置を合わせてください。</p><div class="pair">`+
+    trs.map((tr,i)=>`<div class="card2"><b>${i?'重ねる音':'最初の音'}：${escapeHtml(tr.name)}</b>　大きさ：<b>${volLab(tr.vol)}</b>
+      <div class="row"><button data-vol="${tr.id}" data-d="-3">🔉 小さく</button><button data-vol="${tr.id}" data-d="3">🔊 大きく</button>
       <button data-solo="${tr.id}" class="${tr.solo?'on':''}">${tr.solo?'✓ この音だけ聴いている':'この音だけ聴く'}</button></div></div>`).join('')+'</div>'+
-    (trs[1]?`<div class="card2"><b>2つ目の音が始まる位置：</b><span class="now">${fmtSec(trs[1].clips[0].start)}</span>
-      <div class="row"><button data-mv="-1">◀◀ 1秒早く</button><button data-mv="-0.1">◀ 0.1秒早く</button><button data-mv="-0.01">◀ ほんの少し早く</button><button data-mv="0.01">ほんの少し遅く ▶</button><button data-mv="0.1">0.1秒遅く ▶</button><button data-mv="1">1秒遅く ▶▶</button></div>
-      <div class="row"><button data-e="align">✨ 音の出だしをそろえる</button><button data-e="tempo">✨ テンポ（ノリ）をそろえる</button><span class="note">上の帯をドラッグして動かすこともできます。</span></div></div>`:'')+
+    (trs[1]?`<div class="card2"><b>重ねる音が始まる位置：</b><span class="now">${fmtSec(trs[1].clips[0].start)}</span>
+      <div class="row"><button class="big" data-mv="-0.1">◀ 早く</button><button class="big" data-mv="0.1">遅く ▶</button><span class="note">上の帯をドラッグして動かすこともできます。</span></div>
+      <details><summary>もっと合わせる（自動でそろえる・細かく動かす）</summary><div class="row"><button data-e="align">✨ 音の出だしをそろえる</button><button data-e="tempo">✨ テンポ（ノリ）をそろえる</button></div>
+      <div class="row"><button data-mv="-1">1秒早く</button><button data-mv="-0.01">ほんの少し早く</button><button data-mv="0.01">ほんの少し遅く</button><button data-mv="1">1秒遅く</button></div></details></div>`:'')+
     `<div id="eBusy">${busyText()}</div>`+navHtml('次へ：保存する',true);}
   else if(t==='cut'){
     const sel=rsel&&rsel.b-rsel.a>0.01;
-    h=`<h2>② 残したい部分を選ぶ</h2><p>上の波形（音の形）の上で、<b>残したいところを左から右へドラッグ</b>してください。選んだところが白く光ります。<b>▶ 聴いてみる</b>で選んだ所から聴けます。</p>
-    <div class="card2">${sel?`選んだ部分：<span class="now">${fmtSec(rsel.a)} 〜 ${fmtSec(rsel.b)}</span>（${fmtSec(rsel.b-rsel.a)}）`:'<span class="warn">まだ選んでいません。波形の上をドラッグしてください。</span>'}</div>
-    <div class="row"><button class="primary big" data-e="keep" ${sel?'':'disabled'}>✂ 選んだ部分だけ残す</button><button data-e="del" ${sel?'':'disabled'}>🗑 選んだ部分を消す</button><button data-e="all">全部選び直す</button></div>
-    <div class="row"><label style="color:var(--text);font-size:15px"><input type="checkbox" id="eSmooth" ${firstClip()&&firstClip().fadeIn>0?'checked':''}> はじめと終わりをなめらかにする（だんだん大きく・だんだん小さく）</label></div>
-    <p class="note">切りすぎたら「↶ 1つ戻る」で戻せます。いまの長さ：${fmtSec(projEnd())}</p>`+navHtml('次へ：保存する',true);}
+    h=`<h2>② 残したい部分を選ぶ</h2><p>上の波形（音の形）の上で、<b>残したいところを左から右へドラッグ</b>してください。選んだところが白く光ります。</p>
+    <div class="card2">${sel?`選んだ部分：<span class="now">${fmtSec(rsel.a)} 〜 ${fmtSec(rsel.b)}</span>（${fmtSec(rsel.b-rsel.a)}）`:easy.cutDone?`<span class="ok">✓ 切り取りました（いまの長さ ${fmtSec(projEnd())}）。よければ「次へ」を押してください。</span>`:'<span class="note">まだ選んでいません。波形の上をドラッグしてください。</span>'}</div>
+    <div class="row"><button class="primary big" data-e="keep" ${sel?'':'disabled'}>✂ 選んだ部分だけ残す</button><button data-e="del" ${sel?'':'disabled'}>🗑 選んだ部分を消す</button></div>
+    <div class="row"><label style="color:var(--text);font-size:15px"><input type="checkbox" id="eSmooth" ${easy.smooth?'checked':''}> 残した音のはじめと終わりを、なめらかにする（だんだん大きく・だんだん小さく）</label></div>
+    <p class="note">選んだ所から聴くには、上の <b>▶ 聴いてみる</b>。切りすぎたら「↶ 1つ戻る」で戻せます。</p>`+navHtml('次へ：保存する',true);}
   else if(t==='rec'&&st===0){
     const c=firstClip();
-    h=`<h2>① 録音する</h2><p>何を録音しますか？</p>
-    <div class="row"><button class="primary big" data-e="recScreen">💻 パソコンで鳴っている音</button><button class="big" data-e="recMic">🎙️ マイクの声</button></div>
-    <p class="note">「パソコンで鳴っている音」は、YouTube などを開いているタブを選んで録ります。次に出る画面の説明をよく読んでください。録った音の使い方は、元の音の決まり（利用規約・著作権）を守ってください。</p>
-    ${rec?'<div class="card2 warn">● 録音中です。止めるときは、下のボタン（または上の赤いボタン）を押してください。<div class="row"><button class="big" data-e="recStop">■ 録音を止める</button></div></div>':''}
-    ${c?`<div class="card2"><span class="ok">✓ 録音できました：「${escapeHtml(c.name)}」（${fmtSec(clipLen(c))}）</span>　<button data-e="clear">消して録り直す</button></div>`:''}`+navHtml('次へ：保存する',hasClips()&&!rec);}
+    h=`<h2>① 録音する</h2><p>何を録音しますか？</p>${recPanel()}
+    ${easy.recDone&&c&&!rec?`<div class="card2"><span class="ok">✓ 録音できました（長さ ${fmtSec(clipLen(c))}）</span>　上の <b>▶ 聴いてみる</b> で確かめられます。<div class="row"><button data-e="recAgain">もう一度録り直す</button></div></div>`:''}`+navHtml('次へ：保存する',easy.recDone&&hasClips()&&!rec);}
+  else if((t==='speed'||t==='pitch'||t==='cut')&&rec){h=`<h2>録音して入れる</h2>${recPanel()}`;}
   P.innerHTML=h;wireEasy();
 }
-function easySaveHtml(){
+function genName(){
   const d=new Date(),c=firstClip();
   let base=c?c.name.replace(/[\\/:*?"<>|]/g,'_').slice(0,40):'otomix';if(/[^\x20-\x7e]/.test(base))base='otomix';
   const stamp=`${String(d.getMonth()+1).padStart(2,'0')}${String(d.getDate()).padStart(2,'0')}-${String(d.getHours()).padStart(2,'0')}${String(d.getMinutes()).padStart(2,'0')}`;
   const suf=({speed:c?`_speed${Math.round(c.speed*100)}`:'',pitch:c?`_key${c.semis>=0?'+':''}${c.semis}`:'',mix:'_mix',rec:'_rec',cut:'_cut'}[easy.task]||'')+(base==='otomix'?'_'+stamp:'');
-  const name=easy.savedName||(base+suf);
+  return base+suf;
+}
+function easySaveHtml(){
+  const name=easy.nameEdited&&easy.savedName?easy.savedName:genName();
+  const solo=project.tracks.some(t=>t.solo);
   return `<h2>${TASKS[easy.task].steps.length}. 完成した音を保存する</h2>
-  <p>ボタンを1回押すと、パソコンの「ダウンロード」フォルダに保存されます。保存の前に <b>▶ 聴いてみる</b> で確かめておくと安心です。</p>
+  <p>ボタンを1回押すと、パソコンの「ダウンロード」フォルダに保存されます。保存の前に、上の <b>▶ 聴いてみる</b> で確かめておくと安心です。</p>
   <div class="row"><span>名前：</span><input type="text" id="eName2" value="${escapeHtml(name)}"><span class="note">（英数字がおすすめです。最後に .wav が付きます）</span></div>
+  ${solo?'<p class="note">「この音だけ聴く」がオンになっていますが、保存するときは全部の音が入ります。</p>':''}
   <div class="row"><button class="primary big" data-e="save" ${hasClips()?'':'disabled'}>💾 完成した音を保存する</button><span id="eBusy">${busyText()}</span></div>
   ${easy.saved?`<div class="card2"><span class="ok">✓ 保存しました：「${escapeHtml(easy.saved)}」</span><br><span class="note">ブラウザの「ダウンロード」（Ctrl＋J で一覧が開きます）から開けます。音楽プレーヤーや動画編集ソフトでそのまま使えます。</span>
-    <div class="row"><button class="big" data-e="home">🏠 ホームに戻る</button><button data-e="back">◀ もう少し調整する</button></div></div>`:''}
-  ${easy.saved?'':navHtml('',false)}`;
+    <div class="row"><button class="big" data-e="home">🏠 ホームに戻る</button><button data-e="back">◀ もう少し調整する</button></div></div>`:navHtml('',false)}`;
 }
 function wireEasy(){
   const P=$('#easyPanel'),q=s=>P.querySelectorAll(s);
@@ -1717,56 +1774,53 @@ function wireEasy(){
     if(a==='back')easyBack();
     else if(a==='next')easyNext();
     else if(a==='home')goHome();
+    else if(a==='use')useCurrent();
+    else if(a==='fresh')startFresh();
     else if(a==='file'){easy.pickMode='replace';$('#fileIn').click();}
     else if(a==='file2'){easy.pickMode='add';$('#fileIn').click();}
-    else if(a==='demo'){ac();if(hasClips())clearProject();await loadDemoOne();}
-    else if(a==='clear'){clearProject();renderEasy();}
-    else if(a==='rec'){if(easy.task!=='mix'&&hasClips())clearProject();easy.recReturn=true;$('#rKind').value='mic';$('#rKind').onchange();openRec();}
-    else if(a==='recScreen'||a==='recMic'){if(easy.task==='rec'&&hasClips())clearProject();$('#rKind').value=a==='recMic'?'mic':'screen';$('#rKind').onchange();openRec();}
+    else if(a==='demo'){ac();await loadDemoOne();}
+    else if(a==='recAdd'){easy.recMode=easy.task==='mix'?'add':'replace';P.innerHTML=`<h2>録音して入れる</h2>${recPanel()}<div class="nav"><button data-e="back2">◀ やめる</button></div>`;wireEasy();}
+    else if(a==='back2')renderEasy();
+    else if(a==='recScreen'||a==='recMic')easyRec(a==='recMic'?'mic':'screen');
+    else if(a==='recAgain'){easy.recDone=false;renderEasy();}
     else if(a==='recStop'){stopRecording();}
     else if(a==='save')easySave();
     else if(a==='align')alignOnsets();
     else if(a==='tempo')matchTempo2();
     else if(a==='keep'){keepRange();}
-    else if(a==='del'){if(!rsel)return;deleteRange(true);toast('選んだ部分を消して、前後をつなげました','ok');renderEasy();}
-    else if(a==='all'){selectAll();renderEasy();}
+    else if(a==='del'){if(!rsel)return;deleteRange(true);easy.cutDone=true;toast('選んだ部分を消して、前後をつなげました','ok');renderEasy();}
   });
+  const nm=document.getElementById('eName2');if(nm)nm.oninput=()=>{easy.nameEdited=true;easy.savedName=nm.value;};
   q('[data-speed]').forEach(b=>b.onclick=()=>{for(const c of allClips()){c.speed=+b.dataset.speed/100;c.mode='keep';}after();});
   q('[data-sp]').forEach(b=>b.onclick=()=>{for(const c of allClips()){c.speed=clamp(Math.round(c.speed*100+ +b.dataset.sp)/100,0.5,2);c.mode='keep';}after();});
-  q('[data-pt]').forEach(b=>b.onclick=()=>{for(const c of allClips()){c.semis=clamp(c.semis+ +b.dataset.pt,-12,12);c.mode='keep';}after();});
+  q('[data-pt]').forEach(b=>b.onclick=()=>{const c0=firstClip();const nv=c0.semis+ +b.dataset.pt;if(Math.abs(nv)>12){toast('高さは上下12（1オクターブ）までです','info');return;}for(const c of allClips()){c.semis=nv;c.mode='keep';}after();});
   q('[data-ptv]').forEach(b=>b.onclick=()=>{for(const c of allClips()){c.semis=+b.dataset.ptv;c.mode='keep';}after();});
-  q('[data-vol]').forEach(b=>b.onclick=()=>{const tr=project.tracks.find(x=>x.id===b.dataset.vol);if(!tr)return;const d=+b.dataset.d;tr.vol=d===0?0:clamp(tr.vol+d,-30,12);applyTrackLive();renderTracks();after();});
+  q('[data-vol]').forEach(b=>b.onclick=()=>{const tr=project.tracks.find(x=>x.id===b.dataset.vol);if(!tr)return;const d=+b.dataset.d,nv=tr.vol+d;if(nv>12||nv<-30){toast(d>0?'これ以上は大きくできません':'これ以上は小さくできません','info');return;}tr.vol=nv;applyTrackLive();renderTracks();after();});
   q('[data-solo]').forEach(b=>b.onclick=()=>{const tr=project.tracks.find(x=>x.id===b.dataset.solo);const was=tr.solo;project.tracks.forEach(x=>x.solo=false);tr.solo=!was;applyTrackLive();renderTracks();after();});
-  q('[data-mv]').forEach(b=>b.onclick=()=>{const tr=project.tracks.filter(x=>x.clips.length)[1];if(!tr)return;for(const c of tr.clips)c.start=Math.max(0,c.start+ +b.dataset.mv);after();});
-  const sm=document.getElementById('eSmooth');if(sm)sm.onchange=()=>{const cs=allClips();if(!cs.length)return;const v=sm.checked?0.5:0;
-    const s0=cs.reduce((a,c)=>c.start<a.start?c:a),s1=cs.reduce((a,c)=>clipEnd(c)>clipEnd(a)?c:a);s0.fadeIn=Math.min(v,clipLen(s0)/3);s1.fadeOut=Math.min(v,clipLen(s1)/3);after();};
+  q('[data-mv]').forEach(b=>b.onclick=()=>{const tr=project.tracks.filter(x=>x.clips.length)[1];if(!tr)return;let moved=false;for(const c of tr.clips){const ns=Math.max(0,c.start+ +b.dataset.mv);if(ns!==c.start)moved=true;c.start=ns;}if(!moved)toast('これより早くはできません（いちばん最初です）','info');after();});
+  const sm=document.getElementById('eSmooth');if(sm)sm.onchange=()=>{easy.smooth=sm.checked;if(easy.cutDone)applySmooth();};
 }
-async function easyAddFiles(files){
-  const mode=easy.pickMode||'replace';easy.pickMode=null;
-  if(!easy.task){toast('先に、やりたいことを1つ選んでください（大きなボタンのどれか）','info',5000);return;}
-  if(easy.task==='rec'){toast('録音の作業中です。ファイルを使うときは、ホームから「速さを変える」などを選んでください','info',6000);return;}
-  if(easy.task!=='mix'&&files.length>1){toast('この作業では音を1つだけ使います。最初の1つを入れます','info',5000);files=[files[0]];}
-  const cnt=()=>project.tracks.filter(t=>t.clips.length).length;
-  if(easy.task==='mix'&&cnt()>=2&&mode!=='replace'){toast('「重ねる」は2つの音まで使えます。入れ替えるときは「↶ 1つ戻る」か「別の音にする」を使ってください','info',6000);return;}
-  if((easy.task!=='mix'||mode==='replace'&&easy.step===0)&&hasClips())clearProject();
-  const before=cnt();await addFiles(files);const n=cnt();
-  if(n>before){
-    if(easy.task==='mix')easy.step=n>=2?2:1;else easy.step=1;
-    renderEasy();fitZoom();toast(easy.task==='mix'&&n<2?'1つ目の音を入れました。次に2つ目の音を入れてください':'音を入れました','ok');
-  }
+function applySmooth(){const cs=allClips();if(!cs.length)return;const v=easy.smooth?0.5:0;
+  const s0=cs.reduce((a,c)=>c.start<a.start?c:a),s1=cs.reduce((a,c)=>clipEnd(c)>clipEnd(a)?c:a);s0.fadeIn=Math.min(v,clipLen(s0)/3);s1.fadeOut=Math.min(v,clipLen(s1)/3);checkpoint();draw();restartSoon();}
+function easyRec(kind){
+  const replace=easy.task==='rec'||easy.recMode==='replace';easy.recMode=null;
+  easy.recReplace=replace&&easy.task!=='mix';
+  const withPlay=kind==='mic'&&easy.task==='mix'&&hasClips();
+  startRecording(kind,withPlay,kind==='screen'?3:0,true).then(()=>renderEasy());
 }
 function clearProject(){stopSources();project.tracks=[];selId=null;rsel=null;playhead=0;checkpoint();renderAll();}
 async function loadDemoOne(){
-  const it=synthDemo()[easy.task==='mix'&&hasClips()?0:1];
-  const s=await createSource(it.name,it.bytes,'audio/wav');const t=addTrack(baseName(it.name));const c=newClip(s,0);c.srcBpm=it.bpm;t.clips.push(c);
-  if(easy.task==='mix'&&project.tracks.length<2){const it2=synthDemo()[0];const s2=await createSource(it2.name,it2.bytes,'audio/wav');const t2=addTrack(baseName(it2.name));const c2=newClip(s2,0);c2.srcBpm=it2.bpm;t2.clips.push(c2);}
+  const items=synthDemo();
+  const add=async(it,label)=>{const s=await createSource(it.name,it.bytes,'audio/wav');const t=addTrack(label);const c=newClip(s,0);c.name=label;c.srcBpm=it.bpm;t.clips.push(c);};
+  if(easy.task==='mix'){if(!hasClips())await add(items[1],'お試しの曲');if(project.tracks.filter(t=>t.clips.length).length<2)await add(items[0],'お試しのリズム');}
+  else{if(hasClips())clearProject();await add(items[1],'お試しの曲');}
+  const n=project.tracks.filter(t=>t.clips.length).length;easy.step=easy.task==='mix'?(n>=2?2:1):1;
   fitZoom();checkpoint();renderAll();toast('お試しの音を入れました','ok');
 }
 function keepRange(){
   if(!rsel)return;const {a,b}=rsel;
   for(const t of project.tracks){removeRange(t,b,1e9,false);removeRange(t,0,a,true);}
-  rsel=null;playhead=0;const sm=document.getElementById('eSmooth');
-  if(sm&&sm.checked){const cs=allClips();if(cs.length){const s0=cs.reduce((x,c)=>c.start<x.start?c:x),s1=cs.reduce((x,c)=>clipEnd(c)>clipEnd(x)?c:x);s0.fadeIn=Math.min(0.5,clipLen(s0)/3);s1.fadeOut=Math.min(0.5,clipLen(s1)/3);}}
+  rsel=null;playhead=0;easy.cutDone=true;if(easy.smooth)applySmooth();
   checkpoint();renderAll();fitZoom();toast(`選んだ部分だけ残しました（${fmtSec(projEnd())}）`,'ok');
 }
 function firstSoundTime(c){
@@ -1788,29 +1842,51 @@ function matchTempo2(){
   setTimeout(()=>{
     const b1=c1.srcBpm||detectBPM(s1.buffer,c1.offset,c1.dur),b2=c2.srcBpm||detectBPM(s2.buffer,c2.offset,c2.dur);
     if(!b1||!b2){toast('テンポ（ノリ）を見つけられませんでした。リズムのはっきりした音で試してください','error',6000);return;}
-    let tb=b1*c1.speed,sp=tb/b2;while(sp>1.5)sp/=2;while(sp<0.67)sp*=2;
+    let sp=b1*c1.speed/b2;while(sp>1.5)sp/=2;while(sp<0.67)sp*=2;
     c1.srcBpm=b1;c2.srcBpm=b2;c2.speed=sp;c2.mode='keep';
     checkpoint();layout();draw();updateBusy();scheduleProcessing();renderEasy();
-    toast(`2つ目の音の速さを ${Math.round(sp*100)}% にして、1つ目のテンポ（ノリ）にそろえました`,'ok',6000);
+    toast(`重ねる音の速さを ${Math.round(sp*100)}% にして、最初の音のテンポ（ノリ）にそろえました`,'ok',6000);
   },30);
+}
+async function easyAddFiles(files){
+  const mode=easy.pickMode||'replace';easy.pickMode=null;
+  if(!easy.task){toast('先に、やりたいことを1つ選んでください（大きなボタンのどれか）','info',5000);return;}
+  if(easy.task==='rec'){toast('録音の作業中です。ファイルを使うときは、ホームから「速さを変える」などを選んでください','info',6000);return;}
+  if(easy.ask){toast('先に「この音を使う」か「新しい音で始める」を選んでください','info',5000);return;}
+  if(easy.task!=='mix'&&files.length>1){toast('この作業では音を1つだけ使います。最初の1つを入れます','info',5000);files=[files[0]];}
+  const cnt=()=>project.tracks.filter(t=>t.clips.length).length;
+  if(easy.task==='mix'&&cnt()>=2){toast('「重ねる」は2つの音まで使えます。入れ替えるときは「↶ 1つ戻る」を使ってください','info',6000);return;}
+  const replacing=easy.task!=='mix'&&hasClips();
+  const before=easy.task==='mix'?cnt():0;
+  // 置き換えは、読み込めたときだけ前の音を消す
+  const keep=replacing?JSON.stringify(project.tracks):null;
+  if(replacing)project.tracks=[];
+  await addFiles(files);
+  const n=cnt();
+  if(n>before){
+    if(replacing)toast('前の音と入れ替えました（「↶ 1つ戻る」で戻せます）','info',5000);
+    easy.step=easy.task==='mix'?(n>=2?2:1):1;renderEasy();fitZoom();
+    if(!replacing)toast(easy.task==='mix'&&n<2?'最初の音を入れました。次に重ねる音を入れてください':'音を入れました','ok');
+  }else if(replacing){project.tracks=JSON.parse(keep);renderAll();}
 }
 let easySaving=false;
 async function easySave(){
   if(easySaving)return;if(!hasClips()){toast('保存する音がありません。まず音を入れてください');return;}
   easySaving=true;const btn=$('#easyPanel [data-e=save]');if(btn){btn.disabled=true;btn.textContent='保存しています…';}
+  const solos=project.tracks.map(t=>t.solo);project.tracks.forEach(t=>t.solo=false);
   try{
     const to=projEnd();if(to>3*3600){toast('長すぎて保存できません（3時間まで）','error');return;}
     const chs=await renderMix(0,to,44100);
     let pk=0;for(const ch of chs)for(let i=0;i<ch.length;i++){const a=Math.abs(ch[i]);if(a>pk)pk=a;}
     if(pk>0.891){const k=0.891/pk;for(const ch of chs)for(let i=0;i<ch.length;i++)ch[i]*=k;}
-    const nm=safeName(($('#eName2')&&$('#eName2').value.trim())||'otomix')+'.wav';
-    easy.savedName=$('#eName2')?$('#eName2').value.trim():'';
+    const raw=($('#eName2')&&$('#eName2').value.trim())||genName();
+    const nm=safeName(raw)+'.wav';
     download(new Blob([encodeWav(chs,44100,16)],{type:'audio/wav'}),nm);
     easy.saved=nm;toast('保存しました：'+nm,'ok',6000);
   }catch(e){console.warn(e);toast('保存できませんでした。音が長すぎるか、パソコンのメモリが足りない可能性があります','error',7000);}
-  finally{easySaving=false;renderEasy();}
+  finally{project.tracks.forEach((t,i)=>t.solo=!!solos[i]);easySaving=false;renderEasy();}
 }
-$('#eHome').onclick=()=>{if(rec){toast('録音中です。先に録音を止めてください');return;}goHome();};
+$('#eHome').onclick=()=>goHome();
 $('#ePlay').onclick=()=>{if(!hasClips()){toast('まだ音が入っていません。まず音を入れてください');return;}if(easy.task==='cut'&&rsel&&!play){playhead=rsel.a;}togglePlay();};
 $('#eUndo').onclick=()=>{undo();};
 $('#eRecStop').onclick=()=>stopRecording();
