@@ -274,8 +274,8 @@ body.camtop #maptag{opacity:0}
 #tip.on{display:flex;animation:tipin .4s ease-out}#tip svg{width:9cqmin;height:4.5cqmin}
 @keyframes tipin{from{opacity:0;margin-top:-2cqmin}to{opacity:1;margin-top:0}}
 /* 宝を拾ったあと、結果へ行くまでの間：入力を止めて ボタンをうすく */
-body.endwait .ctl,body.endwait #cam{opacity:.35;pointer-events:none;transition:opacity .3s}
-body.endwait #swipe{pointer-events:none}
+body.endwait #play .ctl,body.endwait #play #cam{opacity:.35;pointer-events:none;transition:opacity .3s}
+body.endwait #play #swipe{pointer-events:none}
 
 /* ---------- Ending（争いの言葉なし。くらべっこの けっか） ---------- */
 .endleft{position:absolute;left:5cqmin;top:5cqmin;width:78cqmin;display:flex;flex-direction:column;align-items:center;gap:2cqmin;text-align:center}

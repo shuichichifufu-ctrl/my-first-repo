@@ -286,8 +286,8 @@ body.camtop #maptag{opacity:0}
 #tip.on{display:flex;animation:tipin .4s ease-out}#tip svg{width:9cqmin;height:4.5cqmin}
 @keyframes tipin{from{opacity:0;margin-top:-2cqmin}to{opacity:1;margin-top:0}}
 /* 宝を拾ったあと、結果へ行くまでの間：入力を止めて ボタンをうすく */
-body.endwait .ctl,body.endwait #cam{opacity:.35;pointer-events:none;transition:opacity .3s}
-body.endwait #swipe{pointer-events:none}
+body.endwait #play .ctl,body.endwait #play #cam{opacity:.35;pointer-events:none;transition:opacity .3s}
+body.endwait #play #swipe{pointer-events:none}
 
 /* ---------- Ending（争いの言葉なし。くらべっこの けっか） ---------- */
 .endleft{position:absolute;left:5cqmin;top:5cqmin;width:78cqmin;display:flex;flex-direction:column;align-items:center;gap:2cqmin;text-align:center}
@@ -2025,7 +2025,7 @@ body.endwait #swipe{pointer-events:none}
     camMode: 1, camBlendT: 1, camFrom: null, chaseLift: 0, camY: 0, intro: null, topFlag: null,
     shake: 0, stateAcc: 0, over: false, treasures: [], scores: [0, 0],
     fx: null, mapVer: 0, pitch: 0, pitchV: 0, aim: null, swipeV: 0,
-    orbitK: 0, idleT: 0, faceHold: 0, atkK: 0, atkHold: 0, hints: null
+    sideK: 1, orbitK: 0, idleT: 0, faceHold: 0, atkK: 0, atkHold: 0, hints: null, moved: false
   };
   var handlers = { found: [], collect: [], terrain: [], state: [], action: [], cam: [], done: [] };
   // 1コマの計算（update）の途中で出たイベントは、そのコマの計算が終わってから知らせる。
@@ -2362,7 +2362,7 @@ body.endwait #swipe{pointer-events:none}
       }
     }
     S.camBlendT = 1; S.chaseLift = 0; S.camY = S.me.y;
-    S.orbitK = 0; S.idleT = 0; S.faceHold = 0; S.atkK = 0; S.atkHold = 0;
+    S.sideK = 1; S.orbitK = 0; S.idleT = 0; S.faceHold = 0; S.atkK = 0; S.atkHold = 0; S.moved = false;
     S.camera.far = overheadHeight() * 1.6 + 60; S.camera.updateProjectionMatrix();
     S.camMode = 1; S.intro = { t: 0 }; S.topFlag = null; // 開始演出：真上から → おいかけへ
     var pose = poseFor(2);
@@ -2617,7 +2617,7 @@ body.endwait #swipe{pointer-events:none}
   // 遠く（おいかけ視点で20マス以上先）からも見えるよう、画面の上で小さくなりすぎない（最小の大きさがある）。
   // 宝そのものは見せない。全部の宝で1つの点の集まり（THREE.Points）＝描画命令は1つだけ。
   var HINT_K = 4;              // 宝1つあたりの点：0=ゆらめく光の粒、1〜3=昇る星
-  var HINT_RISE = 1.7, HINT_CYCLE = 2.4, HINT_TOP = 3.6; // 星が昇る時間・くり返し・昇る高さ
+  var HINT_RISE = 1.7, HINT_CYCLE = 2.4, HINT_TOP = 3.8; // 星が昇る時間・くり返し・昇る高さ
   var HINT_VERT = [
     'attribute float aSize;', 'attribute float aAlpha;', 'attribute float aMin;',
     'uniform float uScale;', 'uniform float uMinPx;',
@@ -2659,14 +2659,15 @@ body.endwait #swipe{pointer-events:none}
     var H = S.hints; if (!H) return;
     var cam = S.camera, vh = S.renderer ? S.renderer.getDrawingBufferSize(tmpV2).y : 600;
     H.mat.uniforms.uScale.value = vh / (2 * Math.tan(THREE.MathUtils.degToRad(cam.fov / 2)));
-    H.mat.uniforms.uMinPx.value = Math.max(9, vh * 0.026); // 遠くても画面の高さの約2.6%より小さくしない
+    H.mat.uniforms.uMinPx.value = Math.max(14, vh * 0.042); // 遠くても画面の高さの約4.2%より小さくしない
     var t0 = S.time, P = H.pos.array, Sz = H.size.array, A = H.alpha.array, M = H.mn.array;
     for (var k = 0; k < S.treasures.length; k++) {
       var tr = S.treasures[k], b = k * HINT_K, on = !tr.revealed && !tr.taken;
       var cx = tr.x + 0.5, cz = tr.z + 0.5, top = vis(S.heights[idx(tr.x, tr.z)]), ph = tr.phase;
-      // 0：ゆらめく光の粒（山の上でふわふわ）
-      P[b * 3] = cx + Math.sin(t0 * 1.3 + ph) * 0.08; P[b * 3 + 1] = top + 0.75 + Math.sin(t0 * 2.1 + ph) * 0.12; P[b * 3 + 2] = cz + Math.cos(t0 * 1.1 + ph) * 0.08;
-      Sz[b] = 0.55 + 0.12 * Math.sin(t0 * 5 + ph); A[b] = on ? 0.85 + 0.15 * Math.sin(t0 * 7 + ph) : 0; M[b] = 0.7;
+      // 0：ゆらめく光の粒（山の上、壁より少し高い所でふわふわ）
+      P[b * 3] = cx + Math.sin(t0 * 1.3 + ph) * 0.08; P[b * 3 + 1] = top + 1.9 + Math.sin(t0 * 2.1 + ph) * 0.15; P[b * 3 + 2] = cz + Math.cos(t0 * 1.1 + ph) * 0.08;
+      var tw = 0.5 + 0.5 * Math.sin(t0 * 4.2 + ph);
+      Sz[b] = 0.6 + 0.15 * tw; A[b] = on ? 0.8 + 0.2 * tw : 0; M[b] = 0.8 + 0.2 * tw;
       // 1〜3：ときどき きらっと光って昇る星
       for (var j = 1; j < HINT_K; j++) {
         var q = b + j, u = ((t0 + ph) / HINT_CYCLE + (j - 1) / (HINT_K - 1)) % 1, tt = u * HINT_CYCLE / HINT_RISE;
@@ -2674,9 +2675,9 @@ body.endwait #swipe{pointer-events:none}
         var sw = Math.sin(tt * 9 + j * 2 + ph) * 0.18;
         P[q * 3] = cx + sw; P[q * 3 + 1] = top + 0.6 + HINT_TOP * (1 - Math.pow(1 - tt, 1.6)); P[q * 3 + 2] = cz + Math.cos(tt * 7 + j) * 0.18;
         var flash = tt < 0.18 ? 1 + 0.9 * Math.sin(tt / 0.18 * Math.PI) : 1; // 出た瞬間に きらっ
-        Sz[q] = 0.7 * flash * (1 - 0.35 * tt);
+        Sz[q] = 0.75 * flash * (1 - 0.35 * tt);
         A[q] = tt < 0.06 ? tt / 0.06 : (tt > 0.72 ? (1 - tt) / 0.28 : 1);
-        M[q] = 1.05 * flash * (1 - 0.3 * tt);
+        M[q] = 1.1 * flash * (1 - 0.35 * tt);
       }
     }
     H.pos.needsUpdate = true; H.size.needsUpdate = true; H.alpha.needsUpdate = true; H.mn.needsUpdate = true;
@@ -3252,7 +3253,7 @@ body.endwait #swipe{pointer-events:none}
   // おいかけ視点：シーカーの後ろ上から heading の方向を見る（スワイプで回る）。シーカー（高さ1.7）の全身が画面の下寄りに入る
   var CHASE_BACK = 3.9, CHASE_UP = 3.2, CHASE_AHEAD = 3.6, CHASE_SIDE = 1.1; // 少し右うしろから：ロールケーキの端（星）も見える
   var ATK_SIDE = 1.5, ATK_UP = 1.3, ATK_BACK = 0.6, ATK_HOLD = 0.9;          // ドリルアタック中のずらし
-  var ORBIT_YAW = 2.25, ORBIT_DIST = 3.0, ORBIT_UP = 1.75, IDLE_ORBIT = 2.2;  // 顔を見せる回りこみ（止まって2.2秒で）
+  var ORBIT_YAW = 2.25, ORBIT_DIST = 3.0, ORBIT_UP = 1.75, IDLE_ORBIT = 2.6;  // 顔を見せる回りこみ（止まって2.6秒で）
   var FADE_ON = 0.7;                                                          // 間の壁を透かす量（0.7＝4つに3つ抜く）
   var poseM = new THREE.Matrix4(), UP = new THREE.Vector3(0, 1, 0), NORTH = new THREE.Vector3(0, 0, -1);
   function poseFor(mode) {
@@ -3267,12 +3268,13 @@ body.endwait #swipe{pointer-events:none}
     } else if (mode === 1) {
       var pv = S.pitchV, up = CHASE_UP + (pv > 0 ? -pv * 1.2 : -pv * 2.6), ah = CHASE_AHEAD + pv * (pv > 0 ? 3 : 2.6);
       var rx = -fz, rz = fx; // 右
-      var back = CHASE_BACK, side = CHASE_SIDE, ak = ease(clamp(S.atkK, 0, 1)), ok = ease(clamp(S.orbitK, 0, 1));
+      var back = CHASE_BACK, side = CHASE_SIDE * S.sideK, ak = ease(clamp(S.atkK, 0, 1)), ok = ease(clamp(S.orbitK, 0, 1));
       // ドリルアタック：少し右・上へずれて、正面の壊れるマスが体のかげにならないように
-      side += ak * ATK_SIDE; up += ak * ATK_UP; back -= ak * ATK_BACK;
+      side += ak * ATK_SIDE * (S.sideK < 0 ? -1 : 1); up += ak * ATK_UP; back -= ak * ATK_BACK;
       // 止まっているとき・拾ったとき：前ななめへ回りこんで、顔（目）と端の星を見せる（向き＝操作は変えない）
       back += (ORBIT_DIST - back) * ok; up += (ORBIT_UP - up) * ok;
       var rr = Math.hypot(back, side), th = Math.atan2(side, back) + ok * ORBIT_YAW;
+      if (side < 0) th = Math.atan2(side, back) - ok * ORBIT_YAW; // 左うしろにいるときは左へ回りこむ
       var u = -Math.cos(th) * rr, v = Math.sin(th) * rr; // u=前、v=右
       p.set(px + fx * u + rx * v, py + up + S.chaseLift * (1 - ok), pz + fz * u + rz * v);
       tg.set(px + fx * ah + rx * 0.25, py + 0.35 + pv * (pv > 0 ? 1.1 : 0.4) + S.chaseLift * 0.5, pz + fz * ah + rz * 0.25);
@@ -3320,7 +3322,13 @@ body.endwait #swipe{pointer-events:none}
       else S.atkHold = Math.max(0, S.atkHold - dt);
       S.atkK += ((S.atkHold > 0 ? 1 : 0) - S.atkK) * (1 - Math.exp(-dt * (S.atkHold > 0 ? 7 : 2.5)));
       var h = S.held, still = S.camMode === 1 && !S.intro && !me.act && !me.air && !h.fwd && !h.back && !h.left && !h.right && Math.abs(me.moveV) < 0.05;
-      S.idleT = still ? S.idleT + dt : 0;
+      // 右どなりに高い壁があり左が空いていれば、カメラを左うしろへ（壁の向こうから見ない）
+      var fx = -Math.sin(me.heading), fz = -Math.cos(me.heading), rx = -fz, rz = fx, head = me.y + 0.9;
+      var tall = function (sg) { var m = 0; for (var q = 0; q < 3; q++) { var bk = q * 0.9, x = me.wx + sg * rx * 0.85 - fx * bk, z = me.wz + sg * rz * 0.85 - fz * bk; m = Math.max(m, groundTopAt(x, z)); } return m > head; };
+      var wantSide = tall(1) && !tall(-1) ? -1 : (tall(-1) && !tall(1) ? 1 : (S.sideK < 0 ? -1 : 1));
+      S.sideK += (wantSide - S.sideK) * (1 - Math.exp(-dt * 4));
+      if (Math.abs(me.moveV) > 0.3) S.moved = true; // 出発してすぐは回りこまない（行く先の目じるしを見せておく）
+      S.idleT = still && S.moved ? S.idleT + dt : 0;
       if (S.faceHold > 0) S.faceHold = Math.max(0, S.faceHold - dt);
       var want = (S.faceHold > 0 || S.idleT > IDLE_ORBIT) ? 1 : 0;
       var rate = want ? (S.faceHold > 0 ? 2.6 : 1.1) : 6;
@@ -3335,12 +3343,14 @@ body.endwait #swipe{pointer-events:none}
     var k, want = occWant; for (k in want) delete want[k];
     if (me && S.camMode === 1 && !S.intro && me.root.visible) {
       var cp = S.camera.position, mcx = Math.floor(me.wx), mcz = Math.floor(me.wz);
-      for (var r = 0; r < 3; r++) {
-        var ty = me.y + (r === 0 ? 0.25 : r === 1 ? 0.65 : 1.05);
-        var dx = cp.x - me.wx, dy = cp.y - ty, dz = cp.z - me.wz, len = Math.hypot(dx, dy, dz);
+      var sx = Math.cos(me.heading) * 0.35, sz = -Math.sin(me.heading) * 0.35; // シーカーの左右の幅
+      for (var r = 0; r < 5; r++) {
+        var ty = me.y + (r === 0 ? 0.25 : r === 2 ? 1.05 : 0.65), ox = r === 3 ? sx : r === 4 ? -sx : 0, oz = r === 3 ? sz : r === 4 ? -sz : 0;
+        var bx = me.wx + ox, bz = me.wz + oz;
+        var dx = cp.x - bx, dy = cp.y - ty, dz = cp.z - bz, len = Math.hypot(dx, dy, dz);
         var n = Math.ceil(len / 0.15);
         for (var i = 1; i < n; i++) {
-          var t = i / n, x = me.wx + dx * t, y = ty + dy * t, z = me.wz + dz * t;
+          var t = i / n, x = bx + dx * t, y = ty + dy * t, z = bz + dz * t;
           var cx = Math.floor(x), cz = Math.floor(z);
           if (!inMap(cx, cz) || (cx === mcx && cz === mcz)) continue;
           if (vis(S.heights[idx(cx, cz)]) > y) { var inst = L.cellToInst[idx(cx, cz)]; if (inst >= 0) want[inst] = 1; }
@@ -3593,7 +3603,7 @@ body.endwait #swipe{pointer-events:none}
       });
     },
     _fading: function () { return S.level && S.level.fading ? Object.keys(S.level.fading).length : 0; },
-    _cam: function () { return { orbit: S.orbitK, atk: S.atkK, idle: S.idleT, face: S.faceHold }; },
+    _cam: function () { return { orbit: S.orbitK, atk: S.atkK, idle: S.idleT, face: S.faceHold, side: S.sideK }; },
     // 確認用：自分のシーカーのいちばん低い点（ドリルの先）の高さと、いまいるマスの上面
     _meLow: function () {
       var me = S.me; if (!me) return null;
