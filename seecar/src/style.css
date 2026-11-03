@@ -284,7 +284,8 @@ body.camtop #maptag{opacity:0}
 .who .gemi{display:block;width:7cqmin;height:7cqmin;flex:none}.who .gemi svg{width:100%;height:100%}
 .endrec{display:flex;align-items:center;gap:1.4cqmin;background:var(--cream);border:.5cqmin solid var(--ink);box-shadow:0 .7cqmin 0 rgba(43,33,24,.25);border-radius:5cqmin;padding:.8cqmin 3cqmin .8cqmin 1.4cqmin;font-size:3.4cqmin;color:var(--ink);text-align:left;max-width:100%}
 .endrec .rc-ico{width:7cqmin;height:7cqmin}.endrec .rc-col{display:flex;flex-direction:column;align-items:flex-start;gap:.5cqmin}
-.endrec b{font-size:3.3cqmin;font-weight:900}
+.endrec b{font-size:3.3cqmin;font-weight:900;white-space:nowrap}
+.endrec .rc-n{display:flex;flex-wrap:wrap;gap:0 2.4cqmin}.endrec .rl{white-space:nowrap}
 .endtitle{font-size:9cqmin;font-weight:900;color:var(--ink);line-height:1.1;margin-top:.6cqmin;background:rgba(255,255,255,.9);padding:1cqmin 4cqmin;border-radius:4cqmin;border:.5cqmin solid var(--ink)}
 .endyomi{font-size:3.8cqmin;color:var(--mute);margin-top:-1cqmin}
 .endpic{position:absolute;left:86cqmin;right:6cqmin;top:7cqmin;bottom:25cqmin;display:flex;align-items:center;justify-content:center}

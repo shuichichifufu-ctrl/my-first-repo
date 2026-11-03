@@ -412,7 +412,7 @@
     h('hint-swipeRev', settings.swipeRev ? 'みぎへ なぞると ひだりを むくよ' : 'みぎへ なぞると みぎを むくよ');
     h('hint-binary', settings.binary ? 'しろと くろの 2いろに するよ' : 'いろの こさで ちずに するよ');
     var t = recTotals();
-    h('hint-record', 'ぜんぶで ' + t.all + 'かい あそんだよ（きみ ' + t.me + '・あいて ' + t.opp + '・おなじ ' + t.same + '）');
+    h('hint-record', 'ぜんぶで ' + t.all + 'かい あそんだよ');
   }
   function setOpt(k, v) { settings[k] = v; saveSettings(); renderSettings(); }
   function renderRecChip() {
@@ -904,7 +904,7 @@
     var lab = KIND_NAME[kind] + (opp === 'cpu' ? '・' + OPP_NAME.cpu + '・' + LEVEL_NAME[curLevel] : (opp === 'net' ? '・' + OPP_NAME.net : ''));
     els.endRec.innerHTML = '<span class="rc-ico">' + SETICO.trophy + '</span><span class="rc-col"><b></b><span class="rc-n"></span></span>';
     els.endRec.querySelector('b').textContent = lab;
-    els.endRec.querySelector('.rc-n').textContent = recLines(kind, rr || record.solo).join('　');
+    els.endRec.querySelector('.rc-n').innerHTML = recLines(kind, rr || record.solo).map(function (t) { return '<span class="rl">' + t + '</span>'; }).join('');
     els.endTitle.textContent = m.title || '';
     els.endTitle.style.display = m.title ? '' : 'none';
     els.endYomi.textContent = (m.reading && m.reading !== m.title) ? m.reading : '';

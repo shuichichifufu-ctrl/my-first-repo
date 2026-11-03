@@ -40,7 +40,7 @@ const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
     await page.click('.card[data-id=mikka]', { force: true }); await sleep(1200); await nav('しゅっぱつ！'); await sleep(5500); await shot('15play_solo');
     await page.evaluate(() => App._found(0)); await sleep(900); await shot('16ending_solo');
     await nav('もういちど'); await page.click('.card[data-id=mikka]', { force: true }); await sleep(1200);
-    await page.click('#back', { force: true }); await page.click('#back', { force: true }); await sleep(200);
+    await page.click('#back', { force: true }); await sleep(200);
     await page.click('.howcard[data-kind=race]', { force: true }); await page.click('[data-who=cpu]', { force: true }); await sleep(200);
     await page.click('.lvcard[data-level=hard]', { force: true }); await sleep(200); await page.click('.card[data-id=mikka]', { force: true }); await sleep(1200);
     await nav('しゅっぱつ！'); await sleep(2500); await page.evaluate(() => App._found(1)); await sleep(900); await shot('17ending_race_cpu');
