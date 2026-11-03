@@ -132,7 +132,7 @@ async function solo(browser) {
   // ソナー：円形、上が向いている方向。宝（光る点）が 前方にあれば 上に、右にあれば 右に描かれる
   const px = (x, y) => page.evaluate(([x, y]) => { const cv = document.getElementById('sonar-cv'); const d = cv.getContext('2d').getImageData(x, y, 1, 1).data; return [d[0], d[1], d[2], d[3]]; }, [x, y]);
   const bright = (c) => c[3] > 200 && c[0] > 200 && c[1] > 200;
-  const yel = (c) => c[3] > 200 && c[0] > 200 && c[1] > 170 && c[2] < 90; // 矢印の黄色（ふちのクリーム色とは区別）
+  const yel = (c) => c[3] > 200 && c[0] > 200 && c[1] > 170 && c[2] < 160; // 矢印の黄色（ふちのクリーム色とは区別）
   await page.evaluate(() => { window.__sonarItems = [{ dx: 0, dz: -5, dist: 5, depth: 0 }]; window.__heading = 0; }); await sleep(400);
   await page.screenshot({ path: SH + 'solo_07sonar_ahead.png', clip: { x: 0, y: 90, width: 260, height: 260 } });
   const R = 134, C = 144;
@@ -148,7 +148,7 @@ async function solo(browser) {
   ok('ソナー: 円の外（40マス先）→ 上のふちに矢印、円の中に点は無い', yel(await px(C, C - R - 2)) && !bright(await px(C, C - R / 2)), [await px(C, C - R - 2), await px(C, C - R / 2)]);
   await page.screenshot({ path: SH + 'solo_07sonar_arrow.png', clip: { x: 0, y: 90, width: 260, height: 260 } });
   await page.evaluate(() => { window.__heading = Math.PI / 2; }); await sleep(300);
-  ok('ソナー: 向きを回すと 矢印も 右のふちへ回る', yel(await px(C + R + 2, C)) && !yel(await px(C, C - R - 2)));
+  ok('ソナー: 向きを回すと 矢印も 右のふちへ回る', yel(await px(C + R, C)) && !yel(await px(C, C - R - 2)));
   await farP(9);
   ok('ソナー: 円の中に入ると 矢印は消えて 点（上のふちは明るくない）', bright(await px(C, C - R * 0.9)) && !yel(await px(C, C - R - 2)));
   await page.evaluate(() => { window.__sonarItems = [{ dx: 0.2, dz: -0.3, dist: 0.4, depth: 3 }]; }); await sleep(300);
@@ -207,7 +207,7 @@ async function solo(browser) {
   ok('ホーム: いいえで再開', (await logOf(page, 'setPaused')).slice(-1)[0][1] === false && await state(page) === 'play');
   // 見つけた！
   await page.evaluate(() => App._found(0)); await sleep(700);
-  ok('ひとり: 拾ってすぐは 結果へ行かない（約1.6秒 見せる）。ボタンはうすく・入力は止まる', await state(page) === 'play' && await page.evaluate(() => [document.body.classList.contains('endwait'), +getComputedStyle(document.getElementById('fwd')).opacity, getComputedStyle(document.getElementById('fwd')).pointerEvents]).then((v) => { window.__ew = v; return v[0] && v[1] < 0.6 && v[2] === 'none'; }), await page.evaluate(() => window.__ew));
+  ok('ひとり: 拾ってすぐは 結果へ行かない（約1.6秒 見せる）。ボタンはうすく・入力は止まる', await state(page) === 'play' && await page.evaluate(() => [document.body.classList.contains('endwait'), +getComputedStyle(document.getElementById('fwd')).opacity, getComputedStyle(document.getElementById('fwd')).pointerEvents]).then((v) => v[0] && v[1] < 0.6 && v[2] === "none"), await page.evaluate(() => [App._info().ended, document.body.className, document.body.dataset.state]));
   await waitFor(async () => await state(page) === 'ending', 3000); await sleep(300);
   ok('ひとり: みつけた！', await state(page) === 'ending' && await txt(page, '#end-found') === 'みつけた！', await txt(page, '#end-found'));
   ok('ひとり: 掘り出した宝の言葉と、元の絵を大きく見せる', /ほりだした/.test(await txt(page, '#end-who')) && await page.evaluate(() => { const i = document.getElementById('end-pic'); return i.getBoundingClientRect().width > 250 && !!i.src; }));

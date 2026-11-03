@@ -303,6 +303,8 @@ const E = Math.PI / 2; // heading：0=北(-z)、-E=東(+x)、E=西、PI=南
   await ev(() => { const m = flatMap(20, 24, []); for (let z = 6; z < 20; z++) { m.set(11, z, 10); m.set(12, z, 10); m.set(9, z, 10); } loadMap(m, { mode: 'solo' }); World._setPose(10.5, 12.5, 0); World._step(30); });
   let fade = await ev(() => World._fading());
   ok('1マスの通路で、シーカーを隠す横の壁を透かす', fade > 0, `透かしているマス ${fade}`);
+  cam = await ev(() => { const m = flatMap(20, 24, []); for (let z = 6; z < 20; z++) { m.set(11, z, 10); m.set(12, z, 10); } loadMap(m, { mode: 'solo' }); World._setPose(10.5, 12.5, 0); World._step(40); return World._cam(); });
+  ok('右どなりだけ高い壁なら、カメラは左うしろへ移る', cam.side < -0.8, JSON.stringify(cam));
   await ev(() => { const m = flatMap(20, 24, []); loadMap(m, { mode: 'solo' }); World._setPose(10.5, 12.5, 0); World._step(30); });
   fade = await ev(() => World._fading());
   ok('間に壁がなければ透かさない', fade === 0, `${fade}`);
