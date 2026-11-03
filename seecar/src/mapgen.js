@@ -528,6 +528,7 @@
     { id: 'roketto', kind: 'illust', title: 'ロケット', reading: 'ろけっと' }
   ];
   var STROKE = 0;
+  var ERODE = 10;             // 字の線を白で削る量（画素）
   var THIN = { '鳥': 0, '麗': 0, '龍': 0, '自': 0, '由': 0, '在': 0 }; // 字ごとの太らせる量（線の多い字は細く。0=太らせない）
   var FONT = "'Hiragino Kaku Gothic ProN','Hiragino Sans','Noto Sans JP','Yu Gothic',sans-serif";
   var S = 640;               // 見本の絵の大きさ（画素）
@@ -547,6 +548,8 @@
       // 線の多い字（鳥など）は太らせすぎると黒い塊につぶれるので、太らせる量を字ごとに変える
       var lw = THIN[chars[i]] != null ? THIN[chars[i]] : STROKE;
       if (lw > 0) { g.lineWidth = lw; g.strokeText(chars[i], cx, cz); }
+      // 逆に、字の線を白でなぞって細くする（フォントによって太さが違っても、壁の厚さを5〜6マス以内に保つため）
+      if (ERODE > 0) { g.save(); g.strokeStyle = '#fff'; g.lineWidth = ERODE; g.strokeText(chars[i], cx, cz); g.restore(); }
     }
     return c;
   }
