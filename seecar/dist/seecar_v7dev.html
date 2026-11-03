@@ -530,6 +530,16 @@ body.camtop #maptag{opacity:0}
     turn: function () { tone('triangle', 420, 560, 0.12, 0.12); },
     tap: function () { tone('sine', 660, 880, 0.08, 0.2); tone('sine', 990, 990, 0.06, 0.08, 0.04); },
     bump: function () { tone('square', 140, 90, 0.12, 0.1); noise(0.08, 0.12, 'lowpass', 500); },
+    jump: function () {   // ぽよんと弾む
+      tone('sine', 260, 620, 0.22, 0.28);
+      tone('triangle', 520, 1040, 0.16, 0.1, 0.03);
+    },
+    dig: function () {    // ゴゴゴッと土を掘る
+      tone('sawtooth', 70, 55, 0.4, 0.18);
+      noise(0.45, 0.32, 'lowpass', 700, 150);
+      for (var i = 0; i < 4; i++) noise(0.04, 0.1, 'bandpass', 900 + i * 200, 300, 0.08 + i * 0.08);
+    },
+    collect: function () { tone('triangle', 988, 1976, 0.25, 0.22); tone('sine', 1319, 2637, 0.2, 0.1, 0.06); },
     fire: function () {   // ぽんっと打ち上げる
       tone('sine', 300, 90, 0.25, 0.35);
       tone('triangle', 700, 250, 0.15, 0.12);
@@ -1572,6 +1582,7 @@ body.camtop #maptag{opacity:0}
   var DEBRIS_MAX = 600, PUFF_MAX = 64;
   var GEM_R = 0.42, GEM_Y = 0.95; // 宝石の大きさと高さ
   var SOIL = [0.851, 0.725, 0.549]; // 土の山の色 #d9b98c（淡いクレヨンの茶色）
+  var SOIL_BLOCK = [0.76, 0.56, 0.36]; // 積み木として塗る色（紙の白とクレヨンの質感が重なると #d9b98c くらいに見える）
   var SOIL_DUG = [196, 162, 116];   // 掘ったあとの地面の色
 
   // ---------- 小さな道具 ----------
@@ -2290,7 +2301,7 @@ body.camtop #maptag{opacity:0}
   // 「壁と同じくらい高いカーキ色の積み木」を残さない（高さは画素のいちばん濃い色で決まるので、平均色が明るく出ることがある）
   function blockColor(c, hh, i) {
     // 土の山：淡いクレヨンの茶色（鮮やかにしない）
-    if (i != null && S.buried && S.buried[i] && hh < 8) { var v = ((i * 37) % 7 - 3) * 0.008; c.setRGB(SOIL[0] + v, SOIL[1] + v, SOIL[2] + v); return c; }
+    if (i != null && S.buried && S.buried[i] && hh < 8) { var v = ((i * 37) % 7 - 3) * 0.008; c.setRGB(SOIL_BLOCK[0] + v, SOIL_BLOCK[1] + v, SOIL_BLOCK[2] + v); return c; }
     var lum = 0.299 * c.r + 0.587 * c.g + 0.114 * c.b;
     if (hh >= 8 || lum < 0.3) { c.setRGB(WALL_RGB[0], WALL_RGB[1], WALL_RGB[2]); return c; }
     var chroma = Math.max(c.r, c.g, c.b) - Math.min(c.r, c.g, c.b); // 色みの強さ（カーキ・灰色は小さい）
@@ -2702,7 +2713,7 @@ body.camtop #maptag{opacity:0}
   function stepVertical(a, dt) {
     var f = footInfo(a.wx, a.wz);
     if (a.air) {
-      a.vy -= GRAV * dt; a.y += a.vy * dt;
+      a.y += a.vy * dt - 0.5 * GRAV * dt * dt; a.vy -= GRAV * dt; // コマの長さによらず同じ高さまで上がる
       if (a.vy <= 0 && a.y <= f.y) { a.y = f.y; land(a, -a.vy); }
     } else if (f.y < a.y - 0.04) { a.air = true; a.vy = 0; }
     else a.y += (f.y - a.y) * Math.min(1, dt * 14);
@@ -2796,7 +2807,7 @@ body.camtop #maptag{opacity:0}
       a.wx = A.sx + (cx - A.sx) * k; a.wz = A.sz + (cz - A.sz) * k;
     }
     if (A.phase === 'flip') {
-      a.vy -= DJ.g * dt; a.y += a.vy * dt;
+      a.y += a.vy * dt - 0.5 * DJ.g * dt * dt; a.vy -= DJ.g * dt;
       a.flip = Math.min(1, A.pt / DJ.flip); a.spin = 1;
       if (A.pt >= DJ.flip) { setPhase(A, 'hang'); a.vy = 0; }
     } else if (A.phase === 'hang') {
@@ -2830,7 +2841,7 @@ body.camtop #maptag{opacity:0}
       }
       if (A.pt >= DJ.bore) { setPhase(A, 'pop'); a.vy = DJ.popVy; a.shakeV = 0; digFx(cx, vis(hAt(A.tx, A.tz)), cz, new THREE.Color(0xd9b98c), false); }
     } else if (A.phase === 'pop') {
-      a.vy -= DJ.g * dt; a.y += a.vy * dt; a.spin = 1.5;
+      a.y += a.vy * dt - 0.5 * DJ.g * dt * dt; a.vy -= DJ.g * dt; a.spin = 1.5;
       a.flip = Math.max(0, a.flip - dt / DJ.unflip);
       var gy = footInfo(a.wx, a.wz).y;
       if (a.flip > 0 && a.y < gy + a.tip * a.flip) a.y = gy + a.tip * a.flip; // 逆さのまま地面にもぐらない
@@ -3078,7 +3089,7 @@ body.camtop #maptag{opacity:0}
     return centerFrac * 2 * hh * tn * asp;
   }
   // おいかけ視点：シーカーの後ろ上から heading の方向を見る（スワイプで回る）。シーカー（高さ1.7）の全身が画面の下寄りに入る
-  var CHASE_BACK = 3.6, CHASE_UP = 3.3, CHASE_AHEAD = 5.0;
+  var CHASE_BACK = 3.9, CHASE_UP = 3.2, CHASE_AHEAD = 3.6, CHASE_SIDE = 1.1; // 少し右うしろから：ロールケーキの端（星）も見える
   var poseM = new THREE.Matrix4(), UP = new THREE.Vector3(0, 1, 0), NORTH = new THREE.Vector3(0, 0, -1);
   function poseFor(mode) {
     var p = new THREE.Vector3(), q = new THREE.Quaternion(), tg = new THREE.Vector3();
@@ -3091,8 +3102,9 @@ body.camtop #maptag{opacity:0}
       poseM.lookAt(p, tg, UP);
     } else if (mode === 1) {
       var pv = S.pitchV, up = CHASE_UP + (pv > 0 ? -pv * 1.2 : -pv * 2.6), ah = CHASE_AHEAD + pv * (pv > 0 ? 3 : 2.6);
-      p.set(px - fx * CHASE_BACK, py + up + S.chaseLift, pz - fz * CHASE_BACK);
-      tg.set(px + fx * ah, py + 0.1 + pv * (pv > 0 ? 1.1 : 0.4) + S.chaseLift * 0.5, pz + fz * ah);
+      var rx = -fz, rz = fx; // 右
+      p.set(px - fx * CHASE_BACK + rx * CHASE_SIDE, py + up + S.chaseLift, pz - fz * CHASE_BACK + rz * CHASE_SIDE);
+      tg.set(px + fx * ah + rx * 0.25, py + 0.35 + pv * (pv > 0 ? 1.1 : 0.4) + S.chaseLift * 0.5, pz + fz * ah + rz * 0.25);
       poseM.lookAt(p, tg, UP);
     } else {
       var hh = overheadHeight(), sx = overheadShift(hh);
@@ -4721,6 +4733,7 @@ body.camtop #maptag{opacity:0}
     call('World', 'init', $('worldbox'));
     call('World', 'on', 'collect', onCollect);
     call('World', 'on', 'found', onFound);
+    call('World', 'on', 'done', function () { if (gameMode === 'count') endCount(false); }); // 宝10こ ぜんぶ見つかった
     call('World', 'on', 'terrain', onTerrain);
     call('World', 'on', 'action', onAction);
     call('World', 'on', 'cam', function (top) { doc.body.classList.toggle('camtop', !!top); });
