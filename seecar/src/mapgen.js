@@ -42,7 +42,7 @@
 
   // ---------- 解析 ----------
   // 画素(pw x ph)のRGBA -> MapData（絵の部分）。picture/title/reading は呼び出し側で入れる。
-  function analyze(rgba, pw, ph, darkL, binary) {
+  function analyze(rgba, pw, ph, darkL, binary, opts) {
     var w = pw * BLOCK, h = ph * BLOCK, n = w * h;
     var heights = new Uint8Array(n), colors = new Uint8Array(n * 3);
     var px, pz, i, j, dx, dz;
@@ -71,9 +71,9 @@
       }
     }
 
-    return analyzeCells(heights, colors, w, h);
+    return analyzeCells(heights, colors, w, h, opts);
   }
-  function analyzeCells(heights, colors, w, h) {
+  function analyzeCells(heights, colors, w, h, opts) {
     var n = w * h, label = new Int32Array(n).fill(-1), queue = new Int32Array(n), regions = [], i, j, x, z;
     for (i = 0; i < n; i++) {
       if (heights[i] >= WALL_H || label[i] !== -1) continue;
@@ -100,85 +100,152 @@
         x = Math.min(w - 1, Math.max(0, cx + ex)); z = Math.min(h - 1, Math.max(0, cz + ez));
         heights[z * w + x] = 0;
       }
-      return analyzeCells(heights, colors, w, h);
+      return analyzeCells(heights, colors, w, h, opts);
     }
-    return finish(heights, colors, w, h, label, regions, main);
+    return finish(heights, colors, w, h, label, regions, main, opts);
   }
 
-  function finish(heights, colors, w, h, label, regions, main) {
-    var n = w * h, i, x, z, k;
+  // ---- 宝・土の山・スタートの決め方（第3期） ----
+  var MOUND_H = 3;                 // 土の山の高さ
+  var MOUND_COLOR = [217, 185, 140]; // 淡いクレヨンの茶色 #d9b98c
+  var TREASURE_GAP = 4;            // 宝同士の最小の距離（マス）
+  var STEP_COST = 1, WALL_COST = 6; // 道のりの数え方：1マス=1、壁を壊して通る1マス=6
+  var START_SEP = 12;              // スタート同士の最小の距離（マス）
 
-    // --- スタート2つ：外の領域の、高さ0（無ければ最も低い）のマスから、互いに離して選ぶ ---
+  function finish(heights, colors, w, h, label, regions, main, opts) {
+    var n = w * h, i, x, z, k;
+    var count = opts && opts.treasureCount === 10 ? 10 : 1;
+    function d2(a, b) { var ax = a % w, az = (a - ax) / w, bx = b % w, bz = (b - bx) / w; return (ax - bx) * (ax - bx) + (az - bz) * (az - bz); }
+    function edgeDist(c) { var cx = c % w, cz = (c - cx) / w; return Math.min(cx, cz, w - 1 - cx, h - 1 - cz); }
+
+    // 外の領域でいちばん低い高さ（スタートの高さ）
     var minH = 255;
     for (i = 0; i < n; i++) if (label[i] === main.id && heights[i] < minH) minH = heights[i];
-    var cand = [], soft = [];
-    for (i = 0; i < n; i++) {
-      if (label[i] !== main.id || heights[i] !== minH) continue;
-      cand.push(i);
-      x = i % w; z = (i - x) / w;
-      var ok = x > 0 && z > 0 && x < w - 1 && z < h - 1;
-      for (k = 0; ok && k < 4; k++) {
-        var nj = (z + DZ[k]) * w + (x + DX[k]);
-        if (Math.abs(heights[nj] - minH) > 1) ok = false;
-      }
-      if (ok) soft.push(i);
-    }
-    if (soft.length) cand = soft; // 周りが平らな所を優先（1x1の戦車が動きやすい）
-    function d2(a, b) { var ax = a % w, az = (a - ax) / w, bx = b % w, bz = (b - bx) / w; return (ax - bx) * (ax - bx) + (az - bz) * (az - bz); }
-    function farthest(from, list) { var best = list[0], bd = -1; for (var q = 0; q < list.length; q++) { var d = d2(from, list[q]); if (d > bd) { bd = d; best = list[q]; } } return best; }
-    var s0 = farthest(cand[0], cand);      // 端の一つ（仮。宝が決まったあと、ふちから離して選び直す）
-    var s1 = farthest(s0, cand);           // そこから最も遠い所
-    if (s1 === s0 && cand.length > 1) s1 = cand[cand.length - 1] !== s0 ? cand[cand.length - 1] : cand[0];
-    // ホストは宝に近い側ではなく、地図の左上寄りの端（見た目が安定するように）
-    if (d2(s0, 0) > d2(s1, 0)) { var t = s0; s0 = s1; s1 = t; }
 
-    // --- 宝：端に触れない領域のうち 4画素(16マス)以上で最小の領域の、重心に最も近いマス ---
-    var minCells = MIN_PIXELS * BLOCK * BLOCK, best = null;
-    for (k = 0; k < regions.length; k++) {
-      var r = regions[k];
-      if (r.edge || r.id === main.id || r.size < minCells) continue;
-      if (!best || r.size < best.size) best = r;
-    }
-    var treasure = null;
-    if (best) {
-      var gx = best.sx / best.size, gz = best.sz / best.size, bd = Infinity, rmin = 255;
-      // 領域の中でも、戦車が立てる低い所（高さ0〜1、無ければ領域でいちばん低い所）に置く
-      for (i = 0; i < n; i++) if (label[i] === best.id && heights[i] < rmin) rmin = heights[i];
-      var tmaxH = Math.max(1, rmin);
-      for (i = 0; i < n; i++) {
-        if (label[i] !== best.id || heights[i] > tmaxH) continue;
-        x = i % w; z = (i - x) / w;
-        var d = (x - gx) * (x - gx) + (z - gz) * (z - gz);
-        if (d < bd) { bd = d; treasure = { x: x, z: z }; }
+    // --- 宝：壁で囲まれた白い領域（端に触れず16マス以上）を小さい順に使う ---
+    var minCells = MIN_PIXELS * BLOCK * BLOCK;
+    var encl = regions.filter(function (r) { return !r.edge && r.id !== main.id && r.size >= minCells; });
+    encl.sort(function (a, b) { return a.size - b.size || a.id - b.id; });
+    var cellsOf = {}; // 領域id -> マスの一覧
+    for (i = 0; i < n; i++) if (label[i] >= 0) (cellsOf[label[i]] || (cellsOf[label[i]] = [])).push(i);
+    var treasures = []; // マス番号
+    function strict(c) { // 3x3 がぜんぶ同じ領域の中（土の山が壁にかからない）
+      var cx = c % w, cz = (c - cx) / w;
+      for (var zz = -1; zz <= 1; zz++) for (var xx = -1; xx <= 1; xx++) {
+        var nx = cx + xx, nz = cz + zz;
+        if (nx < 0 || nz < 0 || nx >= w || nz >= h || label[nz * w + nx] !== label[c]) return false;
       }
+      return true;
+    }
+    // 領域の中に宝を1つ置く。置けなければ -1。既に置いた宝から4マス以上離す。
+    function place(reg, strictOnly) {
+      var cells = cellsOf[reg.id] || [], rmin = 255, gx = 0, gz = 0, e;
+      for (e = 0; e < cells.length; e++) { var c0 = cells[e]; if (heights[c0] < rmin) rmin = heights[c0]; gx += c0 % w; gz += (c0 - c0 % w) / w; }
+      gx /= cells.length || 1; gz /= cells.length || 1;
+      var lowMax = Math.max(1, rmin), tiers = [[], [], [], [], []];
+      cells.forEach(function (c) {
+        var far = true;
+        for (var t = 0; t < treasures.length; t++) if (d2(c, treasures[t]) < TREASURE_GAP * TREASURE_GAP) { far = false; break; }
+        if (!far) return;
+        var s = strict(c); if (strictOnly && !s) return;
+        var lowest = heights[c] === rmin && heights[c] === 0;
+        // 地面（高さ0）で3x3が領域内 → 地面 → 低めで3x3が領域内 → 低め → どこでも
+        tiers[lowest && s ? 0 : lowest ? 1 : heights[c] <= lowMax && s ? 2 : heights[c] <= lowMax ? 3 : 4].push(c);
+      });
+      for (var ti = 0; ti < 5; ti++) {
+        var list = tiers[ti]; if (!list.length) continue;
+        var bestC = -1, bestV = -Infinity;
+        list.forEach(function (c) {
+          var cx = c % w, cz = (c - cx) / w, v;
+          if (!treasures.length || !treasures.some(function (t) { return label[t] === reg.id; })) v = -((cx - gx) * (cx - gx) + (cz - gz) * (cz - gz)); // 最初の1つ：重心にいちばん近い
+          else { v = Infinity; treasures.forEach(function (t) { if (label[t] === reg.id) v = Math.min(v, d2(c, t)); }); } // 次からは、いちばん離れた所
+          if (v > bestV) { bestV = v; bestC = c; }
+        });
+        return bestC;
+      }
+      return -1;
+    }
+    if (count === 1) {
+      if (encl.length) treasures.push(place(encl[0]));
     } else {
-      // 候補が無い：スタートから最も遠い、行ける（高さの差1以内）マス
-      var dist = new Int32Array(n).fill(-1), q = new Int32Array(n), qh = 0, qt = 0, last = s0;
-      dist[s0] = 0; q[qt++] = s0;
-      while (qh < qt) {
-        var c = q[qh++]; last = c; x = c % w; z = (c - x) / w;
-        for (k = 0; k < 4; k++) {
-          var nx = x + DX[k], nz = z + DZ[k];
-          if (nx < 0 || nz < 0 || nx >= w || nz >= h) continue;
-          var nj2 = nz * w + nx;
-          if (dist[nj2] !== -1 || Math.abs(heights[nj2] - heights[c]) > 1) continue;
-          dist[nj2] = dist[c] + 1; q[qt++] = nj2;
+      // 土の山(3x3)が壁にかからない所がある領域を先に使う（細いすき間の領域は、足りないときだけ）
+      var roomy = encl.filter(function (r) { return (cellsOf[r.id] || []).some(strict); });
+      var thin = encl.filter(function (r) { return roomy.indexOf(r) < 0; });
+      var quota = {}, full = {};
+      roomy.slice(0, 10).forEach(function (r) { var c = place(r, true); if (c >= 0) { treasures.push(c); quota[r.id] = 1; } });
+      // 足りないぶんは、大きい領域（広さ ÷ 置いた数 が大きい順）の中に散らす
+      [roomy, thin.concat(roomy)].forEach(function (list, round) {
+        if (round === 1) { thin.slice(0, 10 - treasures.length).forEach(function (r) { var c = place(r, false); if (c >= 0) { treasures.push(c); quota[r.id] = 1; } }); full = {}; }
+        while (treasures.length < 10) {
+          var pickR = null;
+          for (k = 0; k < list.length; k++) {
+            var rr = list[k]; if (full[rr.id]) continue;
+            if (!pickR || rr.size / ((quota[rr.id] || 0) + 1) > pickR.size / ((quota[pickR.id] || 0) + 1)) pickR = rr;
+          }
+          if (!pickR) break;
+          var cc = place(pickR, round === 0);
+          if (cc < 0) full[pickR.id] = true; else { treasures.push(cc); quota[pickR.id] = (quota[pickR.id] || 0) + 1; }
+        }
+      });
+    }
+    // 囲まれた領域が足りない：外の領域の地面に、互いに離して置く（最後の手段）
+    if (treasures.length < count) {
+      var mainCells = cellsOf[main.id] || [], mx = 0, mz = 0;
+      mainCells.forEach(function (c) { mx += c % w; mz += (c - c % w) / w; });
+      mx /= mainCells.length || 1; mz /= mainCells.length || 1;
+      while (treasures.length < count) {
+        var bc = -1, bv = -Infinity;
+        mainCells.forEach(function (c) {
+          if (heights[c] !== minH || edgeDist(c) < 3) return;
+          var v = treasures.length ? Infinity : (c % w - mx) * (c % w - mx) + ((c - c % w) / w - mz) * ((c - c % w) / w - mz);
+          for (var t = 0; t < treasures.length; t++) { var dd = d2(c, treasures[t]); if (dd < TREASURE_GAP * TREASURE_GAP) { v = -Infinity; break; } v = Math.min(v, dd); }
+          if (strict(c)) v += 1e6;
+          if (v > bv) { bv = v; bc = c; }
+        });
+        if (bc < 0) break;
+        treasures.push(bc);
+      }
+    }
+    if (!treasures.length) treasures.push(mainCells0());
+    function mainCells0() { var cs = cellsOf[main.id] || []; return cs.length ? cs[0] : 0; }
+
+    // --- 土の山（宝のマスを中心に3x3）の印。高さと色は最後に変える（道のりは山をかぶせる前の地面で数える） ---
+    var buried = new Uint8Array(n);
+    treasures.forEach(function (t) {
+      var tx = t % w, tz = (t - tx) / w;
+      for (var zz = -1; zz <= 1; zz++) for (var xx = -1; xx <= 1; xx++) {
+        var nx = tx + xx, nz = tz + zz;
+        if (nx < 0 || nz < 0 || nx >= w || nz >= h) continue;
+        var j = nz * w + nx;
+        if (label[j] === label[t] && heights[j] < WALL_H) buried[j] = 1;
+      }
+    });
+
+    // --- 道のり：宝から逆向きに、重みつき最短路（登り1段まで・降りは自由・壁は壊して通る=重い） ---
+    function costTo(target) {
+      var INF = 1e9, dist = new Int32Array(n).fill(INF), heap = [], hp = function (v) { return v; };
+      function push(d, c) { heap.push([d, c]); var a = heap.length - 1; while (a > 0) { var p = (a - 1) >> 1; if (heap[p][0] <= heap[a][0]) break; var t = heap[p]; heap[p] = heap[a]; heap[a] = t; a = p; } }
+      function pop() { var top = heap[0], last = heap.pop(); if (heap.length) { heap[0] = last; var a = 0; for (;;) { var l = 2 * a + 1, r = l + 1, m = a; if (l < heap.length && heap[l][0] < heap[m][0]) m = l; if (r < heap.length && heap[r][0] < heap[m][0]) m = r; if (m === a) break; var t = heap[m]; heap[m] = heap[a]; heap[a] = t; a = m; } } return top; }
+      dist[target] = 0; push(0, target);
+      while (heap.length) {
+        var it = pop(), d = it[0], j = it[1]; if (d !== dist[j]) continue;
+        var jx = j % w, jz = (j - jx) / w, wallJ = heights[j] >= WALL_H, stepC = wallJ ? WALL_COST : STEP_COST;
+        for (var q = 0; q < 4; q++) {
+          var ix = jx + DX[q], iz = jz + DZ[q]; if (ix < 0 || iz < 0 || ix >= w || iz >= h) continue;
+          var ii = iz * w + ix, hi = heights[ii] >= WALL_H ? 0 : heights[ii];
+          if (!wallJ && heights[j] - hi > 1) continue; // ii から j へ：登りは1段まで
+          var nd = d + stepC; if (nd < dist[ii]) { dist[ii] = nd; push(nd, ii); }
         }
       }
-      if (last === s0 || last === s1) { // 狭すぎるとき：スタートでない別のマス
-        for (i = 0; i < n; i++) if (i !== s0 && i !== s1 && heights[i] < WALL_H) { last = i; break; }
-      }
-      treasure = { x: last % w, z: (last - (last % w)) / w };
+      return dist;
     }
 
-    // --- スタートの選び直し：地図のふちから離し（前方に迷路が広がる所）、宝から遠い側を host にする ---
-    var tI = treasure.z * w + treasure.x, EDGE_MIN = 6;
-    function edgeDist(c) { var cx = c % w, cz = (c - cx) / w; return Math.min(cx, cz, w - 1 - cx, h - 1 - cz); }
+    // --- スタート：外の領域の高さ0（無ければ最も低い）のマスから選ぶ。地図のふちから離し、前方がひらけた所 ---
     var picked = null;
-    for (var margin = EDGE_MIN; margin >= 0 && !picked; margin--) {
+    for (var margin = 6; margin >= 0 && !picked; margin--) {
       var pool = [];
       for (i = 0; i < n; i++) {
-        if (label[i] !== main.id || heights[i] !== minH || i === tI || edgeDist(i) < margin) continue;
+        if (label[i] !== main.id || heights[i] !== minH || buried[i] || edgeDist(i) < margin) continue;
         pool.push(i);
       }
       var flat = pool.filter(function (c) {
@@ -191,16 +258,17 @@
       });
       if (flat.length) picked = flat; else if (pool.length && margin === 0) picked = pool;
     }
-    // 戦車が実際に歩いて行ける（高さの差1以内でつながる）いちばん広い範囲に、2つのスタートを置く（色の積み木でふさがれた所を避ける）
-    if (picked) {
+    if (!picked) { picked = []; for (i = 0; i < n; i++) if (label[i] === main.id && !buried[i]) picked.push(i); if (!picked.length) picked = [0, n - 1]; }
+    // 実際に歩いて行ける（高さの差1以内でつながる）いちばん広い範囲に置く
+    (function () {
       var wl = new Int32Array(n).fill(-1), wsz = [], wq = new Int32Array(n);
-      for (i = 0; i < n; i++) {
-        if (label[i] !== main.id || wl[i] !== -1) continue;
-        var wid = wsz.length, a0 = 0, a1 = 0; wl[i] = wid; wq[a1++] = i;
+      for (var s = 0; s < n; s++) {
+        if (label[s] !== main.id || wl[s] !== -1) continue;
+        var wid = wsz.length, a0 = 0, a1 = 0; wl[s] = wid; wq[a1++] = s;
         while (a0 < a1) {
           var cc = wq[a0++], cx2 = cc % w, cz2 = (cc - cx2) / w;
-          for (k = 0; k < 4; k++) {
-            var ax = cx2 + DX[k], az = cz2 + DZ[k];
+          for (var kk = 0; kk < 4; kk++) {
+            var ax = cx2 + DX[kk], az = cz2 + DZ[kk];
             if (ax < 0 || az < 0 || ax >= w || az >= h) continue;
             var aj = az * w + ax;
             if (wl[aj] !== -1 || heights[aj] >= WALL_H || Math.abs(heights[aj] - heights[cc]) > 1) continue;
@@ -209,48 +277,10 @@
         }
         wsz.push(a1);
       }
-      var bigW = 0; for (k = 1; k < wsz.length; k++) if (wsz[k] > wsz[bigW]) bigW = k;
+      var bigW = 0; for (var q = 1; q < wsz.length; q++) if (wsz[q] > wsz[bigW]) bigW = q;
       var inBig = picked.filter(function (c) { return wl[c] === bigW; });
       if (inBig.length > 1) picked = inBig;
-    }
-    function dirFor(c) { // 前に7マス以上進める向きのうち、宝にいちばん向いている向き
-      var cx = c % w, cz = (c - cx) / w, vx = treasure.x - cx, vz = treasure.z - cz, len = Math.sqrt(vx * vx + vz * vz) || 1, best = null;
-      for (var d = 0; d < 4; d++) {
-        if (runLen(c, d) < 7) continue;
-        var cs = (vx * DX[d] + vz * DZ[d]) / len;
-        if (!best || cs > best.cs) best = { d: d, cs: cs };
-      }
-      return best;
-    }
-    // 前方に見える黒い壁（高さ10）の数：おいかけ視点で、出発してすぐ迷路（字の形）が画面に入る所を選ぶため
-    function wallsAhead(c, d) {
-      var cx = c % w, cz = (c - cx) / w, cnt = 0, rx = DZ[d] === 0 ? 0 : 1, rz = DX[d] === 0 ? 0 : 1;
-      for (var f = 3; f <= 18; f++) for (var sd = -7; sd <= 7; sd++) {
-        var qx = cx + DX[d] * f + rx * sd, qz = cz + DZ[d] * f + rz * sd;
-        if (qx >= 0 && qz >= 0 && qx < w && qz < h && heights[qz * w + qx] >= WALL_H) cnt++;
-      }
-      return cnt;
-    }
-    if (picked) {
-      // 前方がひらけ、宝のほうを向ける所だけに絞り、宝から ほどよい遠さ（遠すぎず近すぎず）で、
-      // 前方に黒い壁が見え、宝の方向をまっすぐ向ける所を選ぶ
-      var WANT = Math.min(22, 0.2 * Math.sqrt(w * w + h * h)), good = [], open = [];
-      picked.forEach(function (c) {
-        var bd = dirFor(c); if (!bd) return;
-        open.push(c);
-        var dist = Math.sqrt(d2(c, tI));
-        if (bd.cs >= 0.5 && dist >= 8) good.push({ c: c, key: Math.abs(dist - WANT) + (1 - bd.cs) * 16 - Math.min(wallsAhead(c, bd.d), 90) * 0.12 });
-      });
-      good.sort(function (p, q) { return p.key - q.key; });
-      if (good.length) s0 = good[0].c; else s0 = farthest(tI, open.length ? open : picked);
-      // ゲスト：ホストから離れた（12マス以上）中で、いちばん条件のよい所
-      var SEP = 12 * 12; s1 = -1;
-      for (k = 0; k < good.length; k++) if (good[k].c !== s0 && d2(good[k].c, s0) >= SEP) { s1 = good[k].c; break; }
-      if (s1 < 0) {
-        var pool2 = (open.length > 1 ? open : picked).filter(function (c) { return c !== s0; });
-        s1 = pool2.length ? farthest(s0, pool2) : s0;
-      }
-    }
+    })();
     function runLen(cell, d) {
       var cx = cell % w, cz = (cell - cx) / w, run = 0, ph = heights[cell];
       for (;;) {
@@ -261,23 +291,98 @@
       }
       return run;
     }
-
-    // --- 向き：すぐ前に進める所が長く続く向き。同じなら宝の方へ ---
-    function pickDir(cell) {
-      var cx = cell % w, cz = (cell - cx) / w, bestDir = 0, bestScore = -1e9;
+    function aimOf(c) { var b = treasures[0], bd = Infinity; treasures.forEach(function (t) { var d = d2(c, t); if (d < bd) { bd = d; b = t; } }); return b; }
+    function dirFor(c) { // 前に7マス以上進める向きのうち、宝にいちばん向いている向き
+      var cx = c % w, cz = (c - cx) / w, a = aimOf(c), vx = a % w - cx, vz = (a - a % w) / w - cz, len = Math.sqrt(vx * vx + vz * vz) || 1, best = null;
+      for (var d = 0; d < 4; d++) {
+        if (runLen(c, d) < 7) continue;
+        var cs = (vx * DX[d] + vz * DZ[d]) / len;
+        if (!best || cs > best.cs) best = { d: d, cs: cs };
+      }
+      return best;
+    }
+    // 前方に見える黒い壁の数：おいかけ視点で、出発してすぐ迷路（字の形）が画面に入る所を選ぶため
+    function wallsAhead(c, d) {
+      var cx = c % w, cz = (c - cx) / w, cnt = 0, rx = DZ[d] === 0 ? 0 : 1, rz = DX[d] === 0 ? 0 : 1;
+      for (var f = 3; f <= 18; f++) for (var sd = -7; sd <= 7; sd++) {
+        var qx = cx + DX[d] * f + rx * sd, qz = cz + DZ[d] * f + rz * sd;
+        if (qx >= 0 && qz >= 0 && qx < w && qz < h && heights[qz * w + qx] >= WALL_H) cnt++;
+      }
+      return cnt;
+    }
+    var WANT = Math.min(22, 0.2 * Math.sqrt(w * w + h * h)), cx0 = (w - 1) / 2, cz0 = (h - 1) / 2;
+    var cand = []; // {c, key}（小さいほどよい）
+    picked.forEach(function (c) {
+      var bd = dirFor(c); if (!bd) return;
+      var key = (1 - bd.cs) * 16 - Math.min(wallsAhead(c, bd.d), 90) * 0.12;
+      if (count === 1) {
+        var dist = Math.sqrt(d2(c, aimOf(c)));
+        key += Math.abs(dist - WANT) + (bd.cs < 0.5 || dist < 8 ? 40 : 0);
+      } else {
+        key += Math.abs(Math.sqrt((c % w - cx0) * (c % w - cx0) + ((c - c % w) / w - cz0) * ((c - c % w) / w - cz0)) - 0.3 * w) * 0.3;
+      }
+      cand.push({ c: c, key: key });
+    });
+    cand.sort(function (p, q) { return p.key - q.key; });
+    var s0 = -1, s1 = -1;
+    if (cand.length >= 2) {
+      if (count === 1) {
+        // 公平：2人から宝までの道のり（壁は壊す手間を重く数える）がほぼ同じになる2点
+        var dist1 = costTo(treasures[0]), top = cand.slice(0, 500).filter(function (e) { return dist1[e.c] < 1e9; }), best2 = null;
+        for (var tier = 0; tier < 4 && !best2; tier++) {
+          for (var a = 0; a < top.length; a++) for (var b = a + 1; b < top.length; b++) {
+            if (d2(top[a].c, top[b].c) < START_SEP * START_SEP) continue;
+            var ca = dist1[top[a].c], cb = dist1[top[b].c], df = Math.abs(ca - cb), mx = Math.max(ca, cb);
+            var tol = tier === 0 ? Math.max(1, mx * 0.02) : tier === 1 ? Math.max(3, mx * 0.05) : tier === 2 ? Math.max(4, mx * 0.1) : 1e9;
+            if (df > tol) continue;
+            var sc = top[a].key + top[b].key + (tier === 3 ? 10 * df : df);
+            if (!best2 || sc < best2.sc) best2 = { sc: sc, a: top[a].c, b: top[b].c };
+          }
+        }
+        if (best2) { s0 = best2.a; s1 = best2.b; }
+      } else {
+        // 10個：地図の中心について対称に近い2点
+        var openSet = cand, bestP = null;
+        cand.slice(0, 400).forEach(function (ea) {
+          var ax = ea.c % w, az = (ea.c - ax) / w, rx = w - 1 - ax, rz = h - 1 - az, nb = null, nd = Infinity;
+          for (var q = 0; q < openSet.length; q++) {
+            var oc = openSet[q].c, ox = oc % w, oz = (oc - ox) / w, dd = (ox - rx) * (ox - rx) + (oz - rz) * (oz - rz);
+            if (dd < nd) { nd = dd; nb = openSet[q]; }
+          }
+          if (!nb || nb.c === ea.c || d2(ea.c, nb.c) < START_SEP * START_SEP) return;
+          var sc = 4 * Math.sqrt(nd) + (ea.key + nb.key) / 2;
+          if (!bestP || sc < bestP.sc) bestP = { sc: sc, a: ea.c, b: nb.c };
+        });
+        if (bestP) { s0 = Math.min(bestP.a, bestP.b); s1 = Math.max(bestP.a, bestP.b); }
+      }
+    }
+    if (s0 < 0) { // 条件に合う所が無い：離れた2マス
+      var pl = picked.length ? picked : [0, n - 1]; s0 = pl[0]; s1 = pl[0];
+      var fb = -1; pl.forEach(function (c) { var dd = d2(c, s0); if (dd > fb) { fb = dd; s1 = c; } });
+    }
+    function pickDir(cell) { // すぐ前に進める所が長く続く向き。同じなら宝の方へ
+      var cx = cell % w, cz = (cell - cx) / w, bestDir = 0, bestScore = -1e9, a = aimOf(cell);
       for (var d = 0; d < 4; d++) {
         var run = runLen(cell, d);
-        var tvx = treasure.x - cx, tvz = treasure.z - cz, toward = 100 * (tvx * DX[d] + tvz * DZ[d]) / (Math.sqrt(tvx * tvx + tvz * tvz) || 1);
-        // 開けている（7マス以上進める）向きのうち宝に近い向き。どれも狭ければ、いちばん開けている向き
+        var tvx = a % w - cx, tvz = (a - a % w) / w - cz, toward = 100 * (tvx * DX[d] + tvz * DZ[d]) / (Math.sqrt(tvx * tvx + tvz * tvz) || 1);
         var score = (run >= 7 ? 100000 : run * 1000) + (run >= 1 ? toward : -999);
         if (score > bestScore) { bestScore = score; bestDir = d; }
       }
       return bestDir;
     }
+    var starts = [{ x: s0 % w, z: (s0 - s0 % w) / w, dir: pickDir(s0) }, { x: s1 % w, z: (s1 - s1 % w) / w, dir: pickDir(s1) }];
+
+    // --- 土の山をかぶせる：3x3 を高さ3に（もとが3以上ならそのまま）、色は淡い茶色 ---
+    for (i = 0; i < n; i++) {
+      if (!buried[i]) continue;
+      if (heights[i] < MOUND_H) heights[i] = MOUND_H;
+      colors[i * 3] = MOUND_COLOR[0]; colors[i * 3 + 1] = MOUND_COLOR[1]; colors[i * 3 + 2] = MOUND_COLOR[2];
+    }
+    var tr = treasures.map(function (t) { return { x: t % w, z: (t - t % w) / w }; });
     return {
       w: w, h: h, heights: heights, colors: colors,
-      treasure: treasure,
-      starts: [{ x: s0 % w, z: (s0 - s0 % w) / w, dir: pickDir(s0) }, { x: s1 % w, z: (s1 - s1 % w) / w, dir: pickDir(s1) }],
+      treasure: tr[0], treasures: tr, buried: buried,
+      starts: starts,
       title: '', reading: '', picture: ''
     };
   }
@@ -290,7 +395,7 @@
     var small = shrink(pic, pic.width, pic.height, MAX_LONG);
     var pw = small.width, ph = small.height;
     var rgba = small.getContext('2d').getImageData(0, 0, pw, ph).data;
-    var map = analyze(rgba, pw, ph, darkest(src, sw, sh, pw, ph), !!(opts && opts.binary === true));
+    var map = analyze(rgba, pw, ph, darkest(src, sw, sh, pw, ph), !!(opts && opts.binary === true), opts);
     map.title = title; map.reading = reading;
     map.picture = pic.toDataURL('image/jpeg', 0.82);
     return map;
@@ -361,6 +466,8 @@
       w: map.w, h: map.h,
       heights: toB64(map.heights), colors: toB64(map.colors),
       treasure: { x: map.treasure.x, z: map.treasure.z },
+      treasures: (map.treasures || [map.treasure]).map(function (t) { return { x: t.x, z: t.z }; }),
+      buried: toB64(map.buried || new Uint8Array(map.w * map.h)),
       starts: map.starts.map(function (s) { return { x: s.x, z: s.z, dir: s.dir }; }),
       title: map.title, reading: map.reading, picture: map.picture
     };
@@ -369,6 +476,8 @@
     var m = {
       w: o.w, h: o.h, heights: fromB64(o.heights), colors: fromB64(o.colors),
       treasure: { x: o.treasure.x, z: o.treasure.z },
+      treasures: (o.treasures || [o.treasure]).map(function (t) { return { x: t.x, z: t.z }; }),
+      buried: o.buried ? fromB64(o.buried) : new Uint8Array(o.w * o.h),
       starts: o.starts.map(function (s) { return { x: s.x, z: s.z, dir: s.dir }; }),
       title: o.title, reading: o.reading, picture: o.picture
     };

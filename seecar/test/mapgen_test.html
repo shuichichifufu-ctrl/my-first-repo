@@ -11,10 +11,10 @@ window.T = {
     var g = c.getContext('2d');
     for (var z = 0; z < m.h; z++) for (var x = 0; x < m.w; x++) {
       var v = Math.round(255 * (1 - m.heights[z * m.w + x] / 10));
-      g.fillStyle = 'rgb(' + v + ',' + v + ',' + v + ')'; g.fillRect(x * scale, z * scale, scale, scale);
+      g.fillStyle = m.buried && m.buried[z * m.w + x] ? '#b07a3c' : 'rgb(' + v + ',' + v + ',' + v + ')'; g.fillRect(x * scale, z * scale, scale, scale);
     }
     function dot(p, col) { g.fillStyle = col; g.beginPath(); g.arc((p.x + 0.5) * scale, (p.z + 0.5) * scale, scale * 1.6, 0, 7); g.fill(); g.strokeStyle = '#fff'; g.lineWidth = 1; g.stroke(); }
-    dot(m.treasure, '#e00');
+    (m.treasures || [m.treasure]).forEach(function (t) { dot(t, '#e00'); });
     m.starts.forEach(function (s) { dot(s, '#05f'); });
     return c.toDataURL('image/png');
   },
@@ -31,6 +31,27 @@ window.T = {
       });
     }
     return { cells: n, touchesEdge: edge, treasureHeight: m.heights[m.treasure.z * w + m.treasure.x], seen: seen };
+  },
+  // 道のり（始点から全マスまで）：登り1段まで・降りは自由・壁は「壊せば通れる」として壊す手間を6と重く数える。土の山は掘れば地面なので高さ0とみなす。
+  pathCost: function (m, from) {
+    var w = m.w, h = m.h, n = w * h, H = m.heights, INF = 1e9, dist = new Array(n).fill(INF), done = new Uint8Array(n);
+    var Hh = function (i) { return m.buried[i] ? 0 : (H[i] >= 10 ? 0 : H[i]); };
+    // 費用は整数で小さいので、バケット(費用ごとの山)で数える
+    var buckets = [[from]]; dist[from] = 0;
+    for (var d = 0; d < buckets.length; d++) {
+      var b = buckets[d]; if (!b) continue;
+      for (var k = 0; k < b.length; k++) {
+        var i = b[k]; if (done[i] || dist[i] !== d) continue; done[i] = 1;
+        var x = i % w, z = (i - x) / w;
+        [[1, 0], [-1, 0], [0, 1], [0, -1]].forEach(function (dd) {
+          var nx = x + dd[0], nz = z + dd[1]; if (nx < 0 || nz < 0 || nx >= w || nz >= h) return;
+          var j = nz * w + nx, wall = H[j] >= 10 && !m.buried[j];
+          if (!wall && Hh(j) - Hh(i) > 1) return;
+          var nd = d + (wall ? 6 : 1); if (nd < dist[j]) { dist[j] = nd; (buckets[nd] || (buckets[nd] = [])).push(j); }
+        });
+      }
+    }
+    return dist;
   },
   startsInfo: function (m) {
     var r = T.region(m);

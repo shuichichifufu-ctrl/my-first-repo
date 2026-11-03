@@ -1,0 +1,38 @@
+<!doctype html>
+<html lang="ja"><head><meta charset="utf-8"><title>seeker test</title>
+<style>html,body{margin:0;background:#bfeaff}canvas{display:block}</style>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+<script src="/home/user/my-first-repo/seecar/src/seeker.js"></script>
+</head><body>
+<script>
+var W=900,H=700;
+var renderer=new THREE.WebGLRenderer({antialias:true,preserveDrawingBuffer:true});
+renderer.setSize(W,H);document.body.appendChild(renderer.domElement);
+var scene=new THREE.Scene();scene.background=new THREE.Color(0xbfeaff);
+var camera=new THREE.PerspectiveCamera(40,W/H,0.1,50);
+scene.add(new THREE.AmbientLight(0xffffff,0.75));
+var sun=new THREE.DirectionalLight(0xffffff,0.8);sun.position.set(3,6,4);scene.add(sun);
+var ground=new THREE.Mesh(new THREE.PlaneGeometry(10,10).rotateX(-Math.PI/2),new THREE.MeshBasicMaterial({color:0xcfe9a8}));
+ground.position.y=-0.002;scene.add(ground);
+// 1マス（1.0 x 1.0）の枠
+function cell(cx){var g=new THREE.BufferGeometry().setFromPoints([[-.5,0,-.5],[.5,0,-.5],[.5,0,.5],[-.5,0,.5],[-.5,0,-.5]].map(function(p){return new THREE.Vector3(p[0]+cx,0.003,p[2])}));
+  scene.add(new THREE.Line(g,new THREE.LineBasicMaterial({color:0xff0000})));}
+var A=SeekerModel.create({color:0xe08524}), B=SeekerModel.create({color:0x2f8be0});
+A.root.position.x=-0.8;B.root.position.x=0.8;cell(-0.8);cell(0.8);
+scene.add(A.root,B.root);
+var POSES={normal:{},squash:{squash:1},flip:{flip:1,spin:4},fwd:{hatForward:1,spin:6},mid:{hatForward:0.5,spin:3},run:{move:1}};
+var VIEWS={front:[1.8,1.6,3.2],side:[4.2,1.2,0.2],back:[-1.8,1.6,-3.2],top:[0,5,0.01]};
+window.shot=function(pose,view){
+  var s=POSES[pose]||{};
+  [A,B].forEach(function(m,i){
+    m.root.position.y=pose==='flip'?0.75:0;
+    for(var k=0;k<150;k++){var st=Object.assign({},s);if(pose==='run')st.turn=0;st.blink=false;m.update(0.016,st);}
+  });
+  var v=VIEWS[view];camera.position.set(v[0],v[1],v[2]);camera.lookAt(0,pose==='flip'?0.5:0.55,0);
+  renderer.render(scene,camera);
+};
+window.bbox=function(m){var b=new THREE.Box3().setFromObject(m.root);return [b.min.toArray(),b.max.toArray()];};
+window.meshCount=function(m){var n=0;m.root.traverse(function(o){if(o.isMesh)n++;});return n;};
+window.A=A;window.B=B;
+shot('normal','front');
+</script></body></html>

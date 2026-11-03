@@ -6,12 +6,12 @@
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="mobile-web-app-capable" content="yes">
 <meta name="format-detection" content="telephone=no">
-<title>見つめて見つけてほシーカー（SEE-CAR）</title>
+<title>見つけて！PixSee</title>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
 <script src="https://unpkg.com/peerjs@1.5.4/dist/peerjs.min.js"></script>
 <!--STYLE-->
 </head>
-<body data-state="boot">
+<body data-state="boot" data-mode="solo">
 <div id="app">
   <div id="stage">
     <div id="bg" aria-hidden="true">
@@ -23,21 +23,34 @@
     <!-- 1 Boot -->
     <section id="boot" class="screen">
       <div class="center">
-        <div data-logo="0.55"></div>
+        <div data-logo="0.7"></div>
         <div class="touchme"><span class="ring"></span>がめんを さわってね</div>
       </div>
     </section>
 
     <!-- 2 Title -->
     <section id="title" class="screen">
-      <div class="titlelogo" data-logo="1"></div>
+      <div class="titlelogo" data-logo="0.86"></div>
+      <div class="mascot m-l" data-mascot="#e08524"></div>
+      <div class="mascot m-r" data-mascot="#2f8be0"></div>
       <div id="recchip" class="recchip"></div>
     </section>
 
     <!-- 3 Setting -->
-    <section id="setting" class="screen" data-sub="pick">
+    <section id="setting" class="screen" data-sub="how">
       <button type="button" id="back" class="backbtn" tabindex="-1"><i></i><span>もどる</span></button>
-      <div id="sethead" class="head">ちずを えらんでね</div>
+      <div id="sethead" class="head">あそびかたを えらんでね</div>
+
+      <div class="pane sub-how">
+        <button type="button" class="howcard" data-kind="race" tabindex="-1"><i class="hpic" data-art="race"></i><b>どっちが はやい？</b><small>たからは ひとつ。<br>さきに みつけよう！</small></button>
+        <button type="button" class="howcard" data-kind="count" tabindex="-1"><i class="hpic" data-art="count"></i><b>どっちが おおい？</b><small>10この たから。10ぷんで<br>たくさん あつめよう！</small></button>
+        <button type="button" class="howcard" data-kind="solo" tabindex="-1"><i class="hpic" data-art="solo"></i><b>ひとりで れんしゅう</b><small>ひとりで ゆっくり<br>ためしてみよう</small></button>
+      </div>
+
+      <div class="pane sub-who">
+        <button type="button" class="bigcard" data-who="cpu" tabindex="-1"><i class="wpic" data-art="cpu"></i><span>コンピューターと あそぶ</span></button>
+        <button type="button" class="bigcard" data-who="net" tabindex="-1"><i class="wpic" data-art="friends"></i><span>ともだちと あそぶ</span></button>
+      </div>
 
       <div class="pane sub-level">
         <button type="button" class="lvcard" data-level="easy" tabindex="-1"><i class="lvpic"></i><b>やさしい</b><small>ゆっくり うごくよ</small><em></em></button>
@@ -46,11 +59,6 @@
       </div>
 
       <div class="pane sub-opts">
-        <div class="setcard" data-card="arrows">
-          <div class="sc-head"><i class="sc-ico" data-ico="arrows"></i><span>やじるしボタン</span></div>
-          <div class="seg"><button type="button" data-set="arrows" data-val="1" tabindex="-1">だす</button><button type="button" data-set="arrows" data-val="0" tabindex="-1">ださない</button></div>
-          <div class="sc-hint" id="hint-arrows"></div>
-        </div>
         <div class="setcard" data-card="swipeRev">
           <div class="sc-head"><i class="sc-ico" data-ico="swipe"></i><span>スワイプの むき</span></div>
           <div class="seg"><button type="button" data-set="swipeRev" data-val="0" tabindex="-1">ふつう</button><button type="button" data-set="swipeRev" data-val="1" tabindex="-1">はんたい</button></div>
@@ -61,20 +69,20 @@
           <div class="seg"><button type="button" data-set="binary" data-val="1" tabindex="-1">する</button><button type="button" data-set="binary" data-val="0" tabindex="-1">しない</button></div>
           <div class="sc-hint" id="hint-binary"></div>
         </div>
-        <div class="setcard" data-card="record">
-          <div class="sc-head"><i class="sc-ico" data-ico="trophy"></i><span>きろく</span></div>
-          <div class="seg one"><button type="button" id="reset-rec" class="danger" tabindex="-1">きろくを けす</button></div>
+        <div class="setcard wide" data-card="record">
+          <div class="sc-head"><i class="sc-ico" data-ico="trophy"></i><span>くらべっこの きろく</span></div>
           <div class="sc-hint" id="hint-record"></div>
+          <div class="seg one"><button type="button" id="reset-rec" class="danger" tabindex="-1">きろくを けす</button></div>
         </div>
       </div>
 
       <div class="pane sub-choice">
         <button type="button" class="bigcard" id="c-host" tabindex="-1">
-          <svg viewBox="0 0 64 64"><path d="M32 6 6 30h8v26h36V30h8z" fill="#ffd23f" stroke="#fff" stroke-width="3" stroke-linejoin="round"/><path d="M32 22l3.5 7.5 8 1-6 5.5 1.7 8L32 39.800 24.800 44l1.700-8-6-5.500 8-1z" fill="#ff5d8f"/></svg>
+          <svg viewBox="0 0 64 64"><path d="M32 6 6 30h8v26h36V30h8z" fill="#ffe400" stroke="#2b2118" stroke-width="3.500" stroke-linejoin="round"/><path d="M32 22l3.500 7.500 8 1-6 5.500 1.700 8L32 39.800 24.800 44l1.700-8-6-5.500 8-1z" fill="#d97eb8" stroke="#2b2118" stroke-width="2"/></svg>
           <span>へやを つくる</span>
         </button>
         <button type="button" class="bigcard" id="c-join" tabindex="-1">
-          <svg viewBox="0 0 64 64"><rect x="14" y="8" width="36" height="50" rx="4" fill="#7cc4ff" stroke="#fff" stroke-width="3"/><rect x="20" y="14" width="24" height="38" rx="2" fill="#3b8df0"/><circle cx="39" cy="34" r="3" fill="#ffd23f"/><path d="M2 34h14m-5-6 6 6-6 6" stroke="#ff5d8f" stroke-width="5" fill="none" stroke-linecap="round" stroke-linejoin="round"/></svg>
+          <svg viewBox="0 0 64 64"><rect x="14" y="8" width="36" height="50" rx="4" fill="#8be6ff" stroke="#2b2118" stroke-width="3.500"/><rect x="20" y="14" width="24" height="38" rx="2" fill="#19c8f5" stroke="#2b2118" stroke-width="2"/><circle cx="39" cy="34" r="3" fill="#ffe400" stroke="#2b2118" stroke-width="1.500"/><path d="M2 34h14m-5-6 6 6-6 6" stroke="#e08524" stroke-width="5.500" fill="none" stroke-linecap="round" stroke-linejoin="round"/></svg>
           <span>へやに はいる</span>
         </button>
       </div>
@@ -103,21 +111,20 @@
     <!-- 4 Play -->
     <section id="play" class="screen">
       <div id="swipe"></div>
+      <div id="sonar"><canvas id="sonar-cv" width="288" height="288"></canvas></div>
+      <div id="hud">
+        <div id="timer"><i data-ico="clock"></i><b id="t-val">10:00</b></div>
+        <div id="scorebar"><span class="sb me"><i data-ico="gem"></i>きみ <b id="s-me">0</b>こ</span><span class="sb op"><i data-ico="gem"></i>あいて <b id="s-op">0</b>こ</span></div>
+      </div>
       <div id="maptag"><b id="pt-title"></b><small id="pt-yomi"></small></div>
       <div id="notice"></div>
-      <div id="tip"><svg viewBox="0 0 64 32"><path d="M4 16h56M12 8 4 16l8 8M52 8l8 8-8 8" fill="none" stroke="#1f5fd9" stroke-width="5" stroke-linecap="round" stroke-linejoin="round"/></svg><span>ゆびを よこに うごかすと むきが かわるよ</span></div>
-      <div id="flash"><svg viewBox="0 0 24 24"><path d="M15 3 6 12l9 9" fill="none" stroke="#fff" stroke-width="4.4" stroke-linecap="round" stroke-linejoin="round"/></svg></div>
-      <div id="dpad">
-        <button type="button" class="ctl" data-act="fwd" tabindex="-1"><svg viewBox="0 0 24 24"><path d="M12 3l9 12H3z"/></svg><span>まえ</span></button>
-        <button type="button" class="ctl" data-act="left" tabindex="-1"><svg viewBox="0 0 24 24"><path d="M3 12l12-9v18z"/></svg><span>ひだり</span></button>
-        <button type="button" class="ctl" data-act="right" tabindex="-1"><svg viewBox="0 0 24 24"><path d="M21 12 9 3v18z"/></svg><span>みぎ</span></button>
-        <button type="button" class="ctl" data-act="back" tabindex="-1"><svg viewBox="0 0 24 24"><path d="M12 21 3 9h18z"/></svg><span>うしろ</span></button>
-      </div>
-      <button type="button" id="fire" class="ctl" data-act="fire" tabindex="-1">
-        <svg viewBox="0 0 64 64"><g fill="#fff"><rect x="6" y="30" width="34" height="14" rx="4" transform="rotate(-25 20 37)"/><circle cx="26" cy="46" r="13"/><circle cx="54" cy="12" r="5" fill="#222"/></g><circle cx="26" cy="46" r="6" fill="#d9480f"/></svg>
-        <span>うつ</span>
-      </button>
-      <button type="button" id="cam" tabindex="-1"><span class="camrow"><i id="cam-ico"></i></span><span id="cam-label">おいかけ</span></button>
+      <div id="pop"></div>
+      <div id="tip"><svg viewBox="0 0 64 32"><path d="M4 16h56M12 8 4 16l8 8M52 8l8 8-8 8" fill="none" stroke="#2b2118" stroke-width="5" stroke-linecap="round" stroke-linejoin="round"/></svg><span>ゆびを よこに うごかすと むきが かわるよ</span></div>
+      <button type="button" id="fwd" class="ctl" data-act="fwd" tabindex="-1"><i data-ico="fwd"></i><span>すすむ</span></button>
+      <button type="button" id="b-jump" class="ctl act" data-act="jump" tabindex="-1"><i data-ico="jump"></i><span>ジャンプ</span></button>
+      <button type="button" id="b-attack" class="ctl act" data-act="drillAttack" tabindex="-1"><i data-ico="attack"></i><span>ドリル<br>アタック</span></button>
+      <button type="button" id="b-dj" class="ctl act" data-act="drillJump" tabindex="-1"><i data-ico="drilljump"></i><span>ドリル<br>ジャンプ</span></button>
+      <button type="button" id="cam" tabindex="-1"><i id="cam-ico"></i><span id="cam-label">おいかけ</span></button>
     </section>
 
     <!-- 5 Ending -->
@@ -125,7 +132,7 @@
       <div id="confetti"></div>
       <div class="endleft">
         <div class="found" id="end-found">みつけた！</div>
-        <div class="who"><i id="end-disc"></i><span id="end-who"></span></div>
+        <div class="who" id="end-who"></div>
         <div class="endrec" id="end-rec"></div>
         <div class="endtitle" id="end-title"></div>
         <div class="endyomi" id="end-yomi"></div>
@@ -136,12 +143,11 @@
     <!-- 6 Quit -->
     <section id="quit" class="screen">
       <div class="center">
-        <div data-logo="0.55"></div>
+        <div data-logo="0.7"></div>
         <div class="bye">おしまい またね！</div>
       </div>
     </section>
 
-    <div id="boom">ドゴォーン！</div>
     <div id="nav"></div>
     <button type="button" id="home" aria-label="ホーム" tabindex="-1"><svg viewBox="0 0 24 24"><path d="M12 3 1.500 12.500H5V21h5.500v-6h3v6H19v-8.500h3.500z"/></svg></button>
 
