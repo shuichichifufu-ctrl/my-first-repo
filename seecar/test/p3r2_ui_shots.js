@@ -15,10 +15,11 @@ const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
     await page.click('.card[data-id=mikka]', { force: true }); await sleep(1200);
     await nav('しゅっぱつ！'); await sleep(1800);
     await page.screenshot({ path: OUT + tag + 'start_tip.png' });
-    await page.screenshot({ path: OUT + tag + 'sonar_arrow.png', clip: { x: 0, y: 0, width: Math.min(vw, vh) * 0.4, height: Math.min(vw, vh) * 0.4 } });
+    await page.screenshot({ path: OUT + tag + 'sonar_arrow.png', clip: await page.evaluate(() => { const r = document.getElementById('sonar').getBoundingClientRect(); return { x: Math.max(0, r.left - 8), y: Math.max(0, r.top - 8), width: r.width + 16, height: r.height + 16 }; }) });
     const info = await page.evaluate(() => { const r = document.getElementById('tip').getBoundingClientRect(); const o = {}; ['b-attack', 'b-dj', 'b-jump', 'fwd'].forEach((i) => { const b = document.getElementById(i).getBoundingClientRect(); o[i] = [b.left | 0, b.top | 0, b.right | 0, b.bottom | 0]; }); return { tip: [r.left | 0, r.top | 0, r.right | 0, r.bottom | 0], o, s: World.sonar(200) }; });
     console.log(tag, JSON.stringify(info));
-    const crop = { x: 0, y: 0, width: Math.min(vw, vh) * 0.4, height: Math.min(vw, vh) * 0.4 };
+    const sr = await page.evaluate(() => { const r = document.getElementById('sonar').getBoundingClientRect(); return { x: Math.max(0, r.left - 8), y: Math.max(0, r.top - 8), width: r.width + 16, height: r.height + 16 }; });
+    const crop = sr;
     const stub = async (items, name) => {
       await page.evaluate((it) => { if (!window.__so) window.__so = World.sonar; World.sonar = () => ({ heading: 0, items: it }); }, items);
       await sleep(250); await page.screenshot({ path: OUT + tag + name + '.png', clip: crop });

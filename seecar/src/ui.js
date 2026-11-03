@@ -881,13 +881,13 @@
     // ふち（クリーム色とこい線）と 12時の しるし
     g.beginPath(); g.arc(c, c, R, 0, Math.PI * 2); g.lineWidth = 8; g.strokeStyle = '#fff4d6'; g.stroke();
     g.beginPath(); g.arc(c, c, R + 4, 0, Math.PI * 2); g.lineWidth = 3.500; g.strokeStyle = INK; g.stroke();
-    g.beginPath(); g.moveTo(c, c - R + 2); g.lineTo(c - 9, c - R - 8); g.lineTo(c + 9, c - R - 8); g.closePath(); g.fillStyle = '#ffe400'; g.fill(); g.lineWidth = 3; g.strokeStyle = INK; g.stroke();
+    g.beginPath(); g.moveTo(c, c - R + 2); g.lineTo(c - 9, c - R - 8); g.lineTo(c + 9, c - R - 8); g.closePath(); g.fillStyle = '#fff4d6'; g.fill(); g.lineWidth = 3; g.strokeStyle = INK; g.stroke();
     // 円の外の宝：ふちに くさび形の矢印（近いほど大きく・明るく）
     if (far) {
       var fsx = (far.dx * -fz + far.dz * fx), fsy = -(far.dx * fx + far.dz * fz);
       var ang = Math.atan2(fsy, fsx), kk = Math.max(0, Math.min(1, 1 - (far.dist - SONAR_R) / 90));
       var fb = 0.5 + 0.5 * Math.sin(T / 260);
-      var len = 18 + 26 * kk, hw = 9 + 13 * kk, tip = R + 8 + 1.5 * fb, base = tip - len;
+      var len = 22 + 24 * kk, hw = 11 + 11 * kk, tip = R + 8 + 1.5 * fb, base = tip - len;
       g.save(); g.translate(c, c); g.rotate(ang);
       g.beginPath(); g.moveTo(tip, 0); g.lineTo(base, -hw); g.lineTo(base + len * 0.28, 0); g.lineTo(base, hw); g.closePath();
       g.shadowColor = 'rgba(255,230,0,' + (0.6 + 0.4 * kk).toFixed(2) + ')'; g.shadowBlur = 10 + 14 * kk;

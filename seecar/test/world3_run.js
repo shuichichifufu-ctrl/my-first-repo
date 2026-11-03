@@ -4,6 +4,7 @@
 // スクリーンショットは実際の描画ループで撮る（test/shots/p3_world_*.png）。
 const { openPage, stopStatic } = require('/home/user/my-first-repo/seecar/test/harness.js');
 const SHOT = '/home/user/my-first-repo/seecar/test/shots/p3_world_';
+const SHOT2 = '/home/user/my-first-repo/seecar/test/shots/p3r2_world_'; // 第3期 r2 の確認画像
 const wait = (ms) => new Promise((r) => setTimeout(r, ms));
 let fails = 0;
 const ok = (name, cond, info = '') => { if (!cond) fails++; console.log((cond ? 'OK  ' : 'NG  ') + name + (info ? '  ' + info : '')); };
@@ -11,6 +12,10 @@ const E = Math.PI / 2; // heading：0=北(-z)、-E=東(+x)、E=西、PI=南
 
 (async () => {
   const { browser, page, errors } = await openPage('/home/user/my-first-repo/seecar/test/world3_test.html', { viewport: { width: 1024, height: 576 } });
+  // World の中で飲みこまれた例外（console.warn 'World loop error' など）もエラーとして数える
+  page.on('console', (m) => { if (m.type() === 'warning' && /World (loop|handler) error|SeekerModel\.update failed/.test(m.text())) errors.push('warn: ' + m.text()); });
+  // 確認用の画像：_step で時間を進めて止めた場面を、描画が追いつくのを待ってから撮る（作業環境は描画が遅い）
+  const snap = async (name) => { await wait(1500); await page.screenshot({ path: SHOT2 + name + '.png' }); };
   const ev = (fn, arg) => page.evaluate(fn, arg);
   const dbg = (x, z) => ev(([x, z]) => World._debug(x, z), [x, z]);
   const step = (n, dt) => ev(([n, dt]) => World._step(n, dt), [n, dt || 1 / 30]);
@@ -244,6 +249,84 @@ const E = Math.PI / 2; // heading：0=北(-z)、-E=東(+x)、E=西、PI=南
     ok(`見本の地図「${id}」：CPU（むずかしい）が宝を拾う`, JSON.stringify(rr.f) === '[1]', `cpuTime=${rr.d.cpu.time.toFixed(1)}s attacks=${rr.d.cpu.attacks} digs=${rr.d.cpu.digs} jumps=${rr.d.cpu.jumps}`);
   }
 
+
+  // ---------- 11. 第3期 r2：目じるし・ドリルの深さ・カメラ ----------
+  // 11a. 埋まっている宝の目じるし：見本の地図2つで、出発直後のおいかけ視点に入る（20マス前後先）・掘り出したら消える
+  for (const id of ['jiyu', 'shiho']) {
+    const hi = await ev((id) => {
+      const m = MapGen.fromPreset(id, { treasureCount: 1 }); resetEvents();
+      World.load(m, { myIndex: 0, players: [{ color: '#e08524' }, { color: '#2f8be0' }], net: false, cpu: { level: 'normal' }, mode: 'race' });
+      World.setCamera(0); World.setCamera(1); World._step(45);
+      return World._hintInfo();
+    }, id);
+    ok(`目じるし（${id}）：出発直後のおいかけ視点の画面に入る`, hi.length === 1 && hi[0].on && hi[0].onScreen && hi[0].dist >= 15, JSON.stringify(hi));
+    await snap('start_' + id);
+  }
+  let hi2 = await ev(() => { const t = World._debug().treasures[0]; World.applyRemoteTerrain([[t.x, t.z, 0]]); World._step(5); return World._hintInfo(); });
+  ok('目じるし：宝が出たら消える（宝石の光にかわる）', hi2[0].revealed && !hi2[0].on, JSON.stringify(hi2));
+  hi2 = await ev(() => { const T10 = []; for (let k = 0; k < 10; k++) T10.push({ x: 3 + (k % 5) * 6, z: 4 + Math.floor(k / 5) * 12 }); const m = flatMap(34, 24, T10); loadMap(m, { mode: 'count' }); return { h: World._hintInfo(), calls0: World._debug().calls }; });
+  ok('目じるし：count モードでは10この山 すべてに出る', hi2.h.length === 10 && hi2.h.every((h) => h.on), JSON.stringify(hi2.h.map((h) => h.on)));
+
+  // 11b. ドリルジャンプ：掘っている間、ドリルの先が掘っているマスの上面より下に入る
+  await ev(() => { const m = flatMap(20, 20, [{ x: 10, z: 10 }]); loadMap(m, { mode: 'solo' }); World._setPose(10.5, 10.5, 0); });
+  const bores = [];
+  for (let rep = 0; rep < 2; rep++) {
+    await ev(() => { World.press('drillJump', true); World.press('drillJump', false); });
+    for (let k = 0; k < 90; k++) {
+      const r = await ev(() => { World._step(1); const d = World._debug(); return d.me.act === 'drillJump:bore' ? World._meLow() : null; });
+      if (r) bores.push(r);
+    }
+  }
+  const deep = bores.length ? Math.min(...bores.map((b) => b.low - b.top)) : 9;
+  ok('ドリルジャンプ：ドリルの先が掘っているマスに入る（上面より下）', bores.length > 5 && deep < -0.2, `いちばん深い所 ${deep.toFixed(2)}（上面からの差）tip=${bores[0] && bores[0].tip.toFixed(3)}`);
+
+  // 11c. ドリルアタック中はカメラが右上へずれ、終わると戻る
+  await ev(() => { const m = flatMap(20, 20, []); m.set(10, 9, 10); loadMap(m, { mode: 'solo' }); World._setPose(10.5, 10.5, 0); World.press('drillAttack', true); World.press('drillAttack', false); });
+  let cam = await ev(() => { World._step(10); return World._cam(); });
+  ok('ドリルアタック中：カメラを横・上へずらす', cam.atk > 0.6, JSON.stringify(cam));
+  cam = await ev(() => { World._step(90); return World._cam(); });
+  ok('ドリルアタックのあと：カメラが戻る', cam.atk < 0.1, JSON.stringify(cam));
+
+  // 11d. 止まっていると回りこんで顔を見せる（向きは変えない）。すすむ で すぐ戻る
+  await ev(() => { const m = flatMap(20, 20, []); loadMap(m, { mode: 'solo' }); World._setPose(10.5, 14.5, 0); });
+  cam = await ev(() => { World._step(120); return World._cam(); });
+  ok('出発してすぐ（まだ動いていない）は回りこまない', cam.orbit < 0.01, JSON.stringify(cam));
+  await ev(() => { World.press('fwd', true); World._step(10); World.press('fwd', false); });
+  const hd0 = (await dbg()).me.heading;
+  cam = await ev(() => { World._step(150); return World._cam(); });
+  const hd1 = (await dbg()).me.heading;
+  ok('止まって約3秒で回りこむ・向き（操作）は変わらない', cam.orbit > 0.8 && hd0 === hd1, JSON.stringify(cam));
+  cam = await ev(() => { World.press('fwd', true); World._step(10); const c = World._cam(); World.press('fwd', false); return c; });
+  ok('すすむ を押すと すぐ後ろへ戻る', cam.orbit < 0.25, JSON.stringify(cam));
+
+  // 11e. おいかけ視点で、カメラとの間の壁は薄く透かす
+  await ev(() => { const m = flatMap(20, 24, []); for (let z = 6; z < 20; z++) { m.set(11, z, 10); m.set(12, z, 10); m.set(9, z, 10); } loadMap(m, { mode: 'solo' }); World._setPose(10.5, 12.5, 0); World._step(30); });
+  let fade = await ev(() => World._fading());
+  ok('1マスの通路で、シーカーを隠す横の壁を透かす', fade > 0, `透かしているマス ${fade}`);
+  await ev(() => { const m = flatMap(20, 24, []); loadMap(m, { mode: 'solo' }); World._setPose(10.5, 12.5, 0); World._step(30); });
+  fade = await ev(() => World._fading());
+  ok('間に壁がなければ透かさない', fade === 0, `${fade}`);
+
+  // 11f. 拾った同じコマで UI が World.stop() を呼んでも、内部のエラーが出ない（第3期 r1 の 'reading parts'）
+  {
+    const warnBefore = errors.length;
+    const r = await ev(() => {
+      const m = flatMap(20, 20, [{ x: 10, z: 10 }]); loadMap(m, { mode: 'solo' });
+      World.applyRemoteTerrain([[10, 10, 0], [9, 10, 0]]); World._step(20);
+      World._setPose(9.5, 10.5, -Math.PI / 2);
+      window.stopNow = function () { World.stop(); };
+      World.on('found', window.stopNow);
+      let err = null;
+      try { World.press('fwd', true); World._step(40); } catch (e) { err = String(e); }
+      World.press('fwd', false);
+      World.off('found', window.stopNow);
+      const out = { err, found: events.found.slice(), running: World._debug().running };
+      World.init(document.getElementById('wrap')); World.load(window.testMap, { myIndex: 0, players: [{ color: '#e08524' }, { color: '#2f8be0' }], net: false, mode: 'solo' }); World.start();
+      return out;
+    });
+    ok('拾った瞬間に World.stop() されても例外が出ない', !r.err && JSON.stringify(r.found) === '[0]' && errors.length === warnBefore, JSON.stringify(r));
+  }
+
   // ---------- 9. スクリーンショット（描画ループで） ----------
   await ev(() => World._manual(false));
   await ev(() => { const m = window.testMap; resetEvents(); World.load(m, { myIndex: 0, players: [{ color: '#e08524' }, { color: '#2f8be0' }], net: false, cpu: { level: 'normal' }, mode: 'race' }); });
@@ -279,6 +362,57 @@ const E = Math.PI / 2; // heading：0=北(-z)、-E=東(+x)、E=西、PI=南
   await ev(() => { resetEvents(); World.load(window.testMap, { myIndex: 0, players: [{ color: '#e08524' }, { color: '#2f8be0' }], net: false, cpu: { level: 'easy' }, mode: 'race' }); World.setCamera(0); World.setCamera(1); World._setPose(26.5, 41.5, 0); });
   await wait(2500);
   await page.screenshot({ path: SHOT + 'cpu_view.png' });
+
+
+  // ---------- 12. 第3期 r2 の確認画像（_step で場面を作って撮る）＋ 拾ったあと1.6秒の演出の間エラーが出ないこと ----------
+  await ev(() => World._manual(true));
+  const loadTest = () => ev(() => { resetEvents(); World.load(window.testMap, { myIndex: 0, players: [{ color: '#e08524' }, { color: '#2f8be0' }], net: false, mode: 'solo' }); World.setCamera(0); World.setCamera(1); World._step(40); });
+  // ドリルアタック：正面の積み木 (20,27) 高さ4 が壊れた直後
+  await loadTest();
+  await ev(() => { World._setPose(20.5, 28.5, 0); World.press('fwd', true); World._step(3); World.press('fwd', false); World._setPose(20.5, 28.5, 0); World._step(10); World.press('drillAttack', true); World.press('drillAttack', false); World._step(13); });
+  ok('（画像）ドリルアタックで正面が壊れた', (await hOf(20, 27)) === 0);
+  await snap('attack');
+  // ドリルジャンプ：高さ3の積み木の上で潜っているところ
+  await loadTest();
+  await ev(() => { World._setPose(15.5, 26.5, -Math.PI / 2); World._step(10); World.press('drillJump', true); World.press('drillJump', false); for (let k = 0; k < 120; k++) { World._step(1); if (World._debug().me.act === 'drillJump:bore') break; } World._step(7); });
+  const bl = await ev(() => World._meLow());
+  ok('（画像）ドリルジャンプで潜っている：先がマスの中', bl.low < bl.top, JSON.stringify(bl));
+  await snap('djump_bore');
+  // 横の壁の通路：透かし
+  await loadTest();
+  await ev(() => { World._setPose(31.5, 30.5, 0); World.press("fwd", true); World._step(3); World.press("fwd", false); World._setPose(31.5, 30.5, 0); World._step(30); });
+  await snap('wall_side');
+  // 止まっているとき（回りこんで顔と星）
+  await loadTest();
+  await ev(() => { World._setPose(20.5, 34.5, 0); World.press('fwd', true); World._step(12); World.press('fwd', false); World._step(150); });
+  ok('（画像）止まっているときは回りこんでいる', (await ev(() => World._cam().orbit)) > 0.8);
+  await snap('idle_face');
+  // 拾った瞬間：UI と同じく1.6秒あとに stop する。その間に宝石が飛んでくる・顔が見える・エラーが出ない
+  {
+    const warnBefore = errors.length;
+    await loadTest();
+    await ev(() => {
+      World.applyRemoteTerrain([[34, 12, 0], [34, 13, 0]]); World._step(20);
+      World._setPose(34.5, 13.7, 0);
+      window.colT = -1;
+      window.lateStop = function () { window.colT = World._debug().time; }; // 拾った時刻だけ記録（stop は撮影のあとで、UI と同じ1.6秒待って呼ぶ）
+      World.on('found', window.lateStop);
+      World.press('fwd', true);
+      for (let k = 0; k < 60 && window.colT < 0; k++) World._step(1);
+      World.press('fwd', false);
+      World._step(12); // 宝石がシーカーへ飛んでいる途中
+    });
+    await snap('pickup_fly');
+    await ev(() => World._step(26)); // とどいて きらきら・回りこみ
+    await snap('pickup_face');
+    const pk = await ev(() => ({ colT: window.colT, cam: World._cam(), t: World._debug().treasures[0] }));
+    await ev(() => { World._manual(false); setTimeout(function () { World.stop(); window.stopped = true; }, 1600); });
+    for (let k = 0; k < 40 && !(await ev(() => !!window.stopped)); k++) await wait(250);
+    await ev(() => World.off('found', window.lateStop));
+    ok('拾ったあと1.6秒の演出（宝石が飛ぶ・回りこむ）→ stop でエラーなし', pk.colT >= 0 && pk.t.taken && pk.cam.orbit > 0.5 && errors.length === warnBefore, JSON.stringify(pk));
+    await ev(() => { World.init(document.getElementById('wrap')); World.load(window.testMap, { myIndex: 0, players: [{ color: '#e08524' }, { color: '#2f8be0' }], net: false, mode: 'solo' }); World.start(); });
+  }
+  await ev(() => World._manual(false));
 
   // ---------- 10. stop → init → load → start ----------
   await ev(() => { World.stop(); World.init(document.getElementById('wrap')); World.load(window.testMap, { myIndex: 0, players: [{ color: '#e08524' }, { color: '#2f8be0' }], net: true, cpu: { level: 'hard' }, mode: 'race' }); World.start(); });

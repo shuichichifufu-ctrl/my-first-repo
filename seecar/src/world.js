@@ -37,6 +37,7 @@
   var CAM_BLEND = 0.9;
   var DEBRIS_MAX = 600, PUFF_MAX = 64;
   var GEM_R = 0.42, GEM_Y = 0.95; // 宝石の大きさと高さ
+  var GEM_FLY = 0.85;             // 拾った宝石がシーカーへ飛ぶ時間（UI は拾ってから約1.6秒で結果へ）
   var SOIL = [0.851, 0.725, 0.549]; // 土の山の色 #d9b98c（淡いクレヨンの茶色）
   var SOIL_BLOCK = [0.76, 0.56, 0.36]; // 積み木として塗る色（紙の白とクレヨンの質感が重なると #d9b98c くらいに見える）
   var SOIL_DUG = [196, 162, 116];   // 掘ったあとの地面の色
@@ -100,6 +101,18 @@
     for (i = 0; i < 10; i++) { var rr2 = i % 2 ? 9 : 30, an = i / 10 * Math.PI * 2 - Math.PI / 2; g.lineTo(Math.cos(an) * rr2, Math.sin(an) * rr2); }
     g.closePath(); g.fillStyle = '#fff'; g.shadowColor = '#fff'; g.shadowBlur = 8; g.fill();
     T.star = new THREE.CanvasTexture(c);
+
+    // 目じるしの星（白い紙の上でも空でも見えるよう、こい だいだい色のふち＋金色＋白いまん中）
+    c = makeCanvas(64, 64); g = c.getContext('2d');
+    g.translate(32, 32);
+    function starPath(ro, ri) { g.beginPath(); for (var j = 0; j < 10; j++) { var rj = j % 2 ? ri : ro, aj = j / 10 * Math.PI * 2 - Math.PI / 2; g.lineTo(Math.cos(aj) * rj, Math.sin(aj) * rj); } g.closePath(); }
+    gr = g.createRadialGradient(0, 0, 0, 0, 0, 31);
+    gr.addColorStop(0, 'rgba(255,240,150,0.55)'); gr.addColorStop(1, 'rgba(255,200,60,0)');
+    g.fillStyle = gr; g.fillRect(-32, -32, 64, 64);
+    starPath(27, 11.5); g.lineJoin = 'round'; g.lineWidth = 5; g.strokeStyle = '#c4570f'; g.stroke();
+    g.fillStyle = '#ffc61a'; g.fill();
+    starPath(13, 5.5); g.fillStyle = '#fff7cf'; g.fill();
+    T.hint = new THREE.CanvasTexture(c);
 
     // 光の柱（下が明るく、上へ消える）
     c = makeCanvas(4, 128); g = c.getContext('2d');
@@ -221,6 +234,7 @@
     '  vWP = (modelMatrix * cw).xyz;',
     '  vNl = normal;',
     '  vEdge = aEdge;',
+  '  vFade = aFade;',
     '}'
   ].join('\n');
   var BLOCK_FRAG = [
@@ -259,6 +273,13 @@
     '  diffuseColor.rgb += rim * 0.2 * vec3(1.0, 0.97, 0.9);',
     '}'
   ].join('\n');
+  // カメラとシーカーの間にある積み木を、網目に抜いて薄く透かす（aFade 0..1。並べ替え不要で描画命令も増えない）
+  var BLOCK_DITHER = [
+    'if (vFade > 0.01) {',
+    '  float bx = mod(floor(gl_FragCoord.x), 2.0), by = mod(floor(gl_FragCoord.y), 2.0);',
+    '  if (vFade > (2.0 * bx + 3.0 * by - 4.0 * bx * by) / 4.0 + 0.125) discard;',
+    '}'
+  ].join('\n');
   // MeshLambertMaterial にクレヨンの質感を足す（描画命令の数は変わらない）
   function crayonize(mat, mode, rep) {
     var uDetail = { value: T.detail }, uRep = { value: rep || new THREE.Vector2(1, 1) };
@@ -271,10 +292,11 @@
           .replace('#include <map_fragment>', '#include <map_fragment>\n' + FLOOR_FRAG);
       } else {
         sh.vertexShader = sh.vertexShader
-          .replace('#include <common>', '#include <common>\nattribute float aEdge;\nvarying vec3 vWP;\nvarying vec3 vNl;\nvarying float vEdge;\nvarying vec3 vCell;')
+          .replace('#include <common>', '#include <common>\nattribute float aEdge;\nattribute float aFade;\nvarying float vFade;\nvarying vec3 vWP;\nvarying vec3 vNl;\nvarying float vEdge;\nvarying vec3 vCell;')
           .replace('#include <begin_vertex>', '#include <begin_vertex>\n' + BLOCK_VERT);
         sh.fragmentShader = sh.fragmentShader
-          .replace('#include <common>', '#include <common>\nuniform sampler2D uDetail;\nvarying vec3 vWP;\nvarying vec3 vNl;\nvarying float vEdge;\nvarying vec3 vCell;')
+          .replace('#include <common>', '#include <common>\nuniform sampler2D uDetail;\nvarying float vFade;\nvarying vec3 vWP;\nvarying vec3 vNl;\nvarying float vEdge;\nvarying vec3 vCell;')
+          .replace('#include <clipping_planes_fragment>', '#include <clipping_planes_fragment>\n' + BLOCK_DITHER)
           .replace('#include <color_fragment>', '#include <color_fragment>\n' + BLOCK_FRAG);
       }
     };
@@ -424,13 +446,24 @@
     me: null, cpu: null, remotes: {}, held: {}, tapQ: {},
     camMode: 1, camBlendT: 1, camFrom: null, chaseLift: 0, camY: 0, intro: null, topFlag: null,
     shake: 0, stateAcc: 0, over: false, treasures: [], scores: [0, 0],
-    fx: null, mapVer: 0, pitch: 0, pitchV: 0, aim: null, swipeV: 0
+    fx: null, mapVer: 0, pitch: 0, pitchV: 0, aim: null, swipeV: 0,
+    orbitK: 0, idleT: 0, faceHold: 0, atkK: 0, atkHold: 0, hints: null, moved: false
   };
   var handlers = { found: [], collect: [], terrain: [], state: [], action: [], cam: [], done: [] };
+  // 1コマの計算（update）の途中で出たイベントは、そのコマの計算が終わってから知らせる。
+  // （第3期 r1：宝を拾った瞬間に UI が World.stop() を呼ぶと、同じコマの続きの計算が消えた演出（S.fx=null）を読んで
+  //   'World loop error … reading parts' が出ていた。計算を終えてから知らせれば、途中で止められることがない）
+  var evQ = null;
   function emit(ev) {
     var list = handlers[ev]; if (!list) return;
     var args = Array.prototype.slice.call(arguments, 1);
+    if (evQ) { evQ.push([ev, args]); return; }
     list.slice().forEach(function (fn) { try { fn.apply(null, args); } catch (e) { console.warn('World handler error', e); } });
+  }
+  function flushEvents() {
+    var q = evQ; evQ = null;
+    if (!q) return;
+    for (var k = 0; k < q.length; k++) { var e = q[k]; emit.apply(null, [e[0]].concat(e[1])); }
   }
 
   // ---------- 初期化 ----------
@@ -545,6 +578,7 @@
     p.s0 = opt.s0 || 0.3; p.s1 = opt.s1 || 0.9; p.a0 = opt.a == null ? 0.75 : opt.a;
     p.sp.scale.setScalar(p.s0); p.sp.material.opacity = p.a0; p.sp.visible = true;
   }
+  var tmpV2 = new THREE.Vector2();
   var tmpM = new THREE.Matrix4(), tmpQ = new THREE.Quaternion(), tmpE = new THREE.Euler(), tmpV = new THREE.Vector3(), tmpS = new THREE.Vector3(), tmpC = new THREE.Color(), tmpE2 = new THREE.Color();
   // 土のかけら（小さく、低く飛ぶ）
   function spawnDebris(x, y, z, color, n, power) {
@@ -602,6 +636,7 @@
 
   function updateFx(dt) {
     var fx = S.fx, i;
+    if (!fx) return;
     if (fx.parts.length) {
       for (i = fx.parts.length - 1; i >= 0; i--) {
         var p = fx.parts[i];
@@ -679,7 +714,7 @@
     if (S.me) disposeActor(S.me);
     if (S.cpu) disposeActor(S.cpu);
     for (var k in S.remotes) disposeActor(S.remotes[k]);
-    S.level = null; S.me = null; S.cpu = null; S.remotes = {}; S.map = null; S.treasures = []; S.aim = null;
+    S.level = null; S.me = null; S.cpu = null; S.remotes = {}; S.map = null; S.treasures = []; S.aim = null; S.hints = null;
     if (S.gemLight) S.gemLight.intensity = 0;
   }
 
@@ -725,6 +760,11 @@
     var st = (map.starts && map.starts[S.myIndex]) || { x: 1, z: 1, dir: 0 };
     S.me = makeActor(S.myIndex, colorOf(S.myIndex), st);
     add(S.me.root);
+    // 宝1つのモードでは、出発のとき宝の方を向く（目じるしの星が正面に見える）
+    if (S.mode !== 'count' && S.treasures.length) {
+      var t0 = S.treasures[0], tdx = t0.x + 0.5 - S.me.wx, tdz = t0.z + 0.5 - S.me.wz;
+      if (Math.hypot(tdx, tdz) > 1) S.me.heading = Math.atan2(-tdx, -tdz);
+    }
     buildAim(L, add, S.me.color);
     if (cpuOpt) {
       var ci = S.myIndex === 1 ? 0 : 1;
@@ -744,6 +784,7 @@
       }
     }
     S.camBlendT = 1; S.chaseLift = 0; S.camY = S.me.y;
+    S.orbitK = 0; S.idleT = 0; S.faceHold = 0; S.atkK = 0; S.atkHold = 0; S.moved = false;
     S.camera.far = overheadHeight() * 1.6 + 60; S.camera.updateProjectionMatrix();
     S.camMode = 1; S.intro = { t: 0 }; S.topFlag = null; // 開始演出：真上から → おいかけへ
     var pose = poseFor(2);
@@ -796,6 +837,9 @@
     var edgeAttr = new THREE.InstancedBufferAttribute(edgeArr, 1);
     edgeAttr.setUsage(THREE.DynamicDrawUsage);
     geo.setAttribute('aEdge', edgeAttr);
+    var fadeAttr = new THREE.InstancedBufferAttribute(new Float32Array(Math.max(1, n)), 1);
+    fadeAttr.setUsage(THREE.DynamicDrawUsage);
+    geo.setAttribute('aFade', fadeAttr);
     var mat = crayonize(new THREE.MeshLambertMaterial({ vertexColors: true }), 'block');
     var mesh = new THREE.InstancedMesh(geo, mat, Math.max(1, n));
     mesh.instanceMatrix.setUsage(THREE.DynamicDrawUsage);
@@ -817,7 +861,7 @@
     mesh.instanceMatrix.needsUpdate = true;
     if (mesh.instanceColor) mesh.instanceColor.needsUpdate = true;
     add(mesh);
-    L.terrain = mesh; L.cellToInst = cellToInst; L.edgeAttr = edgeAttr;
+    L.terrain = mesh; L.cellToInst = cellToInst; L.edgeAttr = edgeAttr; L.fadeAttr = fadeAttr; L.fading = {};
     L.dispose.push(geo, mat);
   }
   // となりが低い（または地図の外）辺：1=北(z-1) 2=東(x+1) 4=南(z+1) 8=西(x-1)
@@ -989,6 +1033,76 @@
         revealed: false, revealT: 0, taken: false, by: -1, flyT: 0, flyTo: null, phase: rand(0, 6) });
     });
     S.treasures.forEach(function (t) { if (S.heights[idx(t.x, t.z)] === 0) { t.revealed = true; t.revealT = 1; } });
+    buildHints(L, add);
+  }
+  // 埋まっている宝の目じるし：土の山の上で、光の粒がゆらめき、ときどき星がきらっと光って昇る。
+  // 遠く（おいかけ視点で20マス以上先）からも見えるよう、画面の上で小さくなりすぎない（最小の大きさがある）。
+  // 宝そのものは見せない。全部の宝で1つの点の集まり（THREE.Points）＝描画命令は1つだけ。
+  var HINT_K = 4;              // 宝1つあたりの点：0=ゆらめく光の粒、1〜3=昇る星
+  var HINT_RISE = 1.7, HINT_CYCLE = 2.4, HINT_TOP = 3.8; // 星が昇る時間・くり返し・昇る高さ
+  var HINT_VERT = [
+    'attribute float aSize;', 'attribute float aAlpha;', 'attribute float aMin;',
+    'uniform float uScale;', 'uniform float uMinPx;',
+    'varying float vAlpha;',
+    'void main() {',
+    '  vec4 mv = modelViewMatrix * vec4(position, 1.0);',
+    '  gl_Position = projectionMatrix * mv;',
+    '  float px = aSize * uScale / max(0.1, -mv.z);',
+    '  gl_PointSize = aAlpha > 0.0 ? max(px, uMinPx * aMin) : 0.0;',
+    '  vAlpha = aAlpha;',
+    '}'
+  ].join('\n');
+  var HINT_FRAG = [
+    'uniform sampler2D uMap;', 'varying float vAlpha;',
+    'void main() {',
+    '  vec4 c = texture2D(uMap, vec2(gl_PointCoord.x, 1.0 - gl_PointCoord.y));',
+    '  float a = c.a * vAlpha;',
+    '  if (a < 0.03) discard;',
+    '  gl_FragColor = vec4(c.rgb, a);',
+    '}'
+  ].join('\n');
+  function buildHints(L, add) {
+    var n = S.treasures.length; if (!n) { S.hints = null; return; }
+    var N = n * HINT_K, geo = new THREE.BufferGeometry();
+    var pos = new THREE.BufferAttribute(new Float32Array(N * 3), 3), size = new THREE.BufferAttribute(new Float32Array(N), 1);
+    var alpha = new THREE.BufferAttribute(new Float32Array(N), 1), mn = new THREE.BufferAttribute(new Float32Array(N), 1);
+    [pos, size, alpha, mn].forEach(function (b) { b.setUsage(THREE.DynamicDrawUsage); });
+    geo.setAttribute('position', pos); geo.setAttribute('aSize', size); geo.setAttribute('aAlpha', alpha); geo.setAttribute('aMin', mn);
+    var mat = new THREE.ShaderMaterial({
+      uniforms: { uMap: { value: T.hint }, uScale: { value: 300 }, uMinPx: { value: 12 } },
+      vertexShader: HINT_VERT, fragmentShader: HINT_FRAG, transparent: true, depthWrite: false
+    });
+    var pts = new THREE.Points(geo, mat); pts.frustumCulled = false; pts.renderOrder = 8;
+    add(pts);
+    L.dispose.push(geo, mat);
+    S.hints = { pts: pts, pos: pos, size: size, alpha: alpha, mn: mn, mat: mat };
+  }
+  function updateHints() {
+    var H = S.hints; if (!H) return;
+    var cam = S.camera, vh = S.renderer ? S.renderer.getDrawingBufferSize(tmpV2).y : 600;
+    H.mat.uniforms.uScale.value = vh / (2 * Math.tan(THREE.MathUtils.degToRad(cam.fov / 2)));
+    H.mat.uniforms.uMinPx.value = Math.max(14, vh * 0.042); // 遠くても画面の高さの約4.2%より小さくしない
+    var t0 = S.time, P = H.pos.array, Sz = H.size.array, A = H.alpha.array, M = H.mn.array;
+    for (var k = 0; k < S.treasures.length; k++) {
+      var tr = S.treasures[k], b = k * HINT_K, on = !tr.revealed && !tr.taken;
+      var cx = tr.x + 0.5, cz = tr.z + 0.5, top = vis(S.heights[idx(tr.x, tr.z)]), ph = tr.phase;
+      // 0：ゆらめく光の粒（山の上、壁より少し高い所でふわふわ）
+      P[b * 3] = cx + Math.sin(t0 * 1.3 + ph) * 0.08; P[b * 3 + 1] = top + 1.9 + Math.sin(t0 * 2.1 + ph) * 0.15; P[b * 3 + 2] = cz + Math.cos(t0 * 1.1 + ph) * 0.08;
+      var tw = 0.5 + 0.5 * Math.sin(t0 * 4.2 + ph);
+      Sz[b] = 0.6 + 0.15 * tw; A[b] = on ? 0.8 + 0.2 * tw : 0; M[b] = 0.8 + 0.2 * tw;
+      // 1〜3：ときどき きらっと光って昇る星
+      for (var j = 1; j < HINT_K; j++) {
+        var q = b + j, u = ((t0 + ph) / HINT_CYCLE + (j - 1) / (HINT_K - 1)) % 1, tt = u * HINT_CYCLE / HINT_RISE;
+        if (!on || tt >= 1) { A[q] = 0; continue; }
+        var sw = Math.sin(tt * 9 + j * 2 + ph) * 0.18;
+        P[q * 3] = cx + sw; P[q * 3 + 1] = top + 0.6 + HINT_TOP * (1 - Math.pow(1 - tt, 1.6)); P[q * 3 + 2] = cz + Math.cos(tt * 7 + j) * 0.18;
+        var flash = tt < 0.18 ? 1 + 0.9 * Math.sin(tt / 0.18 * Math.PI) : 1; // 出た瞬間に きらっ
+        Sz[q] = 0.75 * flash * (1 - 0.35 * tt);
+        A[q] = tt < 0.06 ? tt / 0.06 : (tt > 0.72 ? (1 - tt) / 0.28 : 1);
+        M[q] = 1.1 * flash * (1 - 0.35 * tt);
+      }
+    }
+    H.pos.needsUpdate = true; H.size.needsUpdate = true; H.alpha.needsUpdate = true; H.mn.needsUpdate = true;
   }
   function checkReveal(withFx) {
     S.treasures.forEach(function (t) {
@@ -1016,7 +1130,13 @@
       var vis1 = 1;
       if (tr.taken) {
         // 拾った人のところへ飛んで小さくなる
-        tr.flyT = Math.min(1, tr.flyT + dt / 0.6);
+        var f0 = tr.flyT;
+        tr.flyT = Math.min(1, tr.flyT + dt / GEM_FLY);
+        if (f0 < 1 && tr.flyT >= 1 && a) { // 届いた：シーカーのまわりに きらきら
+          spawnStars(a.wx, a.y + 0.5, a.wz, 14, [0xffd23f, 0xff6cc4, 0xffffff, 0x7fe0ff]);
+          for (var pk = 0; pk < 6; pk++) { var pa = pk / 6 * Math.PI * 2; spawnPuff(a.wx + Math.cos(pa) * 0.5, a.y + 0.7, a.wz + Math.sin(pa) * 0.5, { color: 0xfff1a8, vx: Math.cos(pa) * 1.6, vy: 0.8, vz: Math.sin(pa) * 1.6, s0: 0.25, s1: 0.8, life: 0.7, a: 0.85 }); }
+          if (a === S.me) popText('やったー', a.wx, a.y + 2.3, a.wz, 1.0);
+        }
         var u = tr.flyT, a = tr.flyTo;
         var ax = a ? a.wx - tr.group.position.x : 0, az = a ? a.wz - tr.group.position.z : 0, ay = a ? a.y + 0.9 : 1;
         tr.gem.position.set(ax * u, gy + (ay - gy) * u + Math.sin(u * Math.PI) * 1.2, az * u);
@@ -1066,6 +1186,7 @@
     if (!t.revealed) { t.revealed = true; t.revealT = 1; }
     S.scores[who] = (S.scores[who] || 0) + 1;
     if (actor) { actor.hop = 1.2; spawnStars(actor.wx, actor.y + 0.6, actor.wz, 10, [0xffd23f, 0xff6cc4, 0xffffff]); }
+    if (actor && actor === S.me && (S.mode !== 'count' || !S.held.fwd)) S.faceHold = S.mode === 'count' ? 1.3 : 30; // 顔を見せる
     sfx('found');
     if (!remote) emit('collect', who, ti, scoresView());
     if (S.cpu && S.cpu.ai) S.cpu.ai.plan = null;
@@ -1306,7 +1427,7 @@
       a.y += a.vy * dt - 0.5 * DJ.g * dt * dt; a.vy -= DJ.g * dt; a.spin = 1.5;
       a.flip = Math.max(0, a.flip - dt / DJ.unflip);
       var gy = footInfo(a.wx, a.wz).y;
-      if (a.flip > 0 && a.y < gy + a.tip * a.flip) a.y = gy + a.tip * a.flip; // 逆さのまま地面にもぐらない
+      if (a.flip > 0 && a.vy < 0 && a.y < gy + a.tip * a.flip) a.y = gy + a.tip * a.flip; // 逆さのまま地面にもぐらない（潜った所から上がるときは そのまま）
       if (a.flip <= 0 && a.vy < 0 && a.y <= gy) { a.y = gy; land(a, Math.max(3.2, -a.vy)); a.act = null; a.spin = 0.15; }
       else if (A.pt > 3) { a.flip = 0; a.act = null; a.air = true; } // 念のため
     }
@@ -1343,6 +1464,7 @@
     if (ACTIONS.indexOf(action) < 0) return;
     if (!isDown) { S.held[action] = false; return; }
     if (S.paused) return;
+    S.idleT = 0;
     if (action === 'jump' || action === 'drillAttack' || action === 'drillJump') {
       if (!S.held[action]) S.tapQ[action] = 0.15; // 押した瞬間だけ（押しっぱなしで連続しない）。少しだけ先行入力を受ける
     }
@@ -1552,6 +1674,9 @@
   }
   // おいかけ視点：シーカーの後ろ上から heading の方向を見る（スワイプで回る）。シーカー（高さ1.7）の全身が画面の下寄りに入る
   var CHASE_BACK = 3.9, CHASE_UP = 3.2, CHASE_AHEAD = 3.6, CHASE_SIDE = 1.1; // 少し右うしろから：ロールケーキの端（星）も見える
+  var ATK_SIDE = 1.5, ATK_UP = 1.3, ATK_BACK = 0.6, ATK_HOLD = 0.9;          // ドリルアタック中のずらし
+  var ORBIT_YAW = 2.25, ORBIT_DIST = 3.0, ORBIT_UP = 1.75, IDLE_ORBIT = 2.6;  // 顔を見せる回りこみ（止まって2.6秒で）
+  var FADE_ON = 0.7;                                                          // 間の壁を透かす量（0.7＝4つに3つ抜く）
   var poseM = new THREE.Matrix4(), UP = new THREE.Vector3(0, 1, 0), NORTH = new THREE.Vector3(0, 0, -1);
   function poseFor(mode) {
     var p = new THREE.Vector3(), q = new THREE.Quaternion(), tg = new THREE.Vector3();
@@ -1565,8 +1690,17 @@
     } else if (mode === 1) {
       var pv = S.pitchV, up = CHASE_UP + (pv > 0 ? -pv * 1.2 : -pv * 2.6), ah = CHASE_AHEAD + pv * (pv > 0 ? 3 : 2.6);
       var rx = -fz, rz = fx; // 右
-      p.set(px - fx * CHASE_BACK + rx * CHASE_SIDE, py + up + S.chaseLift, pz - fz * CHASE_BACK + rz * CHASE_SIDE);
+      var back = CHASE_BACK, side = CHASE_SIDE, ak = ease(clamp(S.atkK, 0, 1)), ok = ease(clamp(S.orbitK, 0, 1));
+      // ドリルアタック：少し右・上へずれて、正面の壊れるマスが体のかげにならないように
+      side += ak * ATK_SIDE; up += ak * ATK_UP; back -= ak * ATK_BACK;
+      // 止まっているとき・拾ったとき：前ななめへ回りこんで、顔（目）と端の星を見せる（向き＝操作は変えない）
+      back += (ORBIT_DIST - back) * ok; up += (ORBIT_UP - up) * ok;
+      var rr = Math.hypot(back, side), th = Math.atan2(side, back) + ok * ORBIT_YAW;
+      var u = -Math.cos(th) * rr, v = Math.sin(th) * rr; // u=前、v=右
+      p.set(px + fx * u + rx * v, py + up + S.chaseLift * (1 - ok), pz + fz * u + rz * v);
       tg.set(px + fx * ah + rx * 0.25, py + 0.35 + pv * (pv > 0 ? 1.1 : 0.4) + S.chaseLift * 0.5, pz + fz * ah + rz * 0.25);
+      if (ak > 0) { tg.x += rx * ak * 0.5; tg.z += rz * ak * 0.5; }
+      if (ok > 0) tg.lerp(tmpV.set(px, py + 0.6, pz), ok);
       poseM.lookAt(p, tg, UP);
     } else {
       var hh = overheadHeight(), sx = overheadShift(hh);
@@ -1601,6 +1735,52 @@
     S.camMode = mode; S.camBlendT = 0;
     sfx('tap');
   }
+  // ドリルアタックのずらし（atkK）と、顔を見せる回りこみ（orbitK）
+  function updateCamFactors(dt) {
+    var me = S.me; if (!me) return;
+    if (!S.paused) {
+      if (me.act && me.act.name === 'drillAttack') S.atkHold = ATK_HOLD;
+      else S.atkHold = Math.max(0, S.atkHold - dt);
+      S.atkK += ((S.atkHold > 0 ? 1 : 0) - S.atkK) * (1 - Math.exp(-dt * (S.atkHold > 0 ? 7 : 2.5)));
+      var h = S.held, still = S.camMode === 1 && !S.intro && !me.act && !me.air && !h.fwd && !h.back && !h.left && !h.right && Math.abs(me.moveV) < 0.05;
+      if (Math.abs(me.moveV) > 0.3) S.moved = true; // 出発してすぐは回りこまない（行く先の目じるしを見せておく）
+      S.idleT = still && S.moved ? S.idleT + dt : 0;
+      if (S.faceHold > 0) S.faceHold = Math.max(0, S.faceHold - dt);
+      var want = (S.faceHold > 0 || S.idleT > IDLE_ORBIT) ? 1 : 0;
+      var rate = want ? (S.faceHold > 0 ? 2.6 : 1.1) : 6;
+      S.orbitK += (want - S.orbitK) * (1 - Math.exp(-dt * rate));
+      if (!want && S.orbitK < 0.002) S.orbitK = 0;
+    }
+  }
+  // カメラとシーカーの間で、シーカーを隠している積み木を薄く透かす
+  var occWant = {};
+  function updateOccluders(dt) {
+    var L = S.level, me = S.me; if (!L || !L.fadeAttr) return;
+    var k, want = occWant; for (k in want) delete want[k];
+    if (me && S.camMode === 1 && !S.intro && me.root.visible) {
+      var cp = S.camera.position, mcx = Math.floor(me.wx), mcz = Math.floor(me.wz);
+      for (var r = 0; r < 3; r++) {
+        var ty = me.y + (r === 0 ? 0.25 : r === 1 ? 0.65 : 1.05);
+        var dx = cp.x - me.wx, dy = cp.y - ty, dz = cp.z - me.wz, len = Math.hypot(dx, dy, dz);
+        var n = Math.ceil(len / 0.15);
+        for (var i = 1; i < n; i++) {
+          var t = i / n, x = me.wx + dx * t, y = ty + dy * t, z = me.wz + dz * t;
+          var cx = Math.floor(x), cz = Math.floor(z);
+          if (!inMap(cx, cz) || (cx === mcx && cz === mcz)) continue;
+          if (vis(S.heights[idx(cx, cz)]) > y) { var inst = L.cellToInst[idx(cx, cz)]; if (inst >= 0) want[inst] = 1; }
+        }
+      }
+    }
+    var arr = L.fadeAttr.array, fd = L.fading, changed = false, kk = 1 - Math.exp(-dt * 10);
+    for (k in want) if (!(k in fd)) fd[k] = 0;
+    for (k in fd) {
+      var tgt = want[k] ? FADE_ON : 0, cur = fd[k], nv = cur + (tgt - cur) * kk;
+      if (Math.abs(nv - tgt) < 0.02) nv = tgt;
+      if (nv !== cur || arr[k] !== nv) { arr[k] = nv; changed = true; }
+      if (nv === 0) delete fd[k]; else fd[k] = nv;
+    }
+    if (changed) L.fadeAttr.needsUpdate = true;
+  }
   var shakeV = new THREE.Vector3();
   function fitNear() {
     var want = Math.max(0.05, (S.camera.position.y - 10) * 0.25);
@@ -1615,6 +1795,7 @@
     }
     S.chaseLift += (chaseLiftTarget() - S.chaseLift) * (1 - Math.exp(-dt * 5));
     S.pitchV += (S.pitch - S.pitchV) * (1 - Math.exp(-dt * 10));
+    updateCamFactors(dt);
     var target = poseFor(S.camMode);
     var top = S.camMode === 2 || !!(S.intro && S.intro.t < INTRO_HOLD + 0.5);
     if (top !== S.topFlag) { S.topFlag = top; emit('cam', top); }
@@ -1647,6 +1828,8 @@
     } else { S.shake = 0; S.shakeOff = null; }
     fitNear();
     if (S.me) S.me.root.visible = !(S.camMode === 0 && S.camBlendT > 0.55);
+    updateOccluders(dt);
+    updateHints();
     var camH = S.camera.position.y;
     function mark(a) {
       if (!a) return;
@@ -1674,6 +1857,11 @@
     };
   }
   function update(dt) {
+    if (!S.level) return;
+    evQ = [];
+    try { updateBody(dt); } finally { flushEvents(); }
+  }
+  function updateBody(dt) {
     S.time += dt;
     updateMe(dt);
     updateCpu(dt);
@@ -1758,10 +1946,12 @@
     swipeTurn: function (dx) {
       dx = +dx; if (!isFinite(dx) || S.paused || !S.me || S.over) return;
       S.me.heading -= clamp(dx, -2, 2) * SWIPE_GAIN;
+      S.idleT = 0;
     },
     nudgePitch: function (dy) {
       dy = +dy; if (!isFinite(dy)) return;
       S.pitch = clamp(S.pitch + clamp(dy, -1, 1), -PITCH_MAX, PITCH_MAX);
+      S.idleT = 0;
     },
     resetPitch: function () { S.pitch = 0; },
     // ソナー：自分から半径 radius マス以内の、拾われていない宝（dx,dz は世界座標の差、depth は宝の上に残る段数）
@@ -1808,9 +1998,26 @@
     // 確認用（ゲームの進行には使わない）：n コマ分を すぐに進める（描画は待たない）
     _step: function (n, dt) {
       if (!S.level || S.paused) return;
-      for (var k = 0; k < (n | 0); k++) { update(dt || 1 / 30); updateCamera(dt || 1 / 30); }
+      for (var k = 0; k < (n | 0); k++) { if (!S.level) break; update(dt || 1 / 30); if (S.level) updateCamera(dt || 1 / 30); }
     },
     _plan: function () { return S.cpu ? planCpu(S.cpu) : null; },
+    // 確認用：埋まっている宝の目じるし（どの宝に出ているか、画面のどこに映るか、自分からの距離、間にある壁で隠れているか）
+    _hintInfo: function () {
+      var H = S.hints, me = S.me; if (!H || !me) return [];
+      S.camera.updateMatrixWorld(true);
+      return S.treasures.map(function (tr, k) {
+        var b = k * HINT_K, A = H.alpha.array, P = H.pos.array, on = false, best = null;
+        for (var j = 0; j < HINT_K; j++) {
+          if (A[b + j] <= 0) continue; on = true;
+          var v = new THREE.Vector3(P[(b + j) * 3], P[(b + j) * 3 + 1], P[(b + j) * 3 + 2]).project(S.camera);
+          var inS = v.z < 1 && Math.abs(v.x) <= 1 && Math.abs(v.y) <= 1;
+          if (inS && (!best || P[(b + j) * 3 + 1] > best.y)) best = { x: v.x, y: P[(b + j) * 3 + 1], sy: v.y };
+        }
+        return { i: k, on: on, onScreen: !!best, ndc: best ? [Math.round(best.x * 100) / 100, Math.round(best.sy * 100) / 100] : null, dist: Math.round(Math.hypot(tr.x + 0.5 - me.wx, tr.z + 0.5 - me.wz) * 10) / 10, revealed: tr.revealed, minPx: H.mat.uniforms.uMinPx.value };
+      });
+    },
+    _fading: function () { return S.level && S.level.fading ? Object.keys(S.level.fading).length : 0; },
+    _cam: function () { return { orbit: S.orbitK, atk: S.atkK, idle: S.idleT, face: S.faceHold }; },
     // 確認用：自分のシーカーのいちばん低い点（ドリルの先）の高さと、いまいるマスの上面
     _meLow: function () {
       var me = S.me; if (!me) return null;
