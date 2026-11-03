@@ -26,7 +26,7 @@
   var HAT_REST = -0.5;       // 帽子のふだんの傾き（後ろへ）
 
   var COL = { tan: 0xf0c46e, eye: 0x22e0a0, star: 0xd77fb8,
-              frame: 0x3b434c, plate: 0x8a97a4, cleat: 0x6f7c89, wheel: 0xa7b3be, hub: 0x2b2f35 };
+              frame: 0x3b434c, plate: 0x6d7a88, cleat: 0x6f7c89, wheel: 0xa7b3be, hub: 0x2b2f35 };
 
   /* ---- トゥーン調（段々の陰影）と黒い輪郭線 ---- */
   var grad = new T.DataTexture(new Uint8Array([90, 170, 255]), 3, 1, T.LuminanceFormat);
@@ -149,7 +149,7 @@
   }
 
   /* ---- 硬いキャタピラ：角のある金属の板が、すき間をあけて並んで回る ---- */
-  var TREAD_N = 26, TREAD_RP = 0.16, PLATE_T = 0.04, CLEAT = 0.025;
+  var TREAD_N = 26, TREAD_RP = 0.16, PLATE_T = 0.04, CLEAT = 0.012;
   var TRK_CY = TREAD_RP + PLATE_T / 2 + CLEAT;      // 板のでっぱりの下端がちょうど y=0 になる高さ
   var TREAD_PM = 2 * TRK_S + 2 * Math.PI * TREAD_RP;
   var _d = new T.Object3D();
@@ -175,8 +175,8 @@
   function getPlateGeo() {
     if (!plateGeo) {
       var w = TRK_W * 0.96;
-      var base = new T.BoxGeometry(w, PLATE_T, 0.083);
-      var cleat = new T.BoxGeometry(w * 0.82, CLEAT, 0.022);          // 外側のでっぱり（すべり止め）
+      var base = new T.BoxGeometry(w, PLATE_T, 0.09);
+      var cleat = new T.BoxGeometry(w, CLEAT, 0.03);          // 外側のでっぱり（すべり止め）
       cleat.translate(0, PLATE_T / 2 + CLEAT / 2, 0);
       plateGeo = mergeGeos([base, cleat]);
     }
@@ -217,7 +217,7 @@
     var need = 0;
     if (th < -0.35) need = (-0.35 - th) * 0.28;
     else if (th > -0.12) need = (th + 0.12) * 0.28;
-    return Math.max(0.06, need + 0.03);
+    return Math.max(0.075, need + 0.035);
   }
 
   var clamp = function (v, a, b) { return Math.max(a, Math.min(b, v)); };
@@ -249,14 +249,14 @@
     var eyeMat = new T.MeshBasicMaterial({ color: COL.eye });
     var eyeGeo = new T.SphereGeometry(1, 16, 12);
     var eyeL = new T.Mesh(eyeGeo, eyeMat), eyeR = new T.Mesh(eyeGeo, eyeMat);
-    eyeL.position.set(-0.1, CY, R + 0.04); eyeR.position.set(0.1, CY, R + 0.04);
-    eyeL.scale.set(0.065, 0.105, 0.03); eyeR.scale.set(0.065, 0.105, 0.03);
+    eyeL.position.set(-0.1, CY, R + 0.03); eyeR.position.set(0.1, CY, R + 0.03);
+    eyeL.scale.set(0.065, 0.105, 0.025); eyeR.scale.set(0.065, 0.105, 0.025);
     inner.add(visor, eyeL, eyeR);
 
     // ドリルになる帽子＋短い黒い棒（傘の柄）。根元 hatPivot はボディの上に乗る
     var stripeTex = makeStripeTexture();
     var hatPivot = new T.Group(); hatPivot.name = 'hat';
-    var pole = new T.Mesh(new T.CylinderGeometry(0.035, 0.035, 1, 10), inkBasic);   // 高さ1 を伸縮して長さにする
+    var pole = new T.Mesh(new T.CylinderGeometry(0.04, 0.04, 1, 10), inkBasic);   // 高さ1 を伸縮して長さにする
     pole.name = 'pole';
     var cone = new T.Mesh(new T.ConeGeometry(HAT_R, HAT_H, 40, 1, false), toon(0xffffff, { map: stripeTex }));
     withInk(cone, 0.016);

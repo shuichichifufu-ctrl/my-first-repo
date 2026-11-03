@@ -10,8 +10,8 @@ var renderer=new THREE.WebGLRenderer({antialias:true,preserveDrawingBuffer:true}
 renderer.setSize(W,H);document.body.appendChild(renderer.domElement);
 var scene=new THREE.Scene();scene.background=new THREE.Color(0xbfeaff);
 var camera=new THREE.PerspectiveCamera(40,W/H,0.1,50);
-scene.add(new THREE.AmbientLight(0xffffff,0.75));
-var sun=new THREE.DirectionalLight(0xffffff,0.8);sun.position.set(3,6,4);scene.add(sun);
+scene.add(new THREE.AmbientLight(0xffffff,0.5));
+var sun=new THREE.DirectionalLight(0xffffff,0.55);sun.position.set(3,6,4);scene.add(sun);
 var ground=new THREE.Mesh(new THREE.PlaneGeometry(10,10).rotateX(-Math.PI/2),new THREE.MeshBasicMaterial({color:0xcfe9a8}));
 ground.position.y=-0.002;scene.add(ground);
 // 1マス（1.0 x 1.0）の枠
@@ -31,7 +31,11 @@ window.shot=function(pose,view){
   var v=VIEWS[view];camera.position.set(v[0],v[1],v[2]);camera.lookAt(0,pose==='flip'?0.5:0.55,0);
   renderer.render(scene,camera);
 };
-window.bbox=function(m){var b=new THREE.Box3().setFromObject(m.root);return [b.min.toArray(),b.max.toArray()];};
+window.bbox=function(m){m.root.updateMatrixWorld(true);var b=new THREE.Box3(),v=new THREE.Vector3(),mm=new THREE.Matrix4();
+  m.root.traverse(function(o){if(!o.isMesh||o.userData.ink||(o.material&&o.material.isShaderMaterial))return;var p=o.geometry.attributes.position;
+    var n=o.isInstancedMesh?o.count:1;for(var j=0;j<n;j++){mm.copy(o.matrixWorld);if(o.isInstancedMesh){var im=new THREE.Matrix4();o.getMatrixAt(j,im);mm.multiply(im);}
+    for(var i=0;i<p.count;i++){v.fromBufferAttribute(p,i).applyMatrix4(mm);b.expandByPoint(v);}}});
+  return [b.min.toArray(),b.max.toArray()];};
 window.meshCount=function(m){var n=0;m.root.traverse(function(o){if(o.isMesh)n++;});return n;};
 window.A=A;window.B=B;
 shot('normal','front');
