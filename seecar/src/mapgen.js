@@ -528,7 +528,7 @@
     { id: 'roketto', kind: 'illust', title: 'ロケット', reading: 'ろけっと' }
   ];
   var STROKE = 0;
-  var ERODE = 10;             // 字の線を白で削る量（画素）
+  var ERODE = 2;             // 字の線を白で削る量（画素）
   var THIN = { '鳥': 0, '麗': 0, '龍': 0, '自': 0, '由': 0, '在': 0 }; // 字ごとの太らせる量（線の多い字は細く。0=太らせない）
   var FONT = "'Hiragino Kaku Gothic ProN','Hiragino Sans','Noto Sans JP','Yu Gothic',sans-serif";
   var S = 640;               // 見本の絵の大きさ（画素）

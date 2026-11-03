@@ -22,6 +22,7 @@
   var JUMP_EXTRA = 0.08;  // 頂点は 足元+5段 の見た目より少し上
   var CROUCH = 0.13;      // 跳ぶ前に凹む時間
   var DA = { wind: 0.2, hit: 0.3, end: 0.62 };  // ドリルアタック：構える→当たる→もどる
+  var BORE_IN = 0.3;      // ドリルジャンプで掘るとき、ドリルの先がマスの上面より下へ入る深さ
   var DJ = { g: 14, rise: 0.95, flip: 0.42, hang: 0.22, bore: 0.55, popVy: 4.4, unflip: 0.45 }; // ドリルジャンプ
   // CPU：速さ（マス/秒）・回る速さ・動作のあとの間（秒）・まよう割合
   var CPU_LV = {
@@ -341,8 +342,13 @@
     return m;
   }
   // 逆さ（flip=1）のとき、ドリルの先が足元（root の y=0）よりどれだけ下に出るか
+  // （SeekerModel.tipDepth は「回転の軸（flipPivot）から先まで」の長さなので、軸の高さを引く。
+  //   第3期 r1 までは引いていなかったため、掘っている間ドリルの先がマスの上に約0.55浮いていた）
   function computeTip(m) {
-    if (typeof m.tipDepth === 'number' && isFinite(m.tipDepth)) return clamp(m.tipDepth, 0.15, 1.6);
+    if (typeof m.tipDepth === 'number' && isFinite(m.tipDepth)) {
+      var py = m.flipPivot && m.flipPivot.position ? m.flipPivot.position.y : 0;
+      return clamp(m.tipDepth - py, 0.15, 1.6);
+    }
     var fp = m.flipPivot; if (!fp) return 0.5;
     var keep = fp.rotation.x;
     try {
@@ -1284,8 +1290,9 @@
       }
     } else if (A.phase === 'bore') {
       a.spin = 6; a.shakeV = 0.025;
+      // ドリルの先を、掘っているマスの（下がったあとの）上面より BORE_IN だけ下まで入れる
       var base = vis(hAt(A.tx, A.tz)) + a.tip;
-      a.y = base - 0.22 * (1 - Math.pow(1 - Math.min(1, A.pt / 0.4), 2));
+      a.y = base - BORE_IN * (1 - Math.pow(1 - Math.min(1, A.pt / 0.3), 2));
       A.dustT -= dt;
       if (A.dustT <= 0) {
         A.dustT = 0.07;
@@ -1804,6 +1811,14 @@
       for (var k = 0; k < (n | 0); k++) { update(dt || 1 / 30); updateCamera(dt || 1 / 30); }
     },
     _plan: function () { return S.cpu ? planCpu(S.cpu) : null; },
+    // 確認用：自分のシーカーのいちばん低い点（ドリルの先）の高さと、いまいるマスの上面
+    _meLow: function () {
+      var me = S.me; if (!me) return null;
+      me.root.updateMatrixWorld(true);
+      var b = new THREE.Box3().setFromObject(me.model.root);
+      var A = me.act, tx = A && A.tx != null ? A.tx : Math.floor(me.wx), tz = A && A.tz != null ? A.tz : Math.floor(me.wz);
+      return { low: b.min.y, top: vis(hAt(tx, tz)), y: me.y, tip: me.tip };
+    },
     _manual: function (b) { S.manual = !!b; }, // 確認用：描画ループでは進めない（_step だけで進める）
     _setPose: function (x, z, heading) {
       var me = S.me; if (!me) return;
