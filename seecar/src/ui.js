@@ -688,6 +688,7 @@
     hideNotice();
     call('World', 'load', m, { myIndex: idx, players: PLAYERS, net: netOn, cpu: cpu || null, mode: gameMode });
     call('World', 'resetPitch');
+    var tinfo = call('World', 'treasureInfo'); if (tinfo && tinfo.total) totalTreasure = tinfo.total; // 宝の数は World が正
     els.ptTitle.textContent = m.title || '';
     els.ptYomi.textContent = (m.reading && m.reading !== m.title) ? m.reading : '';
     camMode = 1; updateCam();
@@ -815,7 +816,7 @@
     var s = call('World', 'sonar', SONAR_R) || { heading: 0, items: [] };
     var fx, fz;
     if (s.forward && isFinite(s.forward.x) && isFinite(s.forward.z)) { fx = +s.forward.x; fz = +s.forward.z; }
-    else { var h = +s.heading || 0; fx = Math.sin(h); fz = Math.cos(h); } // ヨー角：0のとき +z（さいしょの シーカーの前）
+    else { var h = +s.heading || 0; fx = -Math.sin(h); fz = -Math.cos(h); } // heading：0で北（-z）、右へ回ると へる（World と同じ）
     var fl = Math.hypot(fx, fz) || 1; fx /= fl; fz /= fl;
     g.clearRect(0, 0, W, W);
     // 盤
@@ -1105,6 +1106,7 @@
     call('World', 'init', $('worldbox'));
     call('World', 'on', 'collect', onCollect);
     call('World', 'on', 'found', onFound);
+    call('World', 'on', 'done', function () { if (gameMode === 'count') endCount(false); }); // 宝10こ ぜんぶ見つかった
     call('World', 'on', 'terrain', onTerrain);
     call('World', 'on', 'action', onAction);
     call('World', 'on', 'cam', function (top) { doc.body.classList.toggle('camtop', !!top); });
@@ -1123,6 +1125,7 @@
     _found: function (idx) { if (gameMode === 'count') endCount(false); else endRace(idx === 1 ? 1 : 0); },
     _setTime: function (sec) { timeLeft = Math.max(0, +sec || 0); shownSec = -1; updateTimer(); }, // どっちが おおい？ の のこり時間を みじかくする
     _finish: function () { endCount(false); },
+    _collect: function (idx, ti, sc) { onCollect(idx, ti, sc); }, // 宝を拾ったときと同じ処理（確認用）
     _info: function () { return { mode: gameMode, opp: opp, level: curLevel, left: timeLeft, scores: scores.slice(), total: totalTreasure, ended: ended }; },
     go: function (name) { if (['boot', 'title', 'setting', 'play', 'ending', 'quit'].indexOf(name) >= 0) go(name); },
     get state() { return state; }

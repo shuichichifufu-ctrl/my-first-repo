@@ -60,6 +60,16 @@
     turn: function () { tone('triangle', 420, 560, 0.12, 0.12); },
     tap: function () { tone('sine', 660, 880, 0.08, 0.2); tone('sine', 990, 990, 0.06, 0.08, 0.04); },
     bump: function () { tone('square', 140, 90, 0.12, 0.1); noise(0.08, 0.12, 'lowpass', 500); },
+    jump: function () {   // ぽよんと弾む
+      tone('sine', 260, 620, 0.22, 0.28);
+      tone('triangle', 520, 1040, 0.16, 0.1, 0.03);
+    },
+    dig: function () {    // ゴゴゴッと土を掘る
+      tone('sawtooth', 70, 55, 0.4, 0.18);
+      noise(0.45, 0.32, 'lowpass', 700, 150);
+      for (var i = 0; i < 4; i++) noise(0.04, 0.1, 'bandpass', 900 + i * 200, 300, 0.08 + i * 0.08);
+    },
+    collect: function () { tone('triangle', 988, 1976, 0.25, 0.22); tone('sine', 1319, 2637, 0.2, 0.1, 0.06); },
     fire: function () {   // ぽんっと打ち上げる
       tone('sine', 300, 90, 0.25, 0.35);
       tone('triangle', 700, 250, 0.15, 0.12);

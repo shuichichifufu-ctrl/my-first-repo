@@ -1,0 +1,98 @@
+<!doctype html>
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>World3 test</title>
+<style>
+  html, body { margin: 0; height: 100%; background: #000; overflow: hidden; }
+  #wrap { position: fixed; inset: 0; }
+</style>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+</head>
+<body>
+<div id="wrap"></div>
+<script>
+  // 効果音の代わり（呼ばれた名前を記録するだけ）
+  window.sfxLog = [];
+  window.Sfx = { play: function (n) { window.sfxLog.push(n); } };
+</script>
+<script src="/home/user/my-first-repo/seecar/src/mapgen.js"></script>
+<script src="/home/user/my-first-repo/seecar/src/seeker.js"></script>
+<script src="/home/user/my-first-repo/seecar/src/world.js"></script>
+<script>
+  // テスト用の地図：白い紙に黒い太線の小部屋、クレヨンの色の塗り、色の積み木
+  function makeTestMap(W, H) {
+    W = W || 64; H = H || 64;
+    var heights = new Uint8Array(W * H), colors = new Uint8Array(W * H * 3);
+    function set(x, z, h, r, g, b) {
+      if (x < 0 || z < 0 || x >= W || z >= H) return;
+      var i = z * W + x; heights[i] = h; colors[i * 3] = r; colors[i * 3 + 1] = g; colors[i * 3 + 2] = b;
+    }
+    // 白い紙（少しだけむら）
+    for (var z = 0; z < H; z++) for (var x = 0; x < W; x++) { var v = 246 + ((x * 7 + z * 13) % 9); set(x, z, 0, v, v, v - 4); }
+    // クレヨンの淡い塗り（高さ0〜1）
+    function blob(cx, cz, r, h, c) {
+      for (var z = cz - r; z <= cz + r; z++) for (var x = cx - r; x <= cx + r; x++) {
+        var d = Math.hypot(x - cx, z - cz) + Math.sin(x * 1.7 + z) * 0.8;
+        if (d < r) set(x, z, h, c[0], c[1], c[2]);
+      }
+    }
+    var S = W / 64;
+    blob(10 * S | 0, 50 * S | 0, 6 * S | 0, 0, [255, 214, 221]);
+    blob(30 * S | 0, 56 * S | 0, 5 * S | 0, 1, [190, 228, 255]);
+    blob(52 * S | 0, 30 * S | 0, 6 * S | 0, 0, [255, 241, 170]);
+    blob(28 * S | 0, 32 * S | 0, 4 * S | 0, 1, [200, 240, 196]);
+    // 黒い太線の部屋
+    function room(x0, z0, w, h, t, gap) {
+      for (var z = z0; z < z0 + h; z++) for (var x = x0; x < x0 + w; x++) {
+        var edge = x < x0 + t || x >= x0 + w - t || z < z0 + t || z >= z0 + h - t;
+        if (!edge) continue;
+        if (gap && z >= z0 + h - t && x >= x0 + (w >> 1) - 1 && x <= x0 + (w >> 1)) continue; // 入口
+        set(x, z, 10, 18, 18, 22);
+      }
+    }
+    room(4 * S | 0, 4 * S | 0, 18 * S | 0, 16 * S | 0, 2, false);
+    room(28 * S | 0, 6 * S | 0, 12 * S | 0, 12 * S | 0, 2, false);  // 宝の部屋（内側8×8）
+    room(46 * S | 0, 4 * S | 0, 14 * S | 0, 18 * S | 0, 2, true);
+    room(38 * S | 0, 40 * S | 0, 20 * S | 0, 14 * S | 0, 2, false);
+    // 部屋の中を塗る
+    blob(13 * S | 0, 12 * S | 0, 4 * S | 0, 1, [255, 190, 120]);
+    blob(48 * S | 0, 47 * S | 0, 4 * S | 0, 1, [200, 180, 255]);
+    // 色の積み木（いろいろな高さ）
+    function block(x0, z0, w, h, hh, c) { for (var z = z0; z < z0 + h; z++) for (var x = x0; x < x0 + w; x++) set(x, z, hh, c[0], c[1], c[2]); }
+    block(14 * S | 0, 26 * S | 0, 4, 2, 3, [229, 57, 53]);
+    block(18 * S | 0, 26 * S | 0, 4, 2, 4, [255, 152, 0]);
+    block(22 * S | 0, 26 * S | 0, 4, 2, 2, [253, 216, 53]);
+    block(26 * S | 0, 26 * S | 0, 4, 2, 5, [67, 160, 71]);
+    block(8 * S | 0, 34 * S | 0, 2, 6, 6, [30, 136, 229]);
+    block(12 * S | 0, 34 * S | 0, 2, 6, 7, [142, 36, 170]);
+    // 段差のあるひくい台（登れる）
+    block(16 * S | 0, 44 * S | 0, 4, 4, 1, [255, 205, 210]);
+    block(17 * S | 0, 45 * S | 0, 2, 2, 2, [244, 143, 177]);
+    // 太い黒線（迷路っぽく）
+    block(4 * S | 0, 24 * S | 0, 2, 12 * S | 0, 10, [18, 18, 22]);
+    block(32 * S | 0, 26 * S | 0, 2, 10 * S | 0, 10, [18, 18, 22]);
+    var tx = (34 * S | 0), tz = (12 * S | 0);
+    return {
+      w: W, h: H, heights: heights, colors: colors,
+      treasure: { x: tx, z: tz },
+      starts: [{ x: 20 * S | 0, z: 30 * S | 0, dir: 0 }, { x: 26 * S | 0, z: 38 * S | 0, dir: 0 }],
+      title: 'テスト', reading: 'てすと', picture: ''
+    };
+  }
+  window.resetEvents = function () { window.events = { found: [], collect: [], terrain: [], action: [], done: [], state: 0 }; };
+  resetEvents();
+  World.init(document.getElementById('wrap'));
+  World.on('found', function (i) { events.found.push(i); });
+  World.on('collect', function (i, ti, sc) { events.collect.push([i, ti, sc]); });
+  World.on('terrain', function (c) { events.terrain.push(c); });
+  World.on('action', function (n) { events.action.push(n); });
+  World.on('done', function (sc) { events.done.push(sc); });
+  World.on('state', function (s) { events.state++; window.lastState = s; });
+  window.testMap = makeTestMap(64, 64);
+  World.load(testMap, { myIndex: 0, players: [{ color: '#e08524' }, { color: '#2f8be0' }], net: false, mode: 'solo' });
+  World.start();
+</script>
+</body>
+</html>
