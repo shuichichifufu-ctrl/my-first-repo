@@ -92,6 +92,28 @@ const ok = (c, msg, extra) => { if (!c) fails++; console.log((c ? 'OK   ' : 'NG 
     }
   }
   console.log('     道のりの差 ' + fair.join('  '));
+  // ---- 第3期 ラウンド2：スタートから宝まで壊す壁のマス数（最少）。ドリルアタックは1回で1マス ----
+  const wallLine1 = [], wallLine10 = [];
+  for (const p of presets) {
+    const r = await page.evaluate(([id]) => {
+      const out = {};
+      for (const cnt of [1, 10]) {
+        const m = MapGen.fromPreset(id, { treasureCount: cnt }), w = m.w;
+        const d = m.starts.map(s => T.wallCount(m, s.z * w + s.x));
+        out[cnt] = { per: m.treasures.map(t => d.map(a => a[t.z * w + t.x])), img: T.render(m, 6) };
+      }
+      const bw = MapGen.fromPreset(id, { treasureCount: 1, binary: true });
+      return { one: out[1], ten: out[10] };
+    }, [p.id]);
+    save('p3r2_map_' + p.id + '.png', r.one.img); save('p3r2_map_' + p.id + '_10.png', r.ten.img);
+    const w1 = r.one.per[0], w10 = r.ten.per.map(a => Math.max(a[0], a[1]));
+    wallLine1.push(p.title + ' ' + w1.join('/'));
+    wallLine10.push(p.title + ' [' + w10.join(',') + ']');
+    ok(Math.max(...w1) <= 6, p.id + ' 宝1個：スタートから宝まで壊す壁は6マス以内(2人とも)', w1);
+    ok(w10.every(v => v <= 6), p.id + ' 宝10個：どの宝にも壊す壁は6マス以内', w10);
+  }
+  console.log('     壊す壁(宝1個・2人) ' + wallLine1.join('  '));
+  console.log('     壊す壁(宝10個・各宝の多い方) ' + wallLine10.join('  '));
   // 領域が足りない地図（囲み1つ）でも10個置ける／既定は1個
   const few = await page.evaluate(() => { const nest = [[4, 4, 60, 44, 2], [12, 10, 40, 38, 2], [20, 16, 30, 26, 2]];
     const m10 = MapGen.fromCanvas(T.rects(nest), 't', 'r', { treasureCount: 10 }), m1 = MapGen.fromCanvas(T.rects(nest), 't', 'r');
@@ -108,7 +130,8 @@ const ok = (c, msg, extra) => { if (!c) fails++; console.log((c ? 'OK   ' : 'NG 
         if (!edge && c >= 16) sizes.push(c); }
       sizes.sort((a, b) => a - b); const T0 = T.region(m); return { sizes, tcells: T0.cells }; }, p.id);
     ok(k.sizes.length >= 2, p.id + ' 閉じた部分が2つ以上', k.sizes);
-    ok(k.tcells === k.sizes[0], p.id + ' 宝はいちばん小さい閉じた部分', { tcells: k.tcells, smallest: k.sizes[0] });
+    // 見本は「壊す壁が薄い領域」を優先して宝を置く（下の『壊す壁』の確認を参照）。広さは40マス以上。
+    ok(k.tcells >= 40, p.id + ' 宝の領域は40マス以上', { tcells: k.tcells, smallest: k.sizes[0] });
   }
   // 白黒モード：既存の呼び方（opts なし）は今まで通り／binary:false は無指定と同じ／fromCanvas と fromFile の両方
   const bw = await page.evaluate(async () => {

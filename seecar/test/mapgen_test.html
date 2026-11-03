@@ -53,6 +53,22 @@ window.T = {
     }
     return dist;
   },
+  // 最少の「壊す壁のマス数」：高さ10のマスだけ数える（0-1幅優先）。土の山・地面は0。
+  wallCount: function (m, from) {
+    var w = m.w, h = m.h, n = w * h, H = m.heights, dist = new Array(n).fill(1e9), dq = [from], front = 0, back = [];
+    dist[from] = 0; var cur = [from], nxt = [];
+    for (var d = 0; cur.length || nxt.length; ) {
+      if (!cur.length) { cur = nxt; nxt = []; d++; }
+      var i = cur.pop(); if (dist[i] !== d) continue;
+      var x = i % w, z = (i - x) / w;
+      [[1, 0], [-1, 0], [0, 1], [0, -1]].forEach(function (dd) {
+        var nx = x + dd[0], nz = z + dd[1]; if (nx < 0 || nz < 0 || nx >= w || nz >= h) return;
+        var j = nz * w + nx, wall = H[j] >= 10 && !m.buried[j], nd = d + (wall ? 1 : 0);
+        if (nd < dist[j]) { dist[j] = nd; (wall ? nxt : cur).push(j); }
+      });
+    }
+    return dist;
+  },
   startsInfo: function (m) {
     var r = T.region(m);
     return m.starts.map(function (s) { var i = s.z * m.w + s.x; return { x: s.x, z: s.z, dir: s.dir, h: m.heights[i], inTreasureRegion: !!r.seen[i] }; });

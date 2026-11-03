@@ -13,6 +13,8 @@
   var DEFAULT_ERR = 'つながらなかったよ。ばんごうを たしかめてね';
   var COUNT_SEC = 600;        // どっちが おおい？ の じかん（10ぷん）
   var SONAR_R = 10;           // ソナーの はんけい（ブロック）
+  var SONAR_FAR = 200;        // 円の外の宝の方向を しらべる はんけい
+  var END_DELAY = 1600;       // 宝を拾ってから 結果へ行くまで（ミリ秒）。拾う演出を見せる
   var doc = document;
 
   function $(id) { return doc.getElementById(id); }
@@ -210,7 +212,7 @@
   var code = '';
   var sel = null, loading = false;
   var map = null, myIndex = 0, camMode = 1, running = false, modalOpen = false;
-  var pressed = {}, guard = false, hostRetry = 0, recorded = false, ended = false, modalKind = 'quit', sw = null, tipTimer = 0;
+  var pressed = {}, guard = false, hostRetry = 0, recorded = false, ended = false, modalKind = 'quit', sw = null, tipTimer = 0, endTimer = 0;
   var navKey = '', noticeTimer = 0, popTimer = 0;
   var timeLeft = COUNT_SEC, shownSec = -1, scores = [0, 0], totalTreasure = 1, raceSent = false;
   var lastT = 0, rafId = 0, curLevel = 'normal';
@@ -247,7 +249,7 @@
     var pid = null;
     el.addEventListener('pointerdown', function (e) {
       stopEv(e); unlock();
-      if (modalOpen) return;
+      if (modalOpen || ended) return;
       pid = e.pointerId;
       try { el.setPointerCapture(e.pointerId); } catch (_) {}
       press(act, true);
@@ -327,6 +329,7 @@
   // ---------------- 画面遷移 ----------------
   function go(name) {
     var from = state;
+    clearTimeout(endTimer); doc.body.classList.remove('endwait');
     if (from === 'play' && name !== 'play') releaseAll();
     if (name === 'title' || name === 'quit') { stopGame(); closeNet(); gameMode = 'solo'; opp = ''; sel = null; loading = false; hideNotice(); }
     if (name === 'ending') stopGame();
@@ -680,6 +683,7 @@
   // ---------------- Play ----------------
   function startGame(m, idx, net, cpu) {
     map = m; myIndex = idx; netOn = !!net; recorded = false; ended = false; raceSent = false; sw = null;
+    clearTimeout(endTimer); doc.body.classList.remove('endwait');
     doc.body.setAttribute('data-mode', gameMode);
     curLevel = (opp === 'cpu') ? settings.level : '';
     totalTreasure = (m && m.treasures && m.treasures.length) || (gameMode === 'count' ? 10 : 1);
@@ -764,18 +768,27 @@
     if (idx === myIndex && !raceSent) { raceSent = true; netSend({ t: 'collect', idx: idx, ti: 0 }); }
     endRace(idx);
   }
+  // 終わりが決まったら、約1.6秒 そのまま見せてから 結果へ。その間は 入力を止める（ボタンはうすく）
+  function endLater(fn) {
+    ended = true; sw = null; releaseAll();
+    doc.body.classList.add('endwait'); hideTip();
+    clearTimeout(endTimer);
+    endTimer = setTimeout(function () {
+      if (state !== 'play') return;
+      if (modalOpen) { modalOpen = false; els.modal.classList.remove('on'); }
+      fn();
+    }, END_DELAY);
+  }
   function endRace(winner) {
     if (state !== 'play' || ended) return;
-    ended = true;
-    go('ending', { winner: winner === 1 ? 1 : 0 });
+    endLater(function () { go('ending', { winner: winner === 1 ? 1 : 0 }); });
   }
   function endCount(fromNet) {
     if (state !== 'play' || ended) return;
-    ended = true;
     var s = curScores();
     if (netOn && !fromNet) netSend({ t: 'end' });
     call('World', 'finish');
-    go('ending', { scores: s });
+    endLater(function () { go('ending', { scores: s }); });
   }
   function onTerrain(cells) { if (cells && cells.length) netSend({ t: 'terrain', cells: cells }); }
   function onAction(name) { netSend({ t: 'act', name: name }); }
@@ -813,7 +826,7 @@
   function drawSonar(t) {
     var cv = els.sonarCv; if (!cv || !cv.getContext) return;
     var g = cv.getContext('2d'), W = cv.width, c = W / 2, R = c - 10;
-    var s = call('World', 'sonar', SONAR_R) || { heading: 0, items: [] };
+    var s = call('World', 'sonar', SONAR_FAR) || { heading: 0, items: [] };
     var fx, fz;
     if (s.forward && isFinite(s.forward.x) && isFinite(s.forward.z)) { fx = +s.forward.x; fz = +s.forward.z; }
     else { var h = +s.heading || 0; fx = -Math.sin(h); fz = -Math.cos(h); } // heading：0で北（-z）、右へ回ると へる（World と同じ）
@@ -832,33 +845,58 @@
     var a = ((t || 0) / 1800) % 1 * Math.PI * 2;
     var sg = g.createConicGradient ? g.createConicGradient(a - Math.PI / 2, c, c) : null;
     if (sg) { sg.addColorStop(0, 'rgba(139,230,255,0)'); sg.addColorStop(0.9, 'rgba(139,230,255,0)'); sg.addColorStop(1, 'rgba(139,230,255,.35)'); g.fillStyle = sg; g.fillRect(0, 0, W, W); }
-    // 宝
-    var items = s.items || [];
-    for (var i = 0; i < items.length; i++) {
-      var it = items[i]; if (!it) continue;
-      var dx = +it.dx || 0, dz = +it.dz || 0;
-      var sx = (dx * -fz + dz * fx), sy = -(dx * fx + dz * fz); // 上が いま向いている方向
-      var d = Math.hypot(sx, sy); if (d > SONAR_R) { sx *= SONAR_R / d; sy *= SONAR_R / d; }
-      var px = c + sx * R / SONAR_R, py = c + sy * R / SONAR_R;
-      var depth = Math.max(0, +it.depth || 0), al = Math.max(0.28, 1 - depth * 0.2);
-      var pulse = 1 + 0.18 * Math.sin((t || 0) / 220 + i);
-      var rad = (depth <= 0 ? 12 : 9) * pulse;
-      var gl = g.createRadialGradient(px, py, 0, px, py, rad * 2.4);
-      gl.addColorStop(0, 'rgba(255,228,0,' + (al * 0.9).toFixed(2) + ')'); gl.addColorStop(1, 'rgba(255,228,0,0)');
-      g.fillStyle = gl; g.beginPath(); g.arc(px, py, rad * 2.4, 0, Math.PI * 2); g.fill();
-      g.beginPath(); g.arc(px, py, rad * 0.62, 0, Math.PI * 2); g.fillStyle = 'rgba(255,248,190,' + al.toFixed(2) + ')'; g.fill();
-      g.lineWidth = 2.5; g.strokeStyle = 'rgba(43,33,24,' + al.toFixed(2) + ')'; g.stroke();
-    }
     g.restore();
     // 自分（中央の矢印。上むき）
     g.save(); g.translate(c, c);
     g.beginPath(); g.moveTo(0, -17); g.lineTo(12, 13); g.lineTo(0, 7); g.lineTo(-12, 13); g.closePath();
     g.fillStyle = '#e08524'; g.fill(); g.lineWidth = 4; g.strokeStyle = INK; g.lineJoin = 'round'; g.stroke();
     g.restore();
+    // 宝（円の中：矢印より上に、明るく大きく、点滅）。円の外で いちばん近い宝は ふちの矢印で知らせる
+    var items = s.items || [], far = null, T = t || 0;
+    g.save(); g.beginPath(); g.arc(c, c, R, 0, Math.PI * 2); g.clip();
+    for (var i = 0; i < items.length; i++) {
+      var it = items[i]; if (!it) continue;
+      var dx = +it.dx || 0, dz = +it.dz || 0;
+      var dist = isFinite(+it.dist) ? +it.dist : Math.hypot(dx, dz);
+      if (dist > SONAR_R) { if (!far || dist < far.dist) far = { dx: dx, dz: dz, dist: dist }; continue; }
+      var sx = (dx * -fz + dz * fx), sy = -(dx * fx + dz * fz); // 上が いま向いている方向
+      var px = c + sx * R / SONAR_R, py = c + sy * R / SONAR_R;
+      var depth = Math.max(0, +it.depth || 0);
+      var blink = 0.5 + 0.5 * Math.sin(T / 170 + i * 1.7); // 0..1 でチカチカ
+      var al = 1;
+      var rad = Math.max(10, 17 - Math.min(depth, 6) * 0.9) * (1 + 0.12 * blink);
+      var gl = g.createRadialGradient(px, py, 0, px, py, rad * 2.6);
+      gl.addColorStop(0, 'rgba(255,240,60,' + (0.7 + 0.3 * blink).toFixed(2) + ')'); gl.addColorStop(1, 'rgba(255,228,0,0)');
+      g.fillStyle = gl; g.beginPath(); g.arc(px, py, rad * 2.6, 0, Math.PI * 2); g.fill();
+      g.beginPath(); g.arc(px, py, rad * 0.8, 0, Math.PI * 2);
+      g.fillStyle = blink > 0.35 ? '#fffbd0' : '#ffe400'; g.fill();
+      g.lineWidth = 3.5; g.strokeStyle = INK; g.stroke();
+      if (dist < 2.2) { // 宝の真上：矢印に隠れないように 輪っかで かこむ
+        var rr = 24 + 4 * blink;
+        g.beginPath(); g.arc(c, c, rr, 0, Math.PI * 2); g.lineWidth = 9; g.strokeStyle = INK; g.stroke();
+        g.beginPath(); g.arc(c, c, rr, 0, Math.PI * 2); g.lineWidth = 5; g.strokeStyle = blink > 0.35 ? '#ffe400' : '#fff8b0'; g.stroke();
+      }
+    }
+    g.restore();
     // ふち（クリーム色とこい線）と 12時の しるし
     g.beginPath(); g.arc(c, c, R, 0, Math.PI * 2); g.lineWidth = 8; g.strokeStyle = '#fff4d6'; g.stroke();
     g.beginPath(); g.arc(c, c, R + 4, 0, Math.PI * 2); g.lineWidth = 3.500; g.strokeStyle = INK; g.stroke();
     g.beginPath(); g.moveTo(c, c - R + 2); g.lineTo(c - 9, c - R - 8); g.lineTo(c + 9, c - R - 8); g.closePath(); g.fillStyle = '#ffe400'; g.fill(); g.lineWidth = 3; g.strokeStyle = INK; g.stroke();
+    // 円の外の宝：ふちに くさび形の矢印（近いほど大きく・明るく）
+    if (far) {
+      var fsx = (far.dx * -fz + far.dz * fx), fsy = -(far.dx * fx + far.dz * fz);
+      var ang = Math.atan2(fsy, fsx), kk = Math.max(0, Math.min(1, 1 - (far.dist - SONAR_R) / 90));
+      var fb = 0.5 + 0.5 * Math.sin(T / 260);
+      var len = 18 + 26 * kk, hw = 9 + 13 * kk, tip = R + 8 + 1.5 * fb, base = tip - len;
+      g.save(); g.translate(c, c); g.rotate(ang);
+      g.beginPath(); g.moveTo(tip, 0); g.lineTo(base, -hw); g.lineTo(base + len * 0.28, 0); g.lineTo(base, hw); g.closePath();
+      g.shadowColor = 'rgba(255,230,0,' + (0.6 + 0.4 * kk).toFixed(2) + ')'; g.shadowBlur = 10 + 14 * kk;
+      g.globalAlpha = 0.6 + 0.4 * kk - 0.12 * fb;
+      g.fillStyle = kk > 0.5 ? '#fff27a' : '#ffe400'; g.fill();
+      g.shadowBlur = 0; g.globalAlpha = 1;
+      g.lineWidth = 4; g.lineJoin = 'round'; g.strokeStyle = INK; g.stroke();
+      g.restore();
+    }
   }
 
   // ---------------- Ending（争いの言葉は使わない） ----------------
@@ -935,7 +973,7 @@
   function unitPx() { var r = els.stage.getBoundingClientRect(); return Math.max(1, Math.min(r.width, r.height) / 100); }
   function swipeDown(e) {
     stopEv(e); unlock();
-    if (state !== 'play' || modalOpen || sw) return;
+    if (state !== 'play' || modalOpen || ended || sw) return;
     sw = { id: e.pointerId, x: e.clientX, y: e.clientY, lx: e.clientX, ly: e.clientY, axis: '', acc: 0 };
     try { els.swipe.setPointerCapture(e.pointerId); } catch (_) {}
   }
@@ -1011,6 +1049,7 @@
     }
     if (state === 'play') {
       var act = KEYS[e.key];
+      if (ended && e.key !== 'Escape') { e.preventDefault(); return; }
       if (act) { e.preventDefault(); if (!e.repeat) press(act, true); return; }
       if (e.key === 'c' || e.key === 'C') { e.preventDefault(); if (!e.repeat) cycleCam(); return; }
       if (e.key === 'Escape') { e.preventDefault(); openModal(); }

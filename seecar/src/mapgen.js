@@ -112,6 +112,25 @@
   var STEP_COST = 1, WALL_COST = 6; // 道のりの数え方：1マス=1、壁を壊して通る1マス=6
   var START_SEP = 12;              // スタート同士の最小の距離（マス）
 
+  var TREASURE_MIN_CELLS = 40;     // 宝の領域の最小の広さ（細いすき間にしない）
+  var WALL_GOAL = 5, WALL_MAX = 6;  // 外から宝の領域まで壊す壁のマス数：目安5以内・最大6
+  // 外の領域（mainId）から各マスまでに壊す壁（高さ10）のマス数の最少（0-1幅優先）
+  function wallDistFrom(heights, label, mainId, w, h) {
+    var n = w * h, dist = new Int32Array(n).fill(1e9), cur = [], nxt = [], i, d = 0;
+    for (i = 0; i < n; i++) if (label[i] === mainId) { dist[i] = 0; cur.push(i); }
+    while (cur.length || nxt.length) {
+      if (!cur.length) { cur = nxt; nxt = []; d++; }
+      var c = cur.pop(); if (dist[c] !== d) continue;
+      var cx = c % w, cz = (c - cx) / w;
+      for (var q = 0; q < 4; q++) {
+        var ix = cx + DX[q], iz = cz + DZ[q]; if (ix < 0 || iz < 0 || ix >= w || iz >= h) continue;
+        var j = iz * w + ix, wl = heights[j] >= WALL_H ? 1 : 0, nd = d + wl;
+        if (nd < dist[j]) { dist[j] = nd; (wl ? nxt : cur).push(j); }
+      }
+    }
+    return dist;
+  }
+
   function finish(heights, colors, w, h, label, regions, main, opts) {
     var n = w * h, i, x, z, k;
     var count = opts && opts.treasureCount === 10 ? 10 : 1;
@@ -125,7 +144,14 @@
     // --- 宝：壁で囲まれた白い領域（端に触れず16マス以上）を小さい順に使う ---
     var minCells = MIN_PIXELS * BLOCK * BLOCK;
     var encl = regions.filter(function (r) { return !r.edge && r.id !== main.id && r.size >= minCells; });
-    encl.sort(function (a, b) { return a.size - b.size || a.id - b.id; });
+    // 外の領域から各領域までに壊す壁のマス数（最少）。壁が薄い領域（5以内）→6以内→それより厚い、の順に、小さい領域から使う。
+    var wallDist = wallDistFrom(heights, label, main.id, w, h);
+    encl.forEach(function (r) { r.wall = 1e9; });
+    for (i = 0; i < n; i++) if (label[i] >= 0 && label[i] !== main.id) { var rr0 = regions[label[i]]; if (wallDist[i] < rr0.wall) rr0.wall = wallDist[i]; }
+    var thinPref = !!(opts && opts.thinWall); // 見本の地図だけ：壁が薄い領域を選ぶ（読みこんだ絵は今まで通り）
+    function tierOf(r) { return !thinPref ? 0 : (r.wall <= WALL_MAX && r.size >= TREASURE_MIN_CELLS ? (r.wall <= WALL_GOAL ? 0 : 1) : 2); }
+    function okR(r) { return tierOf(r) < 2; }
+    encl.sort(function (a, b) { return tierOf(a) - tierOf(b) || a.size - b.size || a.id - b.id; });
     var cellsOf = {}; // 領域id -> マスの一覧
     for (i = 0; i < n; i++) if (label[i] >= 0) (cellsOf[label[i]] || (cellsOf[label[i]] = [])).push(i);
     var treasures = []; // マス番号
@@ -172,10 +198,10 @@
       var roomy = encl.filter(function (r) { return (cellsOf[r.id] || []).some(strict); });
       var thin = encl.filter(function (r) { return roomy.indexOf(r) < 0; });
       var quota = {}, full = {};
-      roomy.slice(0, 10).forEach(function (r) { var c = place(r, true); if (c >= 0) { treasures.push(c); quota[r.id] = 1; } });
-      // 足りないぶんは、大きい領域（広さ ÷ 置いた数 が大きい順）の中に散らす
-      [roomy, thin.concat(roomy)].forEach(function (list, round) {
-        if (round === 1) { thin.slice(0, 10 - treasures.length).forEach(function (r) { var c = place(r, false); if (c >= 0) { treasures.push(c); quota[r.id] = 1; } }); full = {}; }
+      roomy.filter(okR).slice(0, 10).forEach(function (r) { var c = place(r, true); if (c >= 0) { treasures.push(c); quota[r.id] = 1; } });
+      // 足りないぶんは、大きい領域（広さ ÷ 置いた数 が大きい順）の中に散らす。まず壁が薄い領域だけ、それでも足りなければ全部。
+      [roomy.filter(okR), thin.filter(okR).concat(roomy.filter(okR)), thin.concat(roomy)].forEach(function (list, round) {
+        if (round >= 1) { thin.filter(function (r) { return list.indexOf(r) >= 0 && !quota[r.id]; }).slice(0, 10 - treasures.length).forEach(function (r) { var c = place(r, false); if (c >= 0) { treasures.push(c); quota[r.id] = 1; } }); full = {}; }
         while (treasures.length < 10) {
           var pickR = null;
           for (k = 0; k < list.length; k++) {
@@ -501,11 +527,11 @@
     { id: 'hoshi', kind: 'illust', title: 'ほし', reading: 'ほし' },
     { id: 'roketto', kind: 'illust', title: 'ロケット', reading: 'ろけっと' }
   ];
-  var STROKE = 10;
+  var STROKE = 0;
   var THIN = { '鳥': 0, '麗': 0, '龍': 0, '自': 0, '由': 0, '在': 0 }; // 字ごとの太らせる量（線の多い字は細く。0=太らせない）
   var FONT = "'Hiragino Kaku Gothic ProN','Hiragino Sans','Noto Sans JP','Yu Gothic',sans-serif";
   var S = 640;               // 見本の絵の大きさ（画素）
-  var LW = 26;               // イラストの線の太さ（画像1画素=10px の約2.6画素分。縮小しても途切れない）
+  var LW = 18;               // イラストの線の太さ（画像1画素=10px の約2.6画素分。縮小しても途切れない）
 
   // 四字熟語：白地に太い黒字だけ（色の落書きはしない）
   function drawYoji(def) {
@@ -603,7 +629,7 @@
     var def = findPreset(id);
     // 見本は常に白黒（高さ0の白と高さ10の黒だけ）。字や線のふちの灰色の小さな段を作らない。
     var o = {}; if (opts) for (var key in opts) o[key] = opts[key];
-    o.binary = true;
+    o.binary = true; o.thinWall = true;
     return fromCanvas(presetCanvas(def.id), def.title, def.reading, o);
   }
 

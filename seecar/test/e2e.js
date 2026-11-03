@@ -192,7 +192,7 @@ async function solo(browser) {
   await click(page, '#m-no', 300);
   ok('ホーム: いいえで再開', (await logOf(page, 'setPaused')).slice(-1)[0][1] === false && await state(page) === 'play');
   // 見つけた！
-  await page.evaluate(() => App._found(0)); await sleep(900);
+  await page.evaluate(() => App._found(0)); await sleep(2300);
   ok('ひとり: みつけた！', await state(page) === 'ending' && await txt(page, '#end-found') === 'みつけた！', await txt(page, '#end-found'));
   ok('ひとり: 掘り出した宝の言葉と、元の絵を大きく見せる', /ほりだした/.test(await txt(page, '#end-who')) && await page.evaluate(() => { const i = document.getElementById('end-pic'); return i.getBoundingClientRect().width > 250 && !!i.src; }));
   await page.screenshot({ path: SH + 'solo_11ending.png' }); await textCheck(page, 'けっか（ひとり）'); await sizeCheck(page, 'けっか（ひとり）');
@@ -233,7 +233,7 @@ async function race(browser) {
   ok('はやい: World.load に mode:race、cpu:{level:hard}、myIndex:0、net:false', la && la.mode === 'race' && la.cpu && la.cpu.level === 'hard' && la.myIndex === 0 && la.net === false, la);
   ok('はやい: 残り時間と数は出ない', await page.evaluate(() => getComputedStyle(document.getElementById('hud')).display === 'none'));
   await page.screenshot({ path: SH + 'race_03play.png' });
-  await page.evaluate(() => App._found(0)); await sleep(800);
+  await page.evaluate(() => App._found(0)); await sleep(2300);
   ok('はやい: 自分が先なら「きみが はやかった！」', await txt(page, '#end-found') === 'きみが はやかった！', await txt(page, '#end-found'));
   await page.screenshot({ path: SH + 'race_04ending_me.png' }); await textCheck(page, 'けっか（はやい・きみ）');
   let r = await rec(page);
@@ -242,7 +242,7 @@ async function race(browser) {
   await nav(page, 'もういちど');
   ok('もういちど: ちずえらびへ（おなじ あそびかた・むずかしさ）', await sub(page) === 'pick');
   await click(page, '.card[data-id=mikka]', 800); await depart(page, 2000);
-  await page.evaluate(() => App._found(1)); await sleep(800);
+  await page.evaluate(() => App._found(1)); await sleep(2300);
   ok('コンピューターが先なら「コンピューターが はやかった」', await txt(page, '#end-found') === 'コンピューターが はやかった', await txt(page, '#end-found'));
   await page.screenshot({ path: SH + 'race_05ending_cpu.png' }); await textCheck(page, 'けっか（はやい・あいて）');
   r = await rec(page);
