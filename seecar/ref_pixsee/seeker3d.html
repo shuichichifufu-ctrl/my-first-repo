@@ -1,0 +1,482 @@
+<!doctype html>
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,user-scalable=no">
+<title>探索車シーカー 3D</title>
+<style>
+  html,body{margin:0;height:100%;overflow:hidden;background:#bfeaff;font-family:'Hiragino Kaku Gothic ProN','Yu Gothic','Meiryo',sans-serif;color:#222}
+  canvas{display:block;touch-action:none}
+  button{font-size:16px;font-weight:bold;border:3px solid #222;border-radius:12px;background:#ffe27a;color:#222;cursor:pointer;user-select:none;-webkit-user-select:none;touch-action:none}
+  button:active{background:#ffc83d}
+  #top{position:fixed;top:8px;left:8px;right:8px;display:flex;gap:6px;flex-wrap:wrap;z-index:10}
+  #top button{padding:7px 12px;font-size:14px}
+  #help{position:fixed;top:52px;left:10px;font-size:12px;line-height:1.5;background:rgba(255,255,255,.75);padding:6px 10px;border-radius:8px;z-index:10;pointer-events:none}
+  #ui{position:fixed;left:0;right:0;bottom:14px;display:flex;justify-content:space-between;align-items:flex-end;padding:0 14px;pointer-events:none;z-index:10}
+  .pad{display:grid;grid-template-columns:repeat(3,58px);grid-template-rows:repeat(2,58px);gap:6px;pointer-events:auto}
+  .pad button{font-size:22px;padding:0}
+  #bU{grid-column:2;grid-row:1}#bL{grid-column:1;grid-row:2}#bD{grid-column:2;grid-row:2}#bR{grid-column:3;grid-row:2}
+  #drill{pointer-events:auto;width:110px;height:110px;border-radius:55px;font-size:20px;background:#00d4ff}
+  #drill:active{background:#00a8cc}
+  #sfx{position:fixed;left:50%;top:28%;transform:translateX(-50%);font-size:min(13vw,76px);font-weight:900;color:#fff;
+       -webkit-text-stroke:9px #000;paint-order:stroke fill;opacity:0;pointer-events:none;z-index:9;white-space:nowrap;
+       animation:shake .07s infinite}
+  @keyframes shake{0%{margin-left:-4px;margin-top:2px;rotate:-6deg}50%{margin-left:4px;margin-top:-3px;rotate:-4deg}100%{margin-left:-2px;margin-top:3px;rotate:-7deg}}
+</style>
+</head>
+<body>
+<div id="top">
+  <button id="bAuto">ぐるっと回して見る</button>
+  <button id="bReset">視点リセット</button>
+  <button id="bGlb">GLB保存</button>
+</div>
+<div id="help">ドラッグ: 視点を回す / ホイール・ピンチ: ズーム<br>WASD・矢印: 移動(カメラ基準) / Space・Z: ドリル</div>
+<div id="sfx"></div>
+<div id="ui">
+  <div class="pad"><button id="bU">▲</button><button id="bL">◀</button><button id="bD">▼</button><button id="bR">▶</button></div>
+  <button id="drill">ドリル!</button>
+</div>
+
+<script type="importmap">
+{ "imports": {
+  "three": "https://cdn.jsdelivr.net/npm/three@0.170.0/build/three.module.js",
+  "three/addons/": "https://cdn.jsdelivr.net/npm/three@0.170.0/examples/jsm/"
+} }
+</script>
+
+<script type="module">
+import * as THREE from 'three';
+import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
+import { mergeVertices } from 'three/addons/utils/BufferGeometryUtils.js';
+import { GLTFExporter } from 'three/addons/exporters/GLTFExporter.js';
+
+/* ============================================================
+   探索車シーカー(See Car) 3Dモデル
+   すべてプログラムで作った立体(外部モデル不要)。
+   座標: 原点=足元中央 / +Y=上 / +Z=正面(目の向き) / ±X=左右のキャタピラ側
+   createSeeker() が {root, ...パーツ} を返すので、そのままゲームに組み込めます。
+   ============================================================ */
+const COL = { orange:0xe08524, tan:0xf0c46e, blue:0x00d4ff, yellow:0xffee00, eye:0x22e0a0,
+              track:0x56606a, tread:0x39424a, wheel:0x8795a1, star:0xd77fb8 };
+
+// 寸法(画像の比率から)
+const R = 0.62;          // ロールケーキ(円柱)の半径
+const LEN = 0.7;         // 円柱の長さ(X方向)
+const CY = 0.74;         // ボディ中心の高さ
+const TRK_W = 0.22;      // キャタピラの幅
+const TRK_X = LEN / 2 + TRK_W / 2 - 0.02;
+const TRK_S = 0.94;      // キャタピラ直線部の長さ
+const HAT_H = 0.95, HAT_R = 0.43;
+
+/* ---- トゥーン調マテリアル(段々の陰影)+黒い輪郭線 ---- */
+const grad = new THREE.DataTexture(new Uint8Array([90, 170, 255]), 3, 1, THREE.RedFormat);
+grad.minFilter = grad.magFilter = THREE.NearestFilter; grad.needsUpdate = true;
+const toon = (c, extra = {}) => new THREE.MeshToonMaterial({ color: c, gradientMap: grad, ...extra });
+const inkBasic = new THREE.MeshBasicMaterial({ color: 0x000000 });
+
+function inkMaterial(t) {
+  return new THREE.ShaderMaterial({
+    uniforms: { t: { value: t } },
+    vertexShader: 'uniform float t; void main(){ gl_Position = projectionMatrix * modelViewMatrix * vec4(position + normal * t, 1.0); }',
+    fragmentShader: 'void main(){ gl_FragColor = vec4(0.0,0.0,0.0,1.0); }',
+    side: THREE.BackSide
+  });
+}
+/* 反転法線の輪郭線(イラストの太い黒縁を再現) */
+function withInk(mesh, t = 0.015) {
+  let g = mesh.geometry.clone();
+  g.deleteAttribute('normal'); g.deleteAttribute('uv'); g.clearGroups();
+  g = mergeVertices(g, 1e-4); g.computeVertexNormals();
+  const o = new THREE.Mesh(g, inkMaterial(t));
+  o.userData.ink = true; mesh.add(o);
+  return mesh;
+}
+
+function starShape(ro, ri) {
+  const s = new THREE.Shape();
+  for (let i = 0; i < 10; i++) {
+    const r = i % 2 ? ri : ro, a = Math.PI / 2 + i * Math.PI / 5;
+    const x = Math.cos(a) * r, y = Math.sin(a) * r;
+    i ? s.lineTo(x, y) : s.moveTo(x, y);
+  }
+  s.closePath(); return s;
+}
+
+/* 帽子(ドリル)のしましまテクスチャ。offsetを動かすとらせん状に回って見える */
+function makeStripeTexture() {
+  const c = document.createElement('canvas'); c.width = c.height = 256;
+  const g = c.getContext('2d');
+  g.fillStyle = '#00d4ff'; g.fillRect(0, 0, 256, 256);
+  g.fillStyle = '#ffee00';
+  for (let k = 0; k <= 8; k++) {
+    g.beginPath();
+    g.moveTo(k * 64, 0); g.lineTo(k * 64 + 18, 0);
+    g.lineTo(k * 64 + 18 - 256, 256); g.lineTo(k * 64 - 256, 256);
+    g.closePath(); g.fill();
+  }
+  const t = new THREE.CanvasTexture(c);
+  t.wrapS = t.wrapT = THREE.RepeatWrapping; t.colorSpace = THREE.SRGBColorSpace;
+  t.anisotropy = 4;
+  return t;
+}
+
+/* 円柱の端面(クリーム色の輪+白い穴+ピンクの星) */
+function makeEnd(sign) {
+  const g = new THREE.Group();
+  g.position.set(sign * LEN / 2, CY, 0);
+  g.rotation.y = sign * Math.PI / 2;           // ローカル+Zが外向き
+  const rim = new THREE.Mesh(new THREE.TorusGeometry(R * 0.985, 0.012, 8, 96), inkBasic);
+  const line = new THREE.Mesh(new THREE.TorusGeometry(R * 0.84, 0.004, 6, 96),
+                              new THREE.MeshBasicMaterial({ color: 0x8a7a5a }));
+  line.position.z = 0.002;
+  const hole = new THREE.Mesh(new THREE.CircleGeometry(R * 0.6, 64), toon(0xffffff));
+  hole.position.z = 0.004;
+  const holeRim = new THREE.Mesh(new THREE.TorusGeometry(R * 0.6, 0.013, 8, 64), inkBasic);
+  holeRim.position.z = 0.004;
+  const sInk = new THREE.Mesh(new THREE.ExtrudeGeometry(starShape(0.245, 0.118), { depth: 0.01, bevelEnabled: false }), inkBasic);
+  sInk.position.set(0, -0.02, 0.006);
+  const sPink = new THREE.Mesh(new THREE.ExtrudeGeometry(starShape(0.215, 0.095),
+    { depth: 0.012, bevelEnabled: true, bevelThickness: 0.006, bevelSize: 0.006, bevelSegments: 2 }), toon(COL.star));
+  sPink.position.set(0, -0.02, 0.014);
+  g.add(rim, line, hole, holeRim, sInk, sPink);
+  return g;
+}
+
+/* キャタピラ(履帯ブロックが本当に回る) */
+const TREAD_N = 26, TREAD_RP = 0.16;
+const TREAD_PM = 2 * TRK_S + 2 * Math.PI * TREAD_RP;
+const _d = new THREE.Object3D();
+function layoutTreads(inst, off) {
+  const S = TRK_S, rp = TREAD_RP, cy = 0.18;
+  for (let i = 0; i < TREAD_N; i++) {
+    const s = (((i * TREAD_PM / TREAD_N + off) % TREAD_PM) + TREAD_PM) % TREAD_PM;
+    let y, z, dy, dz;
+    if (s < S) { y = cy + rp; z = -S / 2 + s; dy = 0; dz = 1; }
+    else if (s < S + Math.PI * rp) {
+      const th = (s - S) / rp; z = S / 2 + rp * Math.sin(th); y = cy + rp * Math.cos(th); dz = Math.cos(th); dy = -Math.sin(th);
+    } else if (s < 2 * S + Math.PI * rp) {
+      const u = s - S - Math.PI * rp; z = S / 2 - u; y = cy - rp; dy = 0; dz = -1;
+    } else {
+      const th = (s - 2 * S - Math.PI * rp) / rp; z = -S / 2 - rp * Math.sin(th); y = cy - rp * Math.cos(th); dz = -Math.cos(th); dy = Math.sin(th);
+    }
+    _d.position.set(0, y, z); _d.rotation.set(Math.atan2(-dy, dz), 0, 0); _d.updateMatrix();
+    inst.setMatrixAt(i, _d.matrix);
+  }
+  inst.instanceMatrix.needsUpdate = true;
+}
+
+function makeTrack(sign) {
+  const group = new THREE.Group(); group.position.x = sign * TRK_X;
+  const rb = 0.14, cy = 0.18, S = TRK_S;
+  const sh = new THREE.Shape();
+  sh.moveTo(-S / 2, cy - rb); sh.lineTo(S / 2, cy - rb);
+  sh.absarc(S / 2, cy, rb, -Math.PI / 2, Math.PI / 2, false);
+  sh.lineTo(-S / 2, cy + rb);
+  sh.absarc(-S / 2, cy, rb, Math.PI / 2, Math.PI * 1.5, false);
+  const geo = new THREE.ExtrudeGeometry(sh, { depth: TRK_W, bevelEnabled: false, curveSegments: 20 });
+  geo.rotateY(Math.PI / 2); geo.translate(-TRK_W / 2, 0, 0);
+  const bodyMesh = withInk(new THREE.Mesh(geo, toon(COL.track)), 0.012);
+  group.add(bodyMesh);
+
+  const inst = new THREE.InstancedMesh(new THREE.BoxGeometry(TRK_W * 0.92, 0.05, 0.1), toon(COL.tread), TREAD_N);
+  inst.frustumCulled = false; layoutTreads(inst, 0);
+  group.add(inst);
+
+  const wheels = [];
+  [-0.33, 0, 0.33].forEach(z => {
+    const w = new THREE.Group(); w.position.set(sign * (TRK_W / 2 + 0.014), cy, z);
+    const disc = new THREE.Mesh(new THREE.CylinderGeometry(0.1, 0.1, 0.03, 24).rotateZ(Math.PI / 2), toon(COL.wheel));
+    const hub = new THREE.Mesh(new THREE.CylinderGeometry(0.03, 0.03, 0.045, 12).rotateZ(Math.PI / 2), toon(0x2b2f35));
+    const mark = new THREE.Mesh(new THREE.BoxGeometry(0.036, 0.065, 0.02), toon(0x56606a)); mark.position.y = 0.055;
+    const ring = new THREE.Mesh(new THREE.TorusGeometry(0.1, 0.008, 6, 24).rotateY(Math.PI / 2), inkBasic);
+    w.add(disc, hub, mark, ring); group.add(w); wheels.push(w);
+  });
+  return { group, inst, wheels, phase: 0 };
+}
+
+export function createSeeker() {
+  const root = new THREE.Group(); root.name = 'seeker';
+  const flipPivot = new THREE.Group(); flipPivot.name = 'flipPivot'; flipPivot.position.y = CY; root.add(flipPivot);
+  const rig = new THREE.Group(); rig.position.y = -CY; flipPivot.add(rig);
+
+  // ボディ(ロールケーキ=横向きの円柱)
+  const bodyGeo = new THREE.CylinderGeometry(R, R, LEN, 64).rotateZ(Math.PI / 2);
+  const body = new THREE.Mesh(bodyGeo, [toon(COL.orange), toon(COL.tan), toon(COL.tan)]);
+  body.position.y = CY; body.receiveShadow = true; withInk(body, 0.016);
+  rig.add(body, makeEnd(1), makeEnd(-1));
+
+  // バイザーと緑の目(正面=+Z の曲面に貼り付け)
+  const visor = new THREE.Mesh(new THREE.SphereGeometry(1, 32, 16), new THREE.MeshBasicMaterial({ color: 0x000000 }));
+  visor.scale.set(0.3, 0.17, 0.06); visor.position.set(0, CY, R - 0.005);
+  const eyeMat = new THREE.MeshBasicMaterial({ color: COL.eye });
+  const eyeGeo = new THREE.SphereGeometry(1, 20, 14);
+  const eyeL = new THREE.Mesh(eyeGeo, eyeMat), eyeR = new THREE.Mesh(eyeGeo, eyeMat);
+  eyeL.position.set(-0.1, CY, R + 0.04); eyeR.position.set(0.1, CY, R + 0.04);
+  [eyeL, eyeR].forEach(e => e.scale.set(0.065, 0.105, 0.03));
+  rig.add(visor, eyeL, eyeR);
+
+  // ドリルになる帽子
+  const stripeTex = makeStripeTexture();
+  const hatPivot = new THREE.Group(); hatPivot.name = 'hat'; hatPivot.position.set(0, CY + 0.4, -0.15);
+  hatPivot.rotation.x = -0.5;
+  const cone = new THREE.Mesh(new THREE.ConeGeometry(HAT_R, HAT_H, 48, 1, false), toon(0xffffff, { map: stripeTex }));
+  cone.position.y = HAT_H / 2; withInk(cone, 0.016);
+  hatPivot.add(cone); rig.add(hatPivot);
+
+  // キャタピラ(左右)
+  const tracks = [makeTrack(1), makeTrack(-1)];   // [0]=+X側(左), [1]=-X側(右)
+  tracks.forEach(t => rig.add(t.group));
+
+  root.traverse(o => { if (o.isMesh && !o.userData.ink) o.castShadow = true; });
+  return { root, flipPivot, rig, hatPivot, eyes: [eyeL, eyeR], tracks, stripeTex };
+}
+
+/* ============================================================
+   ここから下はデモ(世界・操作・ドリル動作)
+   ============================================================ */
+const $ = id => document.getElementById(id);
+const renderer = new THREE.WebGLRenderer({ antialias: true });
+renderer.setPixelRatio(Math.min(devicePixelRatio, 2));
+renderer.setSize(innerWidth, innerHeight);
+renderer.shadowMap.enabled = true; renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+document.body.appendChild(renderer.domElement);
+
+const scene = new THREE.Scene();
+scene.background = new THREE.Color(0xbfeaff);
+scene.fog = new THREE.Fog(0xbfeaff, 25, 60);
+
+const camera = new THREE.PerspectiveCamera(50, innerWidth / innerHeight, 0.1, 200);
+const CAM_OFFSET = new THREE.Vector3(4, 3, 5.5);
+camera.position.copy(CAM_OFFSET);
+const controls = new OrbitControls(camera, renderer.domElement);
+controls.target.set(0, 1, 0);
+controls.enableDamping = true; controls.enablePan = false;
+controls.minDistance = 2.5; controls.maxDistance = 16;
+controls.maxPolarAngle = Math.PI * 0.495;
+controls.autoRotateSpeed = 3;
+
+scene.add(new THREE.AmbientLight(0xffffff, 1.4));
+const sun = new THREE.DirectionalLight(0xffffff, 2.0);
+sun.castShadow = true; sun.shadow.mapSize.set(2048, 2048);
+Object.assign(sun.shadow.camera, { left: -14, right: 14, top: 14, bottom: -14, near: 1, far: 45 });
+sun.shadow.bias = -0.0004; sun.shadow.normalBias = 0.03;
+scene.add(sun, sun.target);
+
+// 地面(市松模様)
+{
+  const c = document.createElement('canvas'); c.width = c.height = 128;
+  const g = c.getContext('2d');
+  g.fillStyle = '#9bd35a'; g.fillRect(0, 0, 128, 128);
+  g.fillStyle = '#8bc34a'; g.fillRect(0, 0, 64, 64); g.fillRect(64, 64, 64, 64);
+  const t = new THREE.CanvasTexture(c); t.wrapS = t.wrapT = THREE.RepeatWrapping; t.repeat.set(20, 20);
+  t.colorSpace = THREE.SRGBColorSpace; t.anisotropy = 8;
+  const ground = new THREE.Mesh(new THREE.CircleGeometry(40, 64).rotateX(-Math.PI / 2), toon(0xffffff, { map: t }));
+  ground.receiveShadow = true; scene.add(ground);
+}
+// 大きさ比較用のブロックや岩
+{
+  const cols = [0xff6b6b, 0x4dabf7, 0xffd43b, 0x69db7c, 0xb197fc];
+  let seed = 7; const rnd = () => (seed = (seed * 16807) % 2147483647) / 2147483647;
+  for (let i = 0; i < 14; i++) {
+    const a = rnd() * Math.PI * 2, d = 5 + rnd() * 14, s = 0.6 + rnd() * 1.4;
+    const geo = i % 2 ? new THREE.BoxGeometry(s, s, s) : new THREE.CylinderGeometry(s * 0.5, s * 0.5, s * 1.3, 20);
+    const m = withInk(new THREE.Mesh(geo, toon(cols[i % cols.length])), 0.02);
+    m.position.set(Math.cos(a) * d, (i % 2 ? s : s * 1.3) / 2, Math.sin(a) * d);
+    m.rotation.y = rnd() * 3; m.castShadow = m.receiveShadow = true; scene.add(m);
+  }
+}
+
+const seeker = createSeeker();
+scene.add(seeker.root);
+
+/* ---- 入力 ---- */
+const keys = {}, pad = { u: 0, d: 0, l: 0, r: 0 };
+addEventListener('keydown', e => {
+  const k = e.key.toLowerCase(); keys[k] = true;
+  if (k === ' ' || k.startsWith('arrow')) e.preventDefault();
+  if (k === ' ' || k === 'z') startDrill();
+});
+addEventListener('keyup', e => { keys[e.key.toLowerCase()] = false; });
+function bindPad(id, k) {
+  const b = $(id);
+  b.addEventListener('pointerdown', e => { pad[k] = 1; b.setPointerCapture(e.pointerId); e.preventDefault(); });
+  ['pointerup', 'pointercancel'].forEach(ev => b.addEventListener(ev, () => { pad[k] = 0; }));
+}
+bindPad('bU', 'u'); bindPad('bD', 'd'); bindPad('bL', 'l'); bindPad('bR', 'r');
+$('drill').addEventListener('pointerdown', e => { startDrill(); e.preventDefault(); });
+
+/* ---- キャラクターの状態 ---- */
+const SPEED = 3.2, TIP = 0.61;   // TIP: 逆さま時に帽子の先が足元よりどれだけ下に出るか
+const st = { mode: 'idle', t: 0, vy: 0, flip: 0, yaw: 0, hatA: -0.5, hatV: 0, blink: 2, spin: 0, dustT: 0 };
+const vel = new THREE.Vector3();
+const dusts = [];
+{
+  const geo = new THREE.IcosahedronGeometry(0.07, 0), mat = toon(0xb98649);
+  for (let i = 0; i < 70; i++) { const m = new THREE.Mesh(geo, mat); m.visible = false; scene.add(m); dusts.push({ m, v: new THREE.Vector3(), l: 0 }); }
+}
+function burst(n, power = 3) {
+  const p = seeker.root.position; let c = 0;
+  for (const d of dusts) {
+    if (d.l <= 0 && c < n) {
+      c++; d.l = 0.6 + Math.random() * 0.5; d.m.visible = true;
+      d.m.position.set(p.x + (Math.random() - .5) * 0.5, 0.05, p.z + (Math.random() - .5) * 0.5);
+      const a = Math.random() * Math.PI * 2, s = power * (0.4 + Math.random());
+      d.v.set(Math.cos(a) * s, power * (0.8 + Math.random()), Math.sin(a) * s);
+    }
+  }
+}
+function sfx(text) { const e = $('sfx'); e.textContent = text; e.style.opacity = text ? 1 : 0; }
+function startDrill() {
+  if (st.mode === 'idle' || st.mode === 'walk') { st.mode = 'flip'; st.t = 0; st.vy = 6.5; st.flip = 0; }
+}
+const angDiff = (a, b) => { let d = a - b; while (d > Math.PI) d -= 2 * Math.PI; while (d < -Math.PI) d += 2 * Math.PI; return d; };
+const _f = new THREE.Vector3(), _r = new THREE.Vector3(), _dir = new THREE.Vector3(), _tv = new THREE.Vector3();
+
+function update(dt, time) {
+  const root = seeker.root, p = root.position;
+  const free = st.mode === 'idle' || st.mode === 'walk';
+  let yawRate = 0, fwd = 0;
+
+  if (free) {
+    // カメラ基準で移動
+    const ix = ((keys['d'] || keys['arrowright'] || pad.r) ? 1 : 0) - ((keys['a'] || keys['arrowleft'] || pad.l) ? 1 : 0);
+    const iy = ((keys['w'] || keys['arrowup'] || pad.u) ? 1 : 0) - ((keys['s'] || keys['arrowdown'] || pad.d) ? 1 : 0);
+    camera.getWorldDirection(_f); _f.y = 0; _f.normalize();
+    _r.set(-_f.z, 0, _f.x);
+    _dir.set(0, 0, 0).addScaledVector(_f, iy).addScaledVector(_r, ix);
+    _tv.set(0, 0, 0);
+    if (_dir.lengthSq() > 0.01) {
+      _dir.normalize();
+      const targetYaw = Math.atan2(_dir.x, _dir.z), diff = angDiff(targetYaw, st.yaw);
+      const step = Math.max(-7 * dt, Math.min(7 * dt, diff));
+      st.yaw += step; yawRate = step / dt;
+      _tv.copy(_dir).multiplyScalar(SPEED * (0.3 + 0.7 * Math.max(0, Math.cos(diff))));   // 向き直りながら進む
+    }
+    vel.lerp(_tv, 1 - Math.exp(-8 * dt));
+    p.addScaledVector(vel, dt);
+    const rr = Math.hypot(p.x, p.z); if (rr > 35) { p.x *= 35 / rr; p.z *= 35 / rr; }
+    fwd = vel.x * Math.sin(st.yaw) + vel.z * Math.cos(st.yaw);
+    st.mode = vel.length() > 0.3 ? 'walk' : 'idle';
+  } else vel.multiplyScalar(Math.exp(-6 * dt));
+  root.rotation.y = st.yaw;
+
+  // キャタピラ: 左右の履帯と車輪を別々に回す(その場旋回もそれっぽく)
+  const [tl, tr] = seeker.tracks;
+  tl.phase += (fwd - yawRate * TRK_X) * dt; tr.phase += (fwd + yawRate * TRK_X) * dt;
+  seeker.tracks.forEach(t => { layoutTreads(t.inst, t.phase); t.wheels.forEach(w => { w.rotation.x = t.phase / 0.1; }); });
+
+  // ドリル動作のステートマシン
+  let spinRate = 0.15, shake = 0;
+  switch (st.mode) {
+    case 'flip':
+      st.vy -= 14 * dt; p.y += st.vy * dt; st.flip = Math.min(1, st.flip + dt / 0.45); spinRate = 1;
+      if (st.flip >= 1) { st.mode = 'hang'; st.t = 0; st.vy = 0; sfx('ぐぐっ…'); }
+      break;
+    case 'hang':
+      st.t += dt; spinRate = 2 + st.t * 8; shake = 0.012;
+      if (st.t > 0.28) { st.mode = 'dive'; st.vy = -3; sfx(''); }
+      break;
+    case 'dive':
+      st.vy = Math.max(st.vy - 45 * dt, -20); p.y += st.vy * dt; spinRate = 4;
+      if (p.y <= TIP) { p.y = TIP; st.mode = 'bore'; st.t = 0; st.dustT = 0; burst(16, 4); sfx('ゴゴゴゴッ!!'); }
+      break;
+    case 'bore': {
+      st.t += dt; spinRate = 6; shake = 0.03;
+      const k = Math.min(1, st.t / 0.7); p.y = TIP - 0.85 * (1 - (1 - k) * (1 - k));
+      st.dustT -= dt; if (st.dustT <= 0) { burst(3, 2.5); st.dustT = 0.05; }
+      if (st.t > 1.2) { st.mode = 'pop'; st.vy = 8; burst(22, 5); sfx(''); }
+      break;
+    }
+    case 'pop':
+      st.vy -= 16 * dt; p.y += st.vy * dt; st.flip = Math.max(0, st.flip - dt / 0.5); spinRate = 1.5;
+      if (p.y <= 0 && st.vy < 0 && st.flip === 0) { p.y = 0; st.vy = 0; st.mode = 'idle'; st.hatV += 2.5; burst(10, 3); }
+      break;
+  }
+  seeker.flipPivot.rotation.x = st.flip * Math.PI;
+
+  // 帽子: バネでぷるぷる。ドリル中はまっすぐ立つ
+  const drilling = !free;
+  const target = drilling ? 0 : -(0.45 + 0.12 * Math.min(1, Math.abs(fwd) / SPEED));
+  st.hatV += (target - st.hatA) * 180 * dt; st.hatV *= Math.exp(-9 * dt); st.hatA += st.hatV * dt;
+  seeker.hatPivot.rotation.x = st.hatA;
+  seeker.hatPivot.rotation.z = THREE.MathUtils.clamp(-yawRate * 0.03, -0.15, 0.15);
+  seeker.stripeTex.offset.x += spinRate * dt;
+
+  // 体の揺れ・まばたき
+  let bob = 0;
+  if (st.mode === 'idle') bob = Math.sin(time * 2.2) * 0.012;
+  else if (st.mode === 'walk') bob = Math.abs(Math.sin((tl.phase + tr.phase) * 3)) * 0.015;
+  seeker.rig.position.set((Math.random() - .5) * shake, -CY + bob, (Math.random() - .5) * shake);
+  st.blink -= dt; if (st.blink < -0.12) st.blink = 1.5 + Math.random() * 3;
+  const eyeY = st.blink < 0 ? 0.015 : 0.105;
+  seeker.eyes.forEach(e => { e.scale.y = eyeY; });
+
+  // 砂ぼこり
+  for (const d of dusts) if (d.l > 0) {
+    d.l -= dt; d.v.y -= 12 * dt; d.m.position.addScaledVector(d.v, dt);
+    if (d.m.position.y < 0.03) { d.m.position.y = 0.03; d.v.multiplyScalar(0.3); }
+    d.m.scale.setScalar(Math.min(1, d.l * 3));
+    if (d.l <= 0) d.m.visible = false;
+  }
+}
+
+/* ---- カメラ追従・ボタン ---- */
+const lastPos = new THREE.Vector3();
+function followCamera() {
+  const p = seeker.root.position;
+  const dx = p.x - lastPos.x, dz = p.z - lastPos.z;
+  camera.position.x += dx; camera.position.z += dz; controls.target.x += dx; controls.target.z += dz;
+  lastPos.copy(p);
+  sun.position.set(p.x + 6, 10, p.z + 5); sun.target.position.set(p.x, 0, p.z);
+}
+$('bAuto').addEventListener('click', () => { controls.autoRotate = !controls.autoRotate; $('bAuto').style.background = controls.autoRotate ? '#9bd35a' : ''; });
+$('bReset').addEventListener('click', () => {
+  const p = seeker.root.position;
+  camera.position.set(p.x + CAM_OFFSET.x, CAM_OFFSET.y, p.z + CAM_OFFSET.z); controls.target.set(p.x, 1, p.z);
+});
+
+/* ---- GLB書き出し(他のAIやBlender、Unity、Godotなどへ渡す用) ---- */
+$('bGlb').addEventListener('click', () => {
+  const copy = seeker.root.clone(true);
+  copy.position.set(0, 0, 0); copy.rotation.set(0, 0, 0);
+  copy.traverse(o => {
+    if (o.name === 'flipPivot') o.rotation.set(0, 0, 0);
+    if (o.name === 'hat') o.rotation.set(-0.5, 0, 0);
+  });
+  const cache = new Map();
+  const conv = m => {
+    if (cache.has(m)) return cache.get(m);
+    const n = new THREE.MeshStandardMaterial({ color: m.color, map: m.map || null, roughness: 0.75, metalness: 0 });
+    if (m.isMeshBasicMaterial) n.emissive = m.color.clone();
+    cache.set(m, n); return n;
+  };
+  const kill = [];
+  copy.traverse(o => {
+    if (!o.isMesh) return;
+    if (o.material && o.material.isShaderMaterial) { kill.push(o); return; }   // 輪郭線は除外
+    o.material = Array.isArray(o.material) ? o.material.map(conv) : conv(o.material);
+  });
+  kill.forEach(o => o.parent.remove(o));
+  new GLTFExporter().parse(copy, buf => {
+    const a = document.createElement('a');
+    a.href = URL.createObjectURL(new Blob([buf], { type: 'model/gltf-binary' }));
+    a.download = 'seeker.glb'; a.click(); URL.revokeObjectURL(a.href);
+  }, err => console.error(err), { binary: true });
+});
+
+addEventListener('resize', () => {
+  camera.aspect = innerWidth / innerHeight; camera.updateProjectionMatrix(); renderer.setSize(innerWidth, innerHeight);
+});
+
+const clock = new THREE.Clock();
+function tick() {
+  const dt = Math.min(clock.getDelta(), 0.05);
+  update(dt, clock.elapsedTime);
+  followCamera(); controls.update();
+  renderer.render(scene, camera);
+  requestAnimationFrame(tick);
+}
+tick();
+</script>
+</body>
+</html>

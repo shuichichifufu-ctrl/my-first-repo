@@ -130,3 +130,45 @@ Net.isHost; Net.connected
 - プレイ中のスワイプ：画面を左右にスワイプ＝90°回転（`World.swipeTurn`、設定で左右を反転）、上下にドラッグ＝視点の上下（`World.nudgePitch`）。ボタンの上から始まった操作はスワイプにしない。スワイプで画面遷移・拡大が起きないこと。
 - 結果画面：CPU戦なら「かち！」「まけ…」とわかる表示、今回の勝ち負けを記録に足して「〇かち 〇まけ」を表示。記録は localStorage `seecar.record` に `{easy:{win,lose},normal:{...},hard:{...}}`。
 - 全体のデザインを磨く（タイトル・設定・難しさ選び・地図選び・結果を同じデザインでそろえる）。
+
+---
+# 第3期の追加「見つけて！PixSee」（SPEC3.md 対応。上の取り決めより優先）
+
+結合順：sfx.js → mapgen.js → seeker.js → world.js → net.js → ui.js（build.py を更新済み）。
+
+## Seeker（seeker.js、新規）— `window.SeekerModel`
+山田さんの ref_pixsee/seeker3d.html の createSeeker を THREE r128（グローバル、ES modules 不可）に移植したもの。
+- `SeekerModel.create({color})` → `{root, flipPivot, rig, hatPivot, pole, eyes, tracks, stripeTex, setColor(c), update(dt, state)}`
+  - 大きさ：全体が1マス（幅・奥行き1.0以内）に収まり、ボディの下端が root の y=0。前（目のある側）は +Z。
+  - color はボディの色（ref の orange の代わり。端面のクリーム色・星・しましまドリルは共通）。プレイヤー0は橙 #e08524、1は青 #2f8be0 を想定。
+  - ドリルハットはボディから少し浮かせ、ボディとハットの間に短い黒い棒（pole）。めり込まない最短の長さ。
+  - `update(dt, s)`：s = `{move:前進の速さ(-1..1), turn:回転の速さ, spin:ドリル回転の速さ(0..), squash:0..1(凹み), flip:0..1(0=通常,1=逆さでドリルが真下), hatForward:0..1(ドリルを正面に向ける), blink:true/false}` を見た目に反映（履帯と車輪の回転、帽子のばね、しましまの回転、凹み、逆さ、正面ドリル、まばたき）。物理や位置は world.js が持つ。
+
+## MapData の追加（mapgen.js）
+- `MapGen.fromPreset(id, opts)`, `fromFile(file, opts)`, `fromCanvas(canvas, title, reading, opts)` の opts に `treasureCount`（1 または 10。既定1）。
+- MapData に `treasures: [{x,z}]`（treasureCount 個）。`treasure` は互換のため `treasures[0]`。
+- 宝の場所：壁（高さ10）で囲まれた白い領域を使う（1個なら最小の領域、10個なら小さい順に。足りなければ大きい領域の中に互いに離して散らす）。各宝の場所には「土の山」をかぶせる：宝のマスを中心に3×3マスを高さ3にする（もとの高さが3以上ならそのまま）。土の色は淡いクレヨンの茶色（例 #d9b98c）。宝のマスの真下は高さ0の地面（宝は地面の高さにある）。
+- `MapData.buried`: Uint8Array(w*h)（1=土の山のマス）。
+- スタート2つ：互いに離れ、高さ0、**宝（1個のとき）までの道のりがほぼ同じ**（公平）。10個のときは地図の中で対称に近い2点。
+
+## World（world.js）
+- 移動は自由な向き：`heading`（ラジアン）。`World.press('fwd', down)` で押している間、前（heading）へ約2.4マス/秒。`World.swipeTurn(dx)` は左右スワイプの量に応じて heading を回す（dx は画面幅比の連続値。+で右。UIが反転設定を処理）。`World.nudgePitch(dy)`, `resetPitch()` は継続。`World.press('left'|'right', down)` は押している間回る（キーボード用）。
+- 高さの規則：入るマスの高さが「今の足元+1」以下なら進める（キャタピラ）。降りは自由（落ちる）。空中ではジャンプの高さまで乗れる。
+- `World.press('jump', true)`：凹んでから弾む跳ね方。最高で足元+5段の高さ（見た目は STEP_H×5 より少し上）。「fwd」を押していれば前方ジャンプ。着地でまた少し凹む。
+- `World.press('drillAttack', true)`：ドリルを正面に向けて回す。正面のマス（heading を4方向に丸めた1マス先）の高さを、自分の足元の段まで下げる（土の山も壁も）。何も壊さなければ空振り。
+- `World.press('drillJump', true)`：跳ぶ→空中で逆さ（flip=1）→足元のマスへ潜る→足元のマスを1段下げる→弾んで戻る。「fwd」を押していれば前へ跳んで1マス前を1段下げる。
+- 宝：土の下にある間は見えない（ソナーにだけ出る）。宝のマスの高さが0になると宝石が地面から出てきて光る。シーカーがそのマスに入ると拾う。
+- `World.load(map, {myIndex, players, net, cpu, mode})`：mode は `'race'`（宝1つ、先に拾ったほうが終わり）、`'count'`（宝10個。全部拾われるか、UIが `World.finish()` を呼ぶまで）、`'solo'`（ひとり。宝1つ）。
+- イベント：`'collect'(idx, ti, scores)`（idx=拾った人、ti=宝の番号、scores=[自分,相手]）、`'found'(idx)`（race/solo で最初に拾った時。互換）、`'terrain'(cells)`（自分が変えた地形 [[x,z,h],...]。通信に送る）、`'state'(s)`（約10回/秒、s={x,z,y,heading,anim,...}）、`'action'(name)`（'jump'|'drillAttack'|'drillJump'。演出・通信用）。
+- `World.applyRemoteState(idx, s)`、`World.applyRemoteTerrain(cells)`（発火しない）、`World.applyRemoteCollect(idx, ti)`。
+- `World.sonar(radius=10)` → `{heading, items:[{dx,dz,dist,depth}]}`（自分から見たマス単位の相対位置。dx,dz は世界座標の差。depth=宝の上に残る段数。拾われた宝は除く）。UI はこれで左上の円形レーダーを描く（上が heading 方向になるよう回して描く）。
+- `World.scores()` → [自分の数, 相手の数]。`World.finish()` で止める。
+- CPU（cpu:{level}）：近い宝へ向かい、段差1は登る、5段まではジャンプ、高い壁はドリルアタックで壊す、土の山は上に乗ってドリルジャンプ（または前から壊して）掘り、宝を拾う。count モードでは次の宝へ。行動の間隔で難しさを変える（やさしい 約1.2秒、ふつう 約0.6秒、むずかしい 約0.28秒に相当する速さ）。
+- 争いの言葉を使わない（コード内のコメントは自由。画面に出る文字・効果音名に注意）。
+
+## App（ui.js / style.css / index.html）
+- タイトル「見つけて！PixSee」（PixSee のロゴ。星のモチーフは残してよい）。
+- 流れ：タイトル →「あそびかた」選択（どっちが はやい？／どっちが おおい？／ひとりで れんしゅう）→（ひとり以外）「だれと？」（コンピューターと あそぶ／ともだちと あそぶ）→（コンピューター）難しさ →地図選び →しゅっぱつ。ともだちは従来の部屋づくり（番号）。
+- プレイ画面：左下に大きい「すすむ」（押している間）。右下に「ジャンプ」「ドリルアタック」「ドリルジャンプ」（絵つき、押せる部品は短辺の8%以上）。左上にソナー（円形、半径10ブロック、自分は中央の矢印、宝は光る点、深さで点の濃さ）。どっちが おおい？では上部に残り時間（10:00から）と「きみ 〇こ／あいて 〇こ」。右上はホームボタン（最前面）と小さい視点ボタン。地図名は邪魔にならない位置。
+- スワイプ：左右でなぞった分だけ `World.swipeTurn(dx)`、上下で `nudgePitch`。ボタン上から始めた操作は除外。
+- 結果：争いの言葉を使わない（SPEC3 の決めたことを参照）。記録は localStorage `pixsee.record`（モード×相手×難しさ）。リセットは設定から（確認つき）。設定は localStorage `pixsee.settings`（スワイプ反転、白黒モード）。旧キー seecar.* は読まなくてよい。
