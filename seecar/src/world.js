@@ -48,6 +48,7 @@
   // ---- 宝石 ----
   var GEM_R = 0.34;            // 宝石の大きさ
   var GEM_RISE = 1.7;          // 壊したマスから浮き上がる高さ（シーカーの頭より上）
+  var GEM_OVER_HEAD = 3.4;     // 壊した人が すぐ下にいるとき、宝石は その人の足元から少なくともこの高さまで浮く（頭の上 約1.8）
   var GEM_SHOW = 3.0;          // 浮き上がって回りながら光る時間（そのあと持ち主へ吸い込まれる）
   var GEM_FLY = 0.55;          // 持ち主へ飛ぶ時間
   // MapGen.GEMS が無いときの代わり（順番は CONTRACT の決まりどおり）
@@ -68,33 +69,38 @@
 
   /* ===== W02. CPU の強さ（SPEC4 §6-3。調整はここだけ） ===== */
   // CPU は宝の座標を直接読まない。人と同じソナー（と 'light' のときは光の柱の向き）から、誤差つきで推理する。
+  // 目安（test/world4_vsbot.js：宝の場所が正確に分かる「上手な人の代わりのボット」との勝ち負け）：
+  //   ボットの勝率 むずかしい ≈65%、ふつう ≈75〜80%、やさしい ≈90%（ひかり・ソナーとも）。
+  //   ボットは子どもより強いので、むずかしい は少し弱めの側に合わせている。
   var CPU_LEVELS = {
     easy: {
-      speed: 0.75,      // 速さ：人の基本の速さに対する比率
-      accelMax: 0,      // 加速の上限（基本の速さに対する比率。0 = 加速しない）
+      speed: 0.68,      // 速さ：人の基本の速さに対する比率
+      accelMax: 0,      // 加速の上限（基本の速さに対する比率。0 = 加速しない。人は +50%）
       react: 1.2,       // 反応の遅れ（秒）：ソナーを読み直す間隔・動き出すまでの間
       sonarErr: { ang: 0.45, dist: 0.3 }, // ソナーの読み取り誤差：向き（ラジアンの標準偏差）、距離（距離に対する割合）＝大
       mistake: 0.25,    // 道を間違える確率（新しく道を決めるたび）＝ときどき
       turn: 2.6         // 回る速さ（ラジアン/秒）
     },
     normal: {
-      speed: 0.9,
-      accelMax: 0.2,
-      react: 0.7,
+      speed: 0.82,
+      accelMax: 0.15,
+      react: 0.9,
       sonarErr: { ang: 0.22, dist: 0.15 }, // 中
-      mistake: 0.1,     // 少なめ
+      mistake: 0.12,    // 少なめ
       turn: 4.0
     },
     hard: {
-      speed: 1.0,
-      accelMax: 0.3,
-      react: 0.3,
-      sonarErr: { ang: 0.08, dist: 0.06 }, // 小
-      mistake: 0.03,    // まれ
+      speed: 0.86,
+      accelMax: 0.15,
+      react: 0.55,
+      sonarErr: { ang: 0.1, dist: 0.08 }, // 小
+      mistake: 0.05,    // まれ
       turn: 6.0
     }
   };
   var CPU_SONAR_R = 10;   // ソナーで距離が分かる半径（人の左上のソナーと同じ）
+  var CPU_SONAR_FAR = 200; // 円の外の宝の向きを知らせる範囲（人のソナーの ふちのくさび と同じ。ui.js SONAR_FAR）
+  var CPU_LIGHT_ERR = 0.6;  // 'light' のとき、光の柱の向きの読み取り誤差（ソナーの向きの誤差に対する割合。小さいほど正確）
 
   /* ===== W03. 小さな道具 ===== */
   function sfx(name) { try { if (window.Sfx && window.Sfx.play) window.Sfx.play(name); } catch (e) { /* 音が無くても続ける */ } }
@@ -238,25 +244,30 @@
     '  }',
     '}'
   ].join('\n');
-  // カメラとシーカーの間にある積み木を、網目に抜いて薄く透かす（aFade 0..1。並べ替え不要で描画命令も増えない）
-  var BLOCK_DITHER = [
-    'if (vFade > 0.01) {',
-    '  float bx = mod(floor(gl_FragCoord.x), 2.0), by = mod(floor(gl_FragCoord.y), 2.0);',
-    '  if (vFade > (2.0 * bx + 3.0 * by - 4.0 * bx * by) / 4.0 + 0.125) discard;',
-    '}'
-  ].join('\n');
-  // MeshLambertMaterial に積み木の陰影を足す（描画命令の数は変わらない）
-  function blockShade(mat) {
+  // カメラとシーカーの間にある積み木を、なめらかに薄く透かす（aFade 0..1）。
+  // 同じ積み木を3回描く：①ふつうの積み木（透かす積み木だけ抜く）②透かす積み木の奥行きだけ（色は塗らない）
+  // ③透かす積み木の色を半透明で（②のおかげで、いちばん手前の面だけが1枚ぶん重なる。中の面が何枚も重ならない）
+  var BLOCK_CUT = {
+    solid: 'if (vFade > 0.01) discard;',
+    ghost: 'if (vFade <= 0.01) discard;'
+  };
+  // ③：上の面の明るさ計算のあとで、不透明度を下げる（vFade 0.7 → 不透明度 0.3）
+  var BLOCK_ALPHA = 'diffuseColor.a *= clamp(1.0 - vFade, 0.0, 1.0);';
+  // MeshLambertMaterial に積み木の陰影を足す（kind: 'solid'＝ふつう、'ghost'＝透かす積み木だけ）
+  function blockShade(mat, kind) {
+    kind = kind || 'solid';
     mat.onBeforeCompile = function (sh) {
       sh.vertexShader = sh.vertexShader
         .replace('#include <common>', '#include <common>\nattribute float aEdge;\nattribute float aFade;\nvarying float vFade;\nvarying vec3 vWP;\nvarying vec3 vNl;\nvarying float vEdge;\nvarying vec3 vCell;')
-        .replace('#include <begin_vertex>', '#include <begin_vertex>\n' + BLOCK_VERT);
+        .replace('#include <begin_vertex>', '#include <begin_vertex>\n' + BLOCK_VERT)
+        // 透かす積み木の描画では、透かさない積み木の頂点を画面の外へ（塗る画素を作らない）
+        .replace('#include <project_vertex>', '#include <project_vertex>\n' + (kind === 'ghost' ? 'if (aFade <= 0.01) gl_Position = vec4(0.0, 0.0, 2.0, 1.0);' : ''));
       sh.fragmentShader = sh.fragmentShader
         .replace('#include <common>', '#include <common>\nvarying float vFade;\nvarying vec3 vWP;\nvarying vec3 vNl;\nvarying float vEdge;\nvarying vec3 vCell;')
-        .replace('#include <clipping_planes_fragment>', '#include <clipping_planes_fragment>\n' + BLOCK_DITHER)
-        .replace('#include <color_fragment>', '#include <color_fragment>\n' + BLOCK_FRAG);
+        .replace('#include <clipping_planes_fragment>', '#include <clipping_planes_fragment>\n' + BLOCK_CUT[kind === 'ghost' ? 'ghost' : 'solid'])
+        .replace('#include <color_fragment>', '#include <color_fragment>\n' + BLOCK_FRAG + (kind === 'ghost' ? '\n' + BLOCK_ALPHA : ''));
     };
-    mat.customProgramCacheKey = function () { return 'seecar-block-soft'; };
+    mat.customProgramCacheKey = function () { return 'seecar-block-soft-' + kind; };
     return mat;
   }
 
@@ -525,9 +536,16 @@
     var el = S.container;
     var w = Math.max(1, el.clientWidth || window.innerWidth), h = Math.max(1, el.clientHeight || window.innerHeight);
     S.renderer.setSize(w, h, false);
-    S.camera.aspect = w / h;
-    S.camera.updateProjectionMatrix();
+    // 入れもの（#worldbox）が 16:9 でないとき（4:3 の iPad で画面全体に広げた場合など）は、
+    // 真ん中の 16:9（ステージ）の見え方は そのままに、上下（左右）へ 3D の絵を広げる（帯を出さない）。
+    // カメラの構図（俯瞰の地図の置き場所・獲得のカメラ）は いつもステージ（16:9）を基準に考える。
+    var asp = w / h, cam = S.camera;
+    if (Math.abs(asp - STAGE_ASPECT) < 0.01) { cam.clearViewOffset(); cam.aspect = asp; }
+    else if (asp < STAGE_ASPECT) { var hs = w / STAGE_ASPECT; cam.aspect = STAGE_ASPECT; cam.setViewOffset(w, hs, 0, (hs - h) / 2, w, h); }
+    else { var ws = h * STAGE_ASPECT; cam.aspect = STAGE_ASPECT; cam.setViewOffset(ws, h, (ws - w) / 2, 0, w, h); }
+    cam.updateProjectionMatrix();
   }
+  var STAGE_ASPECT = 16 / 9;
 
   /* ===== W10. 演出の部品（かけら・土ぼこり・きらきら・文字） ===== */
   function buildFx() {
@@ -862,8 +880,17 @@
     mesh.instanceMatrix.needsUpdate = true;
     if (mesh.instanceColor) mesh.instanceColor.needsUpdate = true;
     add(mesh);
+    // 透かす積み木（同じ形・同じ置き場所・同じ色を使う。透明なものの中で、宝石の光やきらきらのあとに描く）
+    var gDepth = blockShade(new THREE.MeshLambertMaterial({ vertexColors: true, colorWrite: false, transparent: true }), 'ghost');
+    var gColor = blockShade(new THREE.MeshLambertMaterial({ vertexColors: true, transparent: true, depthWrite: false }), 'ghost');
+    L.ghosts = [gDepth, gColor].map(function (gm, j) {
+      var gh = new THREE.InstancedMesh(geo, gm, Math.max(1, n));
+      gh.instanceMatrix = mesh.instanceMatrix; gh.instanceColor = mesh.instanceColor;
+      gh.frustumCulled = false; gh.renderOrder = 25 + j; gh.visible = false; // 透かす積み木があるときだけ描く
+      return add(gh);
+    });
     L.terrain = mesh; L.cellToInst = cellToInst; L.edgeAttr = edgeAttr; L.fadeAttr = fadeAttr; L.fading = {};
-    L.dispose.push(geo, mat);
+    L.dispose.push(geo, mat, gDepth, gColor);
   }
   // となりが低い（または地図の外）辺：1=北(z-1) 2=東(x+1) 4=南(z+1) 8=西(x-1)
   function edgeMask(x, z) {
@@ -1137,13 +1164,13 @@
       tintGem(tr, t);
       if (u < 0.8) { // 浮き上がる
         var e = 1 - Math.pow(1 - u / 0.8, 3);
-        gy = A.y0 + GEM_RISE * e; sc = 0.35 + 0.65 * e; spin = 7 - 5 * e; haloK = e; lk = e;
+        gy = A.y0 + A.rise * e; sc = 0.35 + 0.65 * e; spin = 7 - 5 * e; haloK = e; lk = e;
       } else if (u < GEM_SHOW) { // 回りながら光る（光がやわらかく広がる）
         var v = (u - 0.8) / (GEM_SHOW - 0.8);
-        gy = A.y0 + GEM_RISE + Math.sin((u - 0.8) * 2.2) * 0.08; sc = 1 + 0.08 * Math.sin((u - 0.8) * 2.6); spin = 2; haloK = 1 + v * 0.8; lk = 1;
+        gy = A.y0 + A.rise + Math.sin((u - 0.8) * 2.2) * 0.08; sc = 1 + 0.08 * Math.sin((u - 0.8) * 2.6); spin = 2; haloK = 1 + v * 0.8; lk = 1;
       } else { // 持ち主へ吸い込まれる
         var f = clamp((u - GEM_SHOW) / GEM_FLY, 0, 1), fe = f * f, a = actorOf(tr.owner);
-        var sx = 0, sz = 0, sy = A.y0 + GEM_RISE;
+        var sx = 0, sz = 0, sy = A.y0 + A.rise;
         if (a) { sx = (a.wx - tr.group.position.x) * fe; sz = (a.wz - tr.group.position.z) * fe; sy += (a.y + 0.8 - sy) * fe; }
         tr.mesh.position.set(sx, sy + Math.sin(f * Math.PI) * 0.6, sz);
         sc = 1 - 0.85 * f; spin = 6; haloK = 1.8 * (1 - f); lk = 1 - f;
@@ -1199,11 +1226,25 @@
     }
   }
   // 所有者を決める（UI が呼ぶ）。同じ宝石への2回目以降は無視
+  // ソナーの読み取り（人の左上のソナーと CPU が同じものを使う）：(wx,wz) から radius マス以内の、まだだれの物でもない宝
+  //   返り値 { k: 宝の番号, t: 宝, dx, dz, dist }
+  function sonarRead(wx, wz, radius) {
+    var out = [];
+    for (var k = 0; k < S.treasures.length; k++) {
+      var t = S.treasures[k]; if (t.owner >= 0) continue; // 持ち主の決まった宝は出ない
+      var dx = t.x + 0.5 - wx, dz = t.z + 0.5 - wz, d = Math.hypot(dx, dz);
+      if (d <= radius) out.push({ k: k, t: t, dx: dx, dz: dz, dist: d });
+    }
+    return out;
+  }
   function award(who, ti) {
     who = who | 0; ti = ti | 0;
     var tr = S.treasures[ti]; if (!tr || tr.owner >= 0 || !S.level) return false;
     tr.owner = who;
-    tr.anim = { t: 0, y0: vis(S.heights[idx(tr.x, tr.z)]) + 0.15, done: false };
+    tr.anim = { t: 0, y0: vis(S.heights[idx(tr.x, tr.z)]) + 0.15, rise: GEM_RISE, done: false };
+    // 壊した人がすぐ下（ジャンプドリルで同じマスの穴の中など）にいるときは、頭の上にはっきり離れて見えるよう高く浮かせる
+    var ha = actorOf(who);
+    if (ha && Math.hypot(ha.wx - tr.x - 0.5, ha.wz - tr.z - 0.5) < 1.6) tr.anim.rise = Math.max(GEM_RISE, ha.y + GEM_OVER_HEAD - tr.anim.y0);
     S.scores[who] = (S.scores[who] || 0) + 1;
     var a = actorOf(who);
     if (a === S.me && (S.mode !== 'count' || !S.held.fwd)) S.faceHold = S.mode === 'count' ? 1.3 : 30; // 顔を見せる
@@ -1616,7 +1657,7 @@
   /* ===== W22. CPU（ソナーで推理して さがす） ===== */
   // ★ きまり：CPU は宝の座標を直接読まない。
   //   CPU が宝石について知ってよいのは cpuSense() が返す「誤差つきの読み取り」だけ：
-  //     ・ソナー：半径10マスの中は距離と向き、外は向きだけ（人の左上のソナーと同じ手がかり）
+  //     ・ソナー：半径10マスの中は距離と向き、外は いちばん近い1つの向きだけ（人の左上のソナーと同じ手がかり。sonarRead を共用）
   //     ・'light' のときは光の柱の向き（人にも見えている）
   //   cpuSense() のほかの CPU の関数は、S.treasures（宝石の座標）・S.gemAt（宝石のマス）を読まない。
   //   CPU は読み取りを重ねて「どのブロックに入っていそうか」を推理し（遠ければ向きへ進み、近づいたら距離で絞る）、
@@ -1634,16 +1675,19 @@
   }
   // ---- 読み取り（CPU が宝石の情報に触れるのは、ここだけ） ----
   function cpuSense(c) {
-    var cfg = c.ai.cfg, out = [];
-    for (var k = 0; k < S.treasures.length; k++) {
-      var t = S.treasures[k]; if (t.owner >= 0) continue; // ソナーにも、持ち主の決まった宝は出ない
-      var dx = t.x + 0.5 - c.wx, dz = t.z + 0.5 - c.wz, d = Math.hypot(dx, dz), ang = Math.atan2(dx, dz);
-      var r = { key: k, ang: null, sa: cfg.sonarErr.ang * (d <= CPU_SONAR_R ? 1 : 1.8), dist: null };
-      if (d <= CPU_SONAR_R) { // ソナーの円の中：距離と向き（どちらも誤差つき）
+    // 人の画面のソナーと同じ情報だけ：円の中の宝は全部（距離と向き）、円の外は いちばん近い1つの向きだけ（ふちのくさび）。
+    // 'light' のときは、人にも見えている光の柱の向き（全部の宝）をはっきり読める。
+    var cfg = c.ai.cfg, out = [], all = sonarRead(c.wx, c.wz, CPU_SONAR_FAR), far = null, k;
+    for (k = 0; k < all.length; k++) if (all[k].dist > CPU_SONAR_R && (!far || all[k].dist < far.dist)) far = all[k];
+    for (k = 0; k < all.length; k++) {
+      var s = all[k], d = s.dist, ang = Math.atan2(s.dx, s.dz), inR = d <= CPU_SONAR_R;
+      if (!inR && s !== far && S.search !== 'light') continue; // ソナーだけ：円の外の2つ目からは見えない
+      var r = { key: s.k, ang: null, sa: cfg.sonarErr.ang * (inR ? 1 : 1.8), dist: null };
+      if (inR) { // ソナーの円の中：距離と向き（どちらも誤差つき）
         r.dist = Math.max(0, d * (1 + gauss() * cfg.sonarErr.dist) + gauss() * 0.3);
         if (d > 0.7) r.ang = ang + gauss() * cfg.sonarErr.ang;
       } else r.ang = ang + gauss() * cfg.sonarErr.ang * 1.8; // 円の外：向きだけ（遠いほど ぼんやり）
-      if (S.search === 'light' && d > 0.7) { r.ang = ang + gauss() * cfg.sonarErr.ang * 0.35; r.sa = cfg.sonarErr.ang * 0.35; } // 光の柱の向き（はっきり見える）
+      if (S.search === 'light' && d > 0.7) { r.ang = ang + gauss() * cfg.sonarErr.ang * CPU_LIGHT_ERR; r.sa = cfg.sonarErr.ang * CPU_LIGHT_ERR; } // 光の柱の向き（はっきり見える）
       out.push(r);
     }
     return out;
@@ -1931,7 +1975,7 @@
   var CHASE_BACK = 3.9, CHASE_UP = 3.2, CHASE_AHEAD = 3.6, CHASE_SIDE = 1.1; // 少し右うしろから：ロールケーキの端（星）も見える
   var ATK_SIDE = 1.5, ATK_UP = 1.3, ATK_BACK = 0.6, ATK_HOLD = 0.9;          // ドリルアタック中のずらし
   var ORBIT_YAW = 2.25, ORBIT_DIST = 3.0, ORBIT_UP = 1.75, IDLE_ORBIT = 2.6;  // 顔を見せる回りこみ（止まって2.6秒で）
-  var FADE_ON = 0.7;                                                          // 間の壁を透かす量（0.7＝4つに3つ抜く）
+  var FADE_ON = 0.7;                                                          // 間の壁を透かす量（0.7＝不透明度 0.3 の なめらかな半透明）
   var poseM = new THREE.Matrix4(), UP = new THREE.Vector3(0, 1, 0), NORTH = new THREE.Vector3(0, 0, -1);
   function poseFor(mode) {
     var p = new THREE.Vector3(), q = new THREE.Quaternion(), tg = new THREE.Vector3();
@@ -1983,37 +2027,85 @@
     }
     return clamp(lift, 0, 2.6);
   }
-  // 宝石の獲得（自分）：浮き上がる 3.5 秒の間、宝石が画面の上のほう（上から約 25%）、シーカーが下のほうに入るよう、
-  // 横ななめ前から少し引いて見る。獲得宣言のカード（画面の中央）にどちらも隠れない。向きは壁で隠れにくい方向を award のときに1回だけ選ぶ
-  var GEMCAM_R = 6.4, GEMCAM_UP = 2.6, GEMCAM_NDC = 0.56;
-  var gcP = new THREE.Vector3(), gcT = new THREE.Vector3();
-  function gemPeak(tr) { return tr.anim ? tr.anim.y0 + GEM_RISE : vis(S.heights[idx(tr.x, tr.z)]) + 0.15 + GEM_RISE; }
+  // 宝石の獲得（自分）：浮き上がる 3.5 秒の間のカメラ。獲得宣言のカード（ステージの y 33.5〜58.5%・x 18〜82%）に隠れないよう、
+  //   ・宝石は画面の上のほう（上から約 22%。12〜30% の中）
+  //   ・シーカーは カードの下（頭が上から 61% より下、足が画面の下からはみ出さない）
+  // に入る位置を、award のときに1回だけ探して決める（16方向 × 距離 × 高さ。壁にさえぎられにくく、近いほど よい）。
+  // 宝石がシーカーから遠い（8マスより先：通信の遅れなど）か、両方が入る位置がないときは、宝石だけを画面の上のほうに大きく映す。
+  var GEMCAM_GEM_NDC = 0.56;            // 宝石の高さ（画面の中心=0、上の端=1）＝上から 22%
+  var GEMCAM_HEAD_NDC = -0.22;          // シーカーの頭はこれより下（上から 61%＝カードの下の端 58.5% より下）
+  var GEMCAM_FEET_NDC = -0.7;           // シーカーの足はこれより上（上から 85%。画面の下の端・操作ボタンの下へ沈まない）
+  var GEMCAM_FAR = 8;                   // これより遠い宝石は、宝石だけを映す
+  var gcP = new THREE.Vector3(), gcT = new THREE.Vector3(), gcV = new THREE.Vector3(), gcCam = null;
+  function gemPeak(tr) { return tr.anim ? tr.anim.y0 + tr.anim.rise : vis(S.heights[idx(tr.x, tr.z)]) + 0.15 + GEM_RISE; }
+  // 線分の上で、積み木の上の面より下を通る所を数える（さえぎられる量）
+  function occCount(x0, y0, z0, x1, y1, z1) {
+    var n = 0, len = Math.hypot(x1 - x0, y1 - y0, z1 - z0), steps = Math.max(4, Math.ceil(len / 0.3));
+    for (var i = 1; i < steps; i++) {
+      var t = i / steps; if (t > 0.94) break;
+      if (groundTopAt(x0 + (x1 - x0) * t, z0 + (z1 - z0) * t) > y0 + (y1 - y0) * t) n++;
+    }
+    return n;
+  }
   function startGemCam(tr) {
     var a = S.me; if (!a) return;
-    var gx = tr.group.position.x, gz = tr.group.position.z;
-    if (Math.hypot(gx - a.wx, gz - a.wz) > 4) { S.gemCam = null; return; } // 遠くの宝石（確認用など）はいつものカメラのまま
+    if (!gcCam) gcCam = new THREE.PerspectiveCamera(55, 16 / 9, 0.05, 400);
+    gcCam.fov = S.camera.fov; gcCam.aspect = 16 / 9; gcCam.updateProjectionMatrix(); // ステージ（16:9）の画面で考える
+    var gx = tr.group.position.x, gz = tr.group.position.z, gy = gemPeak(tr);
+    var far = Math.hypot(gx - a.wx, gz - a.wz) > GEMCAM_FAR;
+    var best = gemCamSolve(tr, a, gx, gy, gz, far, GEMCAM_FEET_NDC);
+    if (!best && !far) best = gemCamSolve(tr, a, gx, gy, gz, false, -0.9); // 狭い所：足もとは画面の下のはしまで ゆるめる
+    if (!best) best = gemCamSolve(tr, a, gx, gy, gz, true, 0); // 両方は入らない（とても狭い所など）：宝石だけを映す
+    S.gemCamWhy = best ? (best.far ? 'gem-only' : 'both') : 'none';
+    if (!best) { S.gemCam = null; return; } // それでも見つからない：いつものカメラのまま
+    S.gemCam = { tr: tr, p: new THREE.Vector3(best.x, best.y, best.z), pitch: best.pitch, dx: best.dx, dz: best.dz };
+  }
+  function gemCamSolve(tr, a, gx, gy, gz, far, feetNdc) {
+    var tn = Math.tan(THREE.MathUtils.degToRad(gcCam.fov / 2));
     var fx = -Math.sin(a.heading), fz = -Math.cos(a.heading);
-    var mx = (gx + a.wx) / 2, mz = (gz + a.wz) / 2, gy = gemPeak(tr), cy = a.y + GEMCAM_UP;
-    var best = null, bestScore = -1e9;
+    // 見る中心（水平）：宝石とシーカーの間。遠いときは宝石
+    var mx = far ? gx : (gx + a.wx) / 2, mz = far ? gz : (gz + a.wz) / 2;
+    var headY = a.y + 1.6, feetY = a.y + 0.05;
+    var best = null;
     for (var k = 0; k < 16; k++) {
       var an = k / 16 * Math.PI * 2, dx = Math.cos(an), dz = Math.sin(an);
-      var cx = mx + dx * GEMCAM_R, cz = mz + dz * GEMCAM_R;
-      // 壁にさえぎられる量（カメラ→宝石、カメラ→シーカーの頭）
-      var occ = 0;
-      [[gx, gy, gz], [a.wx, a.y + 0.9, a.wz], [a.wx, a.y + 0.3, a.wz]].forEach(function (q) {
-        for (var t = 0.08; t < 0.95; t += 0.06) {
-          var x = cx + (q[0] - cx) * t, y = cy + (q[1] - cy) * t, z = cz + (q[2] - cz) * t;
-          if (groundTopAt(x, z) > y) occ++;
+      for (var D = 3; D <= 24; D += 0.75) {
+        var cx = mx + dx * D, cz = mz + dz * D, found = null;
+        for (var hy = Math.min(a.y, gy) + 0.6; hy <= Math.max(gy, headY) + 14; hy += 0.6) {
+          if (groundTopAt(cx, cz) > hy - 0.6) continue;           // カメラが積み木の中に入らない
+          // 宝石を上から 22% に置く向き
+          var fd = (gx - cx) * -dx + (gz - cz) * -dz;             // 宝石までの前向きの距離
+          if (fd < 1.5) continue;
+          var pitch = Math.atan2(gy - hy, fd) - Math.atan(GEMCAM_GEM_NDC * tn);
+          if (pitch < -1.15 || pitch > 0.5) continue;              // 真下・空を見上げすぎない
+          gcCam.position.set(cx, hy, cz);
+          gcT.set(cx - dx * Math.cos(pitch), hy + Math.sin(pitch), cz - dz * Math.cos(pitch));
+          gcCam.lookAt(gcT); gcCam.updateMatrixWorld();
+          var pg = gcV.set(gx, gy, gz).project(gcCam);
+          if (pg.z > 1 || Math.abs(pg.x) > 0.6 || pg.y < 0.42 || pg.y > 0.74) continue;
+          if (!far) {
+            var ph = gcV.set(a.wx, headY, a.wz).project(gcCam), py = ph.y, px = ph.x, pz = ph.z;
+            var pf = gcV.set(a.wx, feetY, a.wz).project(gcCam);
+            if (pz > 1 || py > GEMCAM_HEAD_NDC || pf.y < feetNdc || Math.abs(px) > 0.55) continue;
+          }
+          found = { x: cx, y: hy, z: cz, pitch: pitch, dx: dx, dz: dz, far: far };
+          break; // この距離では いちばん低い（地面に近い）高さを使う
         }
-      });
-      var inside = inMap(Math.floor(cx), Math.floor(cz)) ? 0 : 1;
-      var front = dx * fx + dz * fz;                      // シーカーの顔の側から見たい
-      var gxv = gx - a.wx, gzv = gz - a.wz, gl = Math.hypot(gxv, gzv);
-      var across = gl > 0.3 ? 1 - Math.abs((dx * gxv + dz * gzv) / gl) : 1; // 宝石とシーカーが横に並んで見える向き
-      var score = -occ * 3 - inside * 2 + front * 1.2 + across * 1.5;
-      if (score > bestScore) { bestScore = score; best = [dx, dz]; }
+        if (!found) continue;
+        var occ = occCount(cx, found.y, cz, gx, gy, gz) * (far ? 3 : 1);
+        if (!far) { // シーカーの頭・体の真ん中・左右のはし・足もとが、壁に隠れないか
+          var lx = -dz * 0.4, lz = dx * 0.4;
+          occ += occCount(cx, found.y, cz, a.wx, headY, a.wz) + occCount(cx, found.y, cz, a.wx, a.y + 0.7, a.wz) + occCount(cx, found.y, cz, a.wx, feetY + 0.2, a.wz)
+            + occCount(cx, found.y, cz, a.wx + lx, a.y + 0.7, a.wz + lz) + occCount(cx, found.y, cz, a.wx - lx, a.y + 0.7, a.wz - lz);
+        }
+        var front = dx * fx + dz * fz;                            // シーカーの顔の側から見たい
+        var outMap = inMap(Math.floor(cx), Math.floor(cz)) ? 0 : 1;
+        var score = -occ * 4 - D * 0.35 + front * 1.0 - outMap * 1.5;
+        if (!best || score > best.score) { found.score = score; best = found; }
+        break; // この向きでは、いちばん近い距離を使う
+      }
     }
-    S.gemCam = { tr: tr, dx: best[0], dz: best[1] };
+    return best;
   }
   function gemCamOn() {
     var G = S.gemCam; if (!G || !G.tr.anim || G.tr.owner < 0) return false;
@@ -2021,16 +2113,9 @@
   }
   function gemCamPose(a, outP, outT) {
     var G = S.gemCam; if (!G) return false;
-    var tr = G.tr, gx = tr.group.position.x, gz = tr.group.position.z, gy = gemPeak(tr);
-    var mx = (gx + a.wx) / 2, mz = (gz + a.wz) / 2, py = S.camY;
-    outP.set(mx + G.dx * GEMCAM_R, Math.max(py + GEMCAM_UP, gy - 0.4), mz + G.dz * GEMCAM_R);
-    var tn = Math.tan(THREE.MathUtils.degToRad(S.camera.fov / 2));
-    var eG = Math.atan2(gy - outP.y, Math.hypot(gx - outP.x, gz - outP.z));
-    var eS = Math.atan2(py + 0.05 - outP.y, Math.hypot(a.wx - outP.x, a.wz - outP.z));
-    // 宝石を画面の上から約 22% に（獲得宣言のカードは画面の中央 30〜70%）。ただしシーカーの足元が画面の下からはみ出さない範囲で
-    var pitch = Math.min(eG - Math.atan(GEMCAM_NDC * tn), eS + Math.atan(0.72 * tn));
-    var hx = mx - outP.x, hz = mz - outP.z, hl = Math.hypot(hx, hz) || 1, cp = Math.cos(pitch);
-    outT.set(outP.x + hx / hl * cp * 5, outP.y + Math.sin(pitch) * 5, outP.z + hz / hl * cp * 5);
+    outP.copy(G.p);
+    var cp = Math.cos(G.pitch);
+    outT.set(G.p.x - G.dx * cp * 5, G.p.y + Math.sin(G.pitch) * 5, G.p.z - G.dz * cp * 5);
     return true;
   }
   function setCamera(mode) {
@@ -2100,6 +2185,8 @@
       if (nv === 0) delete fd[k]; else fd[k] = nv;
     }
     if (changed) L.fadeAttr.needsUpdate = true;
+    var anyFade = false; for (k in fd) { anyFade = true; break; }
+    if (L.ghosts) L.ghosts.forEach(function (gh) { gh.visible = anyFade; });
   }
   var shakeV = new THREE.Vector3();
   function fitNear() {
@@ -2313,10 +2400,8 @@
       radius = radius == null ? 10 : +radius;
       var me = S.me, out = { heading: me ? me.heading : 0, items: [] };
       if (!me || !S.level) return out;
-      S.treasures.forEach(function (t) {
-        if (t.owner >= 0) return;
-        var dx = t.x + 0.5 - me.wx, dz = t.z + 0.5 - me.wz, d = Math.hypot(dx, dz);
-        if (d <= radius) out.items.push({ dx: Math.round(dx * 100) / 100, dz: Math.round(dz * 100) / 100, dist: Math.round(d * 100) / 100, depth: S.heights[idx(t.x, t.z)], i: t.i });
+      sonarRead(me.wx, me.wz, radius).forEach(function (r) {
+        out.items.push({ dx: Math.round(r.dx * 100) / 100, dz: Math.round(r.dz * 100) / 100, dist: Math.round(r.dist * 100) / 100, depth: S.heights[idx(r.t.x, r.t.z)], i: r.t.i });
       });
       return out;
     },
@@ -2363,6 +2448,8 @@
         goal: ai.goal ? { kind: ai.goal.kind, x: ai.goal.cell % W, z: (ai.goal.cell / W) | 0 } : null, hold: ai.hold ? ai.hold.kind : null, hits: ai.hitLog.slice(),
         steps: ai.steps, jumps: ai.jumps, attacks: ai.attacks, digs: ai.digs, replans: ai.replans, stage: c.stage, speed: c.speed };
     },
+    // 確認用：CPU がいま受け取るソナーの読み取り（key＝宝の番号、dist＝円の中だけ）
+    _cpuSense: function () { return S.cpu ? cpuSense(S.cpu).map(function (r) { return { key: r.key, dist: r.dist != null, ang: r.ang != null }; }) : null; },
     _engine: function () { return engineLast; },
     _hintInfo: function () {
       var H = S.hints, me = S.me; if (!H || !me) return [];
@@ -2379,6 +2466,16 @@
       });
     },
     _fading: function () { return S.level && S.level.fading ? Object.keys(S.level.fading).length : 0; },
+    // 確認用：いまのカメラで、宝石（ti）とシーカーの頭・足がステージ（16:9）のどこに映るか（左上=0%、右下=100%）
+    _stagePos: function (ti) {
+      if (!S.camera || !S.me) return null;
+      var c = new THREE.PerspectiveCamera(S.camera.fov, STAGE_ASPECT, S.camera.near, S.camera.far);
+      c.position.copy(S.camera.position); c.quaternion.copy(S.camera.quaternion); c.updateMatrixWorld();
+      function sp(x, y, z) { var v = new THREE.Vector3(x, y, z).project(c); return [Math.round((v.x + 1) * 500) / 10, Math.round((1 - v.y) * 500) / 10]; }
+      var tr = S.treasures[ti | 0], me = S.me, out = { head: sp(me.wx, me.y + 1.6, me.wz), feet: sp(me.wx, me.y + 0.05, me.wz), gemCam: S.gemCam ? S.gemCamWhy : false, gemCamK: Math.round(S.gemCamK * 100) / 100 };
+      if (tr) out.gem = sp(tr.group.position.x + tr.mesh.position.x, tr.group.position.y + tr.mesh.position.y, tr.group.position.z + tr.mesh.position.z);
+      return out;
+    },
     _cam: function () { return { orbit: S.orbitK, atk: S.atkK, idle: S.idleT, face: S.faceHold, side: S.sideK }; },
     // 自分のシーカーのいちばん低い点（ドリルの先）の高さと、いまいるマスの上面
     _meLow: function () {

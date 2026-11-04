@@ -99,6 +99,24 @@ const logOf = (p, name) => p.evaluate((n) => window.__log.filter((l) => l[0] ===
 const clearLog = (p) => p.evaluate(() => { window.__log.length = 0; });
 const txt = (p, sel) => p.evaluate((s) => (document.querySelector(s) || {}).textContent || '', sel);
 const shot = (p, n) => p.screenshot({ path: path.join(SH, `e2e4_${n}.png`) });
+const TITLE_REPORT = [];
+// タイトル：画面の部品（進行ボタン・記録チップ・署名・版・ホーム）が どれも重ならないか（cqmin）
+const titleOverlap = (p) => p.evaluate(() => {
+  const st = document.getElementById('stage').getBoundingClientRect(), cq = Math.min(st.width, st.height) / 100;
+  const els = { home: '#home', recchip: '#recchip', copy: '.footrow .copy', ver: '.footrow .ver' };
+  const R = {};
+  [...document.querySelectorAll('#nav .nbtn')].forEach((b) => { els[b.dataset.nav] = b; });
+  for (const k in els) { const e = typeof els[k] === 'string' ? document.querySelector(els[k]) : els[k]; const b = e.getBoundingClientRect(); R[k] = [b.left - st.left, b.top - st.top, b.right - st.left, b.bottom - st.top].map((v) => +(v / cq).toFixed(1)); }
+  const keys = Object.keys(R), hits = []; let minGap = 1e9, minPair = '';
+  for (let i = 0; i < keys.length; i++) for (let j = i + 1; j < keys.length; j++) {
+    const a = R[keys[i]], b = R[keys[j]], gap = Math.max(b[0] - a[2], a[0] - b[2], b[1] - a[3], a[1] - b[3]);
+    if (gap < 0) hits.push(keys[i] + '×' + keys[j]);
+    if (gap < minGap) { minGap = gap; minPair = keys[i] + '×' + keys[j]; }
+  }
+  return { rects: R, hits, minGap: +minGap.toFixed(1), minPair };
+});
+// 音の様子（Sfx._debug）。BGM が鳴っているか・一時停止が残っていないか
+const snd = (p) => p.evaluate(() => (window.Sfx && window.Sfx._debug) ? window.Sfx._debug() : null);
 async function waitFor(fn, ms = 10000) { const t = Date.now(); while (Date.now() - t < ms) { if (await fn()) return true; await sleep(80); } return false; }
 async function bootToTitle(p) {
   await waitFor(async () => !(await p.evaluate(() => document.getElementById('bootbtn').disabled)), 8000);
@@ -203,6 +221,9 @@ async function soloFlow() {
   });
   ok('タイトル：コピーライト中央下・v9.0 右下・同じ大きさと透明度', foot.same && foot.centre && foot.right && foot.text.includes('v9.0') && +foot.op < 1, foot);
   ok('タイトル：最下段は #nav と記録チップに重ならない', !foot.overlap, foot);
+  const tov = await titleOverlap(p);
+  TITLE_REPORT.push(Object.assign({ vp: '1280x720' }, tov));
+  ok(`タイトル 1280×720：はじめる・せってい・記録チップ・署名・版・ホームが どれも重ならない（最小のすきま ${tov.minGap}cqmin：${tov.minPair}）`, tov.hits.length === 0 && tov.minGap >= 0.5, tov);
   await fontCheck(p, 'タイトル'); await wordCheck(p, 'タイトル');
   // タイトルのモーダル
   await click(p, '#home');
@@ -280,6 +301,7 @@ async function soloFlow() {
   await p.evaluate(() => { window.__emit('onomato', 'drill'); document.getElementById('tip').classList.add('on'); }); await sleep(100);
   await clearLog(p);
   const el0 = (await info(p)).elapsed;
+  const tHit = Date.now();
   await p.evaluate(() => window.__emit('gemHit', 0, 0)); await sleep(500);
   await p.evaluate(() => window.__emit('onomato', 'jump')); await sleep(50);
   const together = await p.evaluate(() => ({ counting: document.body.classList.contains('counting'), ono: document.querySelectorAll('#ono-l .ono,#ono-r .ono').length,
@@ -294,7 +316,7 @@ async function soloFlow() {
   await p.evaluate(() => window.__emit('gemHit', 0, 0)); await sleep(100);
   ok('獲得：同じ宝石は2回目なし', (await logOf(p, 'World.award')).length === 1);
   await sleep(2200);
-  ok('獲得：3.5秒たつまでは結果へ行かない', (await st(p)) === 'play');
+  { const ms = Date.now() - tHit, s0 = await st(p); ok(`獲得：3.5秒たつまでは結果へ行かない（宣言から ${ms}ms）`, s0 === 'play' || ms >= 3500, { ms, s0 }); }
   await waitFor(async () => (await st(p)) === 'ending', 4000);
   ok('結果：宣言のあとに結果', (await st(p)) === 'ending');
   ok('結果：ジングル practice', (await logOf(p, 'Sfx.jingle')).some((l) => l[1] === 'practice'));
@@ -337,6 +359,8 @@ async function cpuRace() {
   ok('CPU：結果「コンピューターが はやかった」と lose のジングル', (await txt(p, '#end-found')) === 'コンピューターが はやかった' && (await logOf(p, 'Sfx.jingle')).some((l) => l[1] === 'lose'));
   await shot(p, '15ending_cpu_race');
   await endingCheck(p, '結果（コンピューターが はやかった）');
+  const recT = await txt(p, '#end-rec');
+  ok('CPU：結果の記録は「コンピューターが さき」（あいて と書かない）', recT.includes('コンピューターが さき') && !recT.includes('あいて'), recT);
   // 結果の見出し 全種類：上から並べて 切れない（fillEnding と同じ 大きさの きまり）
   const heads = ['みつけた！', 'きみが はやかった！', 'コンピューターが はやかった', 'ともだちが はやかった', 'きみの ほうが おおかった！', 'コンピューターの ほうが おおかった', 'ともだちの ほうが おおかった', 'みんな なかよし！ へいわの しょうり！'];
   const hr = await p.evaluate((hs) => hs.map((h) => {
@@ -356,12 +380,21 @@ async function cpuRace() {
   ok('プレイ：モーダル「タイトルへもどりますか？」', (await txt(p, '#m-title')) === 'タイトルへもどりますか？');
   await click(p, '#m-yes', 500);
   const i = await info(p);
+  await sleep(700);
+  const s1 = await snd(p);
+  ok('プレイ：はい → resetGame のあと タイトルの BGM が ほんとうに鳴っている（Sfx の一時停止が 残らない）', s1 && s1.song === 'title' && s1.paused === false && s1.sources > 0, s1);
   ok('プレイ：はい → resetGame（World.stop・Sfx.stopAll・状態のリセット）→ タイトル', (await st(p)) === 'title' && (await logOf(p, 'World.stop')).length >= 1 && (await logOf(p, 'Sfx.stopAll')).length >= 1 && i.phase === 'idle' && i.opp === '' && i.mode === 'solo' && !i.paused && i.scores.join() === '0,0', i);
   ok('resetGame：カウントダウン・宣言の表示が消える', await p.evaluate(() => !document.body.classList.contains('counting') && !document.body.classList.contains('announcing') && !document.body.classList.contains('frozen')));
   // もう一度あそべる
   await nav(p, 'はじめる'); await click(p, '.howcard[data-kind=solo]'); await click(p, '.card[data-id]', 1500);
   await nav(p, 'しゅっぱつ！', 300);
   ok('resetGame のあと もう一度あそべる', await waitFor(async () => (await info(p)).phase === 'run', 7000));
+  await sleep(300);
+  const fb = await (await p.$('#fwd')).boundingBox();
+  await p.mouse.move(fb.x + fb.width / 2, fb.y + fb.height / 2); await p.mouse.down(); await sleep(900);
+  const s2 = await snd(p);
+  await p.mouse.up(); await sleep(200);
+  ok('resetGame のあと 次のゲーム：プレイの BGM と 走る音（キャタピラ）が 鳴る', s2 && /^play[123]$/.test(s2.song || '') && s2.paused === false && s2.tread === true && s2.sources > 0, s2);
   // Quit はタイトルからだけ
   await click(p, '#home'); await click(p, '#m-yes', 500);
   await click(p, '#home');
@@ -372,6 +405,24 @@ async function cpuRace() {
   ok('Quit：モーダル「タイトルへもどりますか？」', (await txt(p, '#m-title')) === 'タイトルへもどりますか？');
   await click(p, '#m-yes', 500);
   ok('Quit：はい → タイトル', (await st(p)) === 'title');
+  // Quit →「はじめから」→ タイトル：BGM が鳴る
+  await click(p, '#home'); await click(p, '#m-yes', 500);
+  ok('タイトル：はい → Quit（2回目）', (await st(p)) === 'quit');
+  await nav(p, 'はじめから', 800);
+  const s3 = await snd(p);
+  ok('Quit →「はじめから」→ タイトルの BGM が ほんとうに鳴っている', (await st(p)) === 'title' && s3 && s3.song === 'title' && s3.paused === false && s3.sources > 0, s3);
+  const tov = await titleOverlap(p);
+  TITLE_REPORT.push(Object.assign({ vp: '1024x768' }, tov));
+  ok(`タイトル 1024×768：はじめる・せってい・記録チップ・署名・版・ホームが どれも重ならない（最小のすきま ${tov.minGap}cqmin：${tov.minPair}）`, tov.hits.length === 0 && tov.minGap >= 0.5, tov);
+  // その次のゲームでも 音が鳴る
+  await nav(p, 'はじめる'); await click(p, '.howcard[data-kind=solo]'); await click(p, '.card[data-id]', 1500);
+  await nav(p, 'しゅっぱつ！', 300);
+  await waitFor(async () => (await info(p)).phase === 'run', 7000); await sleep(300);
+  const fb2 = await (await p.$('#fwd')).boundingBox();
+  await p.mouse.move(fb2.x + fb2.width / 2, fb2.y + fb2.height / 2); await p.mouse.down(); await sleep(900);
+  const s4 = await snd(p);
+  await p.mouse.up(); await sleep(200);
+  ok('Quit →「はじめから」のあと 次のゲーム：プレイの BGM と 走る音が 鳴る', s4 && /^play[123]$/.test(s4.song || '') && s4.paused === false && s4.tread === true, s4);
   ok('エラーなし（CPU）', errors.length === 0, errors);
   await context.close();
 }
@@ -381,7 +432,14 @@ async function cpuCount() {
   const { page: p, errors, context } = await open();
   await bootToTitle(p);
   await nav(p, 'はじめる');
-  await click(p, '.howcard[data-kind=count]'); await click(p, '[data-who=cpu]'); await click(p, '.lvcard[data-level=hard]');
+  await click(p, '.howcard[data-kind=count]'); await click(p, '[data-who=cpu]');
+  const lvT = await p.evaluate(() => [...document.querySelectorAll('.lvcard em')].map((e) => e.textContent));
+  ok('むずかしさ：記録は「コンピューターが おおい」（あいて と書かない）', lvT.length === 3 && lvT.every((t) => t.includes('コンピューターが おおい') && !t.includes('あいて')), lvT);
+  await fontCheck(p, 'むずかしさ');
+  const lvFit = await p.evaluate(() => [...document.querySelectorAll('.lvcard em')].every((e) => { const c = e.closest('.lvcard').getBoundingClientRect(), r = e.getBoundingClientRect(); return r.left >= c.left - 1 && r.right <= c.right + 1 && r.bottom <= c.bottom + 1; }));
+  ok('むずかしさ：記録の文が カードの中に収まる', lvFit);
+  await shot(p, '12b_level_count');
+  await click(p, '.lvcard[data-level=hard]');
   await click(p, '.card[data-id]', 1800);
   await nav(p, 'しゅっぱつ！', 300);
   await waitFor(async () => (await info(p)).phase === 'run', 7000);
@@ -406,6 +464,8 @@ async function cpuCount() {
   ok('おおい：全員が勝者の見た目（全員に かんむり）', await p.evaluate(() => document.querySelectorAll('#end-team figure.top').length === 2));
   await shot(p, '18ending_peace');
   await endingCheck(p, '結果（へいわの しょうり）');
+  const recC = await txt(p, '#end-rec');
+  ok('おおい（CPU）：結果の記録は「コンピューターが おおい」', recC.includes('コンピューターが おおい') && !recC.includes('あいて'), recC);
   await wordCheck(p, 'へいわ');
   await fontCheck(p, 'へいわ');
   ok('エラーなし（おおい）', errors.length === 0, errors);
@@ -456,8 +516,13 @@ async function overlap() {
     }
     const r = await p.evaluate(() => {
       document.body.classList.add('counting', 'announcing'); document.getElementById('tip').classList.add('on');
+      // ちずの名前は いちばん長い よみ、大きいお知らせは 通信で ともだちが いなくなったときの 文で はかる
+      const pt = document.getElementById('pt-title'), py = document.getElementById('pt-yomi'), mt = document.getElementById('maptag'), keepT = [pt.textContent, py.textContent];
+      pt.textContent = '一日千秋'; py.textContent = 'いちじつせんしゅう';
+      const nt = document.getElementById('notice'); nt.textContent = 'ともだちが いなくなったよ' + String.fromCharCode(10) + 'ひとりで つづけよう'; nt.classList.add('on', 'big'); nt.style.animation = 'none';
       const st = document.getElementById('stage').getBoundingClientRect(), cq = Math.min(st.width, st.height) / 100;
-      const ids = { home: '#home', sonar: '#sonar', 'timer+score': '#hud', maptag: '#maptag', camera: '#cam', 'すすむ': '#fwd', 'ジャンプ': '#b-jump', 'ドリルアタック': '#b-attack', 'ジャンプドリル': '#b-jd', '擬音(左)': '#ono-l', '擬音(右)': '#ono-r', '獲得宣言': '#ann', 'カウントダウン': '#count', '説明': '#tip' };
+      const mtClip = { sw: mt.scrollWidth, cw: mt.clientWidth, sh: mt.scrollHeight, ch: mt.clientHeight, inner: [pt, py].every((e) => { const r = e.getBoundingClientRect(), m = mt.getBoundingClientRect(); return r.right <= m.right + 0.5 && r.bottom <= m.bottom + 0.5; }) };
+      const ids = { home: '#home', sonar: '#sonar', 'timer+score': '#hud', maptag: '#maptag', 'お知らせ(大)': '#notice', camera: '#cam', 'すすむ': '#fwd', 'ジャンプ': '#b-jump', 'ドリルアタック': '#b-attack', 'ジャンプドリル': '#b-jd', '擬音(左)': '#ono-l', '擬音(右)': '#ono-r', '獲得宣言': '#ann', 'カウントダウン': '#count', '説明': '#tip' };
       const R = {};
       for (const k in ids) { const b = document.querySelector(ids[k]).getBoundingClientRect(); R[k] = [b.left - st.left, b.top - st.top, b.right - st.left, b.bottom - st.top].map((v) => +(v / cq).toFixed(1)); }
       // 擬音の文字そのもの（いちばん大きくなる瞬間）と、カウントダウン「GO!」・宣言の箱の中身が 帯の中に収まるか
@@ -489,6 +554,7 @@ async function overlap() {
       annT.push({ t: 'コンピューターが', fs: +(parseFloat(getComputedStyle(awho).fontSize) / cq).toFixed(2), w: +((rw(awho) + document.getElementById('ann-gem').getBoundingClientRect().width) / cq).toFixed(1), inner: +(inner / cq).toFixed(1), lines: lines(awho) });
       ac.style.animation = '';
       document.body.classList.remove('counting', 'announcing'); document.getElementById('tip').classList.remove('on');
+      nt.classList.remove('on', 'big'); nt.textContent = ''; nt.style.animation = ''; pt.textContent = keepT[0]; py.textContent = keepT[1];
       // 同じ時には出ないので 場所が かさなってよい組（ui.js：宣言を はじめるとき カウントダウンを終わらせ・擬音を消し・説明を消し・ちずの名前を かくす。
       // 宣言中は 擬音を出さない。説明は GO! が消えてから 出す）。この組は「重なり 0」の数から はずし、別に 時間で わかれていることを確かめる
       const NEVER_TOGETHER = ['獲得宣言', 'カウントダウン', '擬音(左)', '擬音(右)', 'maptag', '説明'];
@@ -504,9 +570,11 @@ async function overlap() {
         if (gap < minGap) { minGap = gap; minPair = pair; }
       }
       const inside = keys.filter((k) => R[k][0] < -0.1 || R[k][1] < -0.1 || R[k][2] > st.width / cq + 0.1 || R[k][3] > 100.1);
-      return { R, hits, shared, annT, fits, minGap: +minGap.toFixed(1), minPair, inside, stage: [Math.round(st.width), Math.round(st.height)] };
+      return { R, hits, shared, annT, fits, mtClip, minGap: +minGap.toFixed(1), minPair, inside, stage: [Math.round(st.width), Math.round(st.height)] };
     });
     ok(`重なり ${vp.width}×${vp.height}：絶対配置の要素どうしが重ならない（最小のすきま ${r.minGap}cqmin：${r.minPair}）`, r.hits.length === 0, r.hits);
+    ok(`ちずの名前 ${vp.width}×${vp.height}：いちばん長い「一日千秋 いちじつせんしゅう」でも 切れない（2行）`, r.mtClip.sw <= r.mtClip.cw + 1 && r.mtClip.sh <= r.mtClip.ch + 1 && r.mtClip.inner, r.mtClip);
+    ok(`大きいお知らせ ${vp.width}×${vp.height}：すすむ・ドリルアタック・ジャンプにかからない`, ['すすむ', 'ドリルアタック', 'ジャンプ', 'ジャンプドリル'].every((k) => { const a = r.R['お知らせ(大)'], b = r.R[k]; return Math.max(b[0] - a[2], a[0] - b[2], b[1] - a[3], a[1] - b[3]) > 0; }), [r.R['お知らせ(大)'], r.R['ドリルアタック']]);
     ok(`重なり ${vp.width}×${vp.height}：すべて 16:9 のステージの中`, r.inside.length === 0, r.inside);
     const A = r.R['獲得宣言'], cx = (A[0] + A[2]) / 2, cy = (A[1] + A[3]) / 2, sw = r.stage[0] / Math.min(r.stage[0], r.stage[1]) * 100;
     ok(`獲得宣言 ${vp.width}×${vp.height}：画面中央（中心 x ${cx.toFixed(1)}/${(sw / 2).toFixed(1)}・y ${cy.toFixed(1)}）、上の y 12〜30 は 3Dの宝石のために あける`, Math.abs(cx - sw / 2) < 1 && cy > 40 && cy < 52 && A[1] >= 30, A);
@@ -519,7 +587,7 @@ async function overlap() {
     ok(`エラーなし（重なり ${vp.width}×${vp.height}）`, errors.length === 0, errors);
     await context.close();
   }
-  fs.writeFileSync(path.join(SH, 'overlap_report.json'), JSON.stringify(report, null, 1));
+  fs.writeFileSync(path.join(SH, 'overlap_report.json'), JSON.stringify({ play: report, title: TITLE_REPORT }, null, 1));
 }
 
 /* ---------- 7. 通信（ホストとクライアント。カウントダウンの同期・claim/award/resume） ---------- */
@@ -555,10 +623,35 @@ async function netFlow() {
     ok('通信：両方 カウントダウン → run', await waitFor(async () => (await info(h)).phase === 'run' && (await info(g)).phase === 'run', 8000));
     await shot(g, '21net_guest_play');
     await sleep(500);
+    // ホストが ホームのモーダルを開く → クライアントも止まり「ともだちを まっているよ」→ いいえ で 両方 動く
+    await clearLog(h); await clearLog(g);
+    await click(h, '#home', 400);
+    ok('通信：ホストが モーダルを開くと pause(on) を送る', (await logOf(h, 'net>pause')).some((l) => /"on":true/.test(l[1])));
+    ok('通信：クライアントも止まる（World.setPaused・Sfx.pause・「ともだちを まっているよ」）', await waitFor(async () => (await info(g)).paused && (await info(g)).remotePaused, 4000)
+      && (await logOf(g, 'World.setPaused')).some((l) => l[1] === true) && (await logOf(g, 'Sfx.pause')).some((l) => l[1] === true)
+      && await g.evaluate(() => getComputedStyle(document.getElementById('waitnote')).display === 'flex' && document.getElementById('waitnote').textContent.includes('ともだちを まっているよ')));
+    const ge0 = (await info(g)).elapsed; await sleep(1000); const ge1 = (await info(g)).elapsed;
+    ok('通信：止まっている間 クライアントの時間は進まない', Math.abs(ge1 - ge0) < 0.05, [ge0, ge1]);
+    const wn = await g.evaluate(() => { const st = document.getElementById('stage').getBoundingClientRect(), cq = Math.min(st.width, st.height) / 100, c = document.querySelector('.wn-card').getBoundingClientRect(), hm = document.getElementById('home').getBoundingClientRect();
+      return { fs: +(parseFloat(getComputedStyle(document.querySelector('.wn-card span')).fontSize) / cq).toFixed(2), hitHome: c.left < hm.right && hm.left < c.right && c.top < hm.bottom && hm.top < c.bottom, pe: getComputedStyle(document.getElementById('waitnote')).pointerEvents, op: getComputedStyle(document.getElementById('waitnote')).opacity + '/' + getComputedStyle(document.querySelector('.wn-card')).opacity }; });
+    ok('通信：「ともだちを まっているよ」は 大きく（7cqmin 以上）・ホームボタンに かからず 押せる', wn.fs >= 7 && !wn.hitHome && wn.pe === 'none' && wn.op === '1/1', wn);
+    await shot(g, '21b_net_guest_waiting');
+    await fontCheck(g, '通信 まっているよ');
+    await click(h, '#m-no', 400);
+    ok('通信：ホストが いいえ → クライアントも 動きだす', await waitFor(async () => !(await info(g)).paused && !(await info(g)).remotePaused, 4000)
+      && await g.evaluate(() => getComputedStyle(document.getElementById('waitnote')).display === 'none'));
+    const ge2 = (await info(g)).elapsed; await sleep(600); const ge3 = (await info(g)).elapsed;
+    ok('通信：クライアントの時間が また進む', ge3 - ge2 > 0.3, [ge2, ge3]);
+    // クライアントが モーダルを開く → ホストも止まる → いいえ
+    await click(g, '#home', 400);
+    ok('通信：クライアントが モーダルを開くと ホストも止まる', await waitFor(async () => (await info(h)).paused && (await info(h)).remotePaused, 4000));
+    await click(g, '#m-no', 400);
+    ok('通信：クライアントが いいえ → ホストも 動きだす', await waitFor(async () => !(await info(h)).paused, 4000));
     // クライアントが宝石を壊す → claim → ホストが award → resume
     await clearLog(h); await clearLog(g);
-    await g.evaluate(() => window.__emit('gemHit', 1, 0));
-    ok('通信：クライアントは claim を送り 自分では award しない', (await logOf(g, 'net>claim')).length === 1 && (await logOf(g, 'World.award')).length === 0);
+    // 同じ評価の中で しらべる（手元の中継は速く、ホストの award が すぐ届くため）
+    const cl = await g.evaluate(() => { window.__emit('gemHit', 1, 0); return { claim: window.__log.filter((l) => l[0] === 'net>claim').length, award: window.__log.filter((l) => l[0] === 'World.award').length }; });
+    ok('通信：クライアントは claim を送り 自分では award しない', cl.claim === 1 && cl.award === 0, cl);
     ok('通信：ホストが award を決めて送る', await waitFor(async () => (await logOf(h, 'net>award')).length === 1, 5000) && (await logOf(h, 'World.award')).some((l) => l[1] === 1 && l[2] === 0));
     ok('通信：クライアントも award', await waitFor(async () => (await logOf(g, 'World.award')).some((l) => l[1] === 1 && l[2] === 0), 5000));
     await h.evaluate(() => window.__emit('gemHit', 0, 0)); await sleep(200);
@@ -578,6 +671,51 @@ async function netFlow() {
   }
 }
 
+/* ---------- 8. 通信：とちゅうで 片方が「はい」（resetGame）→ もう片方は 止まったままに ならず ひとりで つづける ---------- */
+async function netLeave() {
+  const { startPeerServer } = require('./harness.js');
+  const port = PEER_PORT + 1, srv = startPeerServer(port);
+  const query = `?peerhost=127.0.0.1&peerport=${port}&peerpath=/myapp&peersecure=0`;
+  const VPN = { width: 1024, height: 768 };
+  const H = await open(VPN, { query }), G = await open(VPN, { query });
+  const h = H.page, g = G.page;
+  try {
+    await bootToTitle(h); await bootToTitle(g);
+    await nav(h, 'はじめる'); await click(h, '.howcard[data-kind=count]'); await click(h, '[data-who=net]'); await click(h, '#c-host', 1500);
+    const code = await h.evaluate(() => [...document.querySelectorAll('#codeshow b')].map((b) => b.textContent).join(''));
+    await nav(g, 'はじめる'); await click(g, '.howcard[data-kind=count]'); await click(g, '[data-who=net]'); await click(g, '#c-join');
+    for (const d of code) await click(g, `.key:not(.del):not(.nul) >> text="${d}"`, 120);
+    await nav(g, 'つなぐ！', 500);
+    ok('通信（ぬける）：つながる', await waitFor(async () => (await h.evaluate(() => document.getElementById('setting').dataset.sub)) === 'pick', 15000));
+    await sleep(800);
+    await click(h, '.card[data-id]', 1500);
+    await nav(h, 'しゅっぱつ！', 300);
+    ok('通信（ぬける）：両方 run', await waitFor(async () => (await info(h)).phase === 'run' && (await info(g)).phase === 'run', 15000));
+    await sleep(500);
+    await click(g, '#home', 400);
+    ok('通信（ぬける）：クライアントの モーダルで ホストも止まる', await waitFor(async () => (await info(h)).paused && (await info(h)).remotePaused, 4000));
+    await shot(h, '25net_host_waiting_43');
+    await clearLog(g);
+    await click(g, '#m-yes', 800);
+    ok('通信（ぬける）：クライアントは はい → タイトル', (await st(g)) === 'title');
+    const gs = await snd(g);
+    ok('通信（ぬける）：クライアントの タイトルの BGM が 鳴っている', gs && gs.song === 'title' && gs.paused === false && gs.sources > 0, gs);
+    ok('通信（ぬける）：ホストは「ともだちが いなくなったよ」を出し 止まったままに ならない', await waitFor(async () => { const x = await info(h); return !x.paused && !x.remotePaused && !x.netOn; }, 8000)
+      && await h.evaluate(() => document.getElementById('notice').classList.contains('big') && document.getElementById('notice').textContent.includes('ともだちが いなくなったよ') && getComputedStyle(document.getElementById('waitnote')).display === 'none'));
+    const nb = await h.evaluate(() => { const R = (s) => document.querySelector(s).getBoundingClientRect(), n = R('#notice'); return ['#fwd', '#b-attack', '#b-jump', '#b-jd'].filter((s) => { const b = R(s); return n.left < b.right && b.left < n.right && n.top < b.bottom && b.top < n.bottom; }); });
+    ok('通信（ぬける）：大きいお知らせは 操作ボタンに かからない（4:3）', nb.length === 0, nb);
+    await sleep(300);
+    await shot(h, '26net_host_partner_left_43');
+    const he0 = (await info(h)).left; await sleep(800); const he1 = (await info(h)).left;
+    ok('通信（ぬける）：ホストは ひとりで つづける（時間が進む）', he0 - he1 > 0.4 && (await info(h)).phase === 'run', [he0, he1]);
+    ok('通信（ぬける）：大きいお知らせは しばらくすると消える', await waitFor(async () => !(await h.evaluate(() => document.getElementById('notice').classList.contains('on'))), 6000));
+    ok('エラーなし（通信 ぬける）', H.errors.length === 0 && G.errors.length === 0, H.errors.concat(G.errors));
+  } finally {
+    await H.context.close(); await G.context.close();
+    try { srv.close(); } catch (e) {}
+  }
+}
+
 (async () => {
   try {
     if (!ONLY || ONLY === 'static') staticChecks();
@@ -587,6 +725,7 @@ async function netFlow() {
     if (!ONLY || ONLY === 'modal') await modalBoot();
     if (!ONLY || ONLY === 'overlap') await overlap();
     if (!ONLY || ONLY === 'net') await netFlow();
+    if (!ONLY || ONLY === 'net' || ONLY === 'leave') await netLeave();
   } catch (e) { ok('例外なく終わる', false, e.stack); }
   if (browser) await browser.close();
   if (server) server.close();

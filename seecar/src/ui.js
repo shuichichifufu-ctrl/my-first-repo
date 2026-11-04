@@ -92,10 +92,12 @@
     if (kind === 'solo') return record.solo;
     return o === 'net' ? record[kind].net : record[kind].cpu[level];
   }
-  // 記録の文（争いの言葉なし）
-  function recLines(kind, r) {
-    if (kind === 'race') return ['きみが さき ' + r.me + 'かい', 'あいてが さき ' + r.opp + 'かい'];
-    if (kind === 'count') return ['きみが おおい ' + r.me + 'かい', 'あいてが おおい ' + r.opp + 'かい', 'おなじ ' + r.same + 'かい'];
+  // 記録の文（争いの言葉なし）。o='cpu' のときは「コンピューター」、通信は「あいて」
+  function recLines(kind, r, o) {
+    var who = o === 'cpu' ? OPP_NAME.cpu : 'あいて';
+    var sp = String.fromCharCode(160); // 「おおい 0かい」は 折らない（折るのは「…が」のあと）
+    if (kind === 'race') return ['きみが さき' + sp + r.me + 'かい', who + 'が さき' + sp + r.opp + 'かい'];
+    if (kind === 'count') return ['きみが おおい' + sp + r.me + 'かい', who + 'が おおい' + sp + r.opp + 'かい', 'おなじ' + sp + r.same + 'かい'];
     return ['れんしゅう ' + (r.n || 0) + 'かい'];
   }
   function recTotals() {
@@ -430,6 +432,7 @@
   var map = null, myIndex = 0, camMode = 1, running = false, modalOpen = false, isPaused = false;
   var pressed = {}, guard = false, hostRetry = 0, recorded = false, ended = false, modalKind = 'quit', sw = null, tipTimer = 0, endTimer = 0, readyTimer = 0;
   var navKey = '', noticeTimer = 0;
+  var remotePaused = false, sentPause = false; // 通信：ともだちが ホームのモーダルを開いている／自分が止めたことを 知らせたか
   var timeLeft = COUNT_SEC, shownSec = -1, scores = [0, 0], totalTreasure = 1;
   var lastT = 0, rafId = 0, curLevel = 'normal';
   // プレイの段階：'wait'（通信のそろい待ち）| 'count'（3・2・1・GO!）| 'run' | 'announce'（獲得宣言）| 'end'
@@ -467,7 +470,7 @@
     call('World', 'press', act, on);
   }
   function releaseAll() { Object.keys(pressed).forEach(function (a) { if (pressed[a]) press(a, false); }); }
-  function inputLocked() { return modalOpen || ended || phase !== 'run'; }
+  function inputLocked() { return modalOpen || isPaused || ended || phase !== 'run'; }
   // 押している間だけ効く操作ボタン（すすむ・ドリルアタック・ジャンプドリル。ジャンプも同じ部品で、World が押した瞬間だけ使う）
   function hold(el, act) {
     var pid = null;
@@ -530,7 +533,7 @@
   function go(name) {
     var from = state;
     clearTimeout(endTimer); doc.body.classList.remove('endwait');
-    if (from === 'play' && name !== 'play') { releaseAll(); leavePlayFx(); }
+    if (from === 'play' && name !== 'play') { releaseAll(); leavePlayFx(); remotePaused = false; sentPause = false; if (els.waitnote) els.waitnote.classList.remove('on'); }
     if (name === 'title' || name === 'quit') { stopGame(); closeNet(); gameMode = 'solo'; opp = ''; sel = null; loading = false; hideNotice(); }
     if (name === 'ending') stopGame();
     state = name;
@@ -543,6 +546,7 @@
     else if (name === 'play' || name === 'ending') call('Sfx', 'bgm', null);
     else if (name === 'quit') call('Sfx', 'stopAll');
     if (name === 'ending') fillEnding.apply(null, [].slice.call(arguments, 1));
+    if (from === 'play' && name !== 'play') applyPause(); // ともだちの一時停止は プレイの外へは もちこまない
     renderNav();
   }
   function leavePlayFx() {
@@ -605,7 +609,7 @@
       var lv = list[i].getAttribute('data-level');
       list[i].querySelector('.lvpic').innerHTML = LVPIC[lv];
       var k = gameMode === 'count' ? 'count' : 'race';
-      list[i].querySelector('em').innerHTML = recLines(k, recOf(k, 'cpu', lv)).slice(0, 2).join('<br>');
+      list[i].querySelector('em').innerHTML = recLines(k, recOf(k, 'cpu', lv), 'cpu').slice(0, 2).join('<br>');
       list[i].classList.toggle('on', settings.level === lv);
     }
   }
@@ -896,13 +900,15 @@
     else if (d.t === 'award') { if (netRole === 'join') doAward(d.idx === 0 ? 0 : 1, d.ti | 0); }
     else if (d.t === 'resume') { if (netRole === 'join' && ann) ann.resume = true; }
     else if (d.t === 'end') endCount(true);
+    else if (d.t === 'pause') { remotePaused = !!d.on; applyPause(); } // ともだちが ホームのモーダルを開いた／閉じた
   }
   function onNetClose() {
     netConnected = false;
     if (state === 'play' && netOn) {
       netOn = false;
+      remotePaused = false; sentPause = false; applyPause(); // ともだちが 止めたままでも ひとりで つづける
       call('World', 'dropRemote', 1 - myIndex);
-      showNotice('あいてが いなくなったよ　ひとりで つづけよう', true);
+      showNotice('ともだちが いなくなったよ' + String.fromCharCode(10) + 'ひとりで つづけよう', true);
       if (phase === 'wait') startCountdown();          // まだ始まっていなければ ひとりで始める
       if (ann && netRole === 'join') ann.resume = true; // ホストを待たずに 宣言を終える
     } else if (state === 'setting' && opp === 'net') {
@@ -921,7 +927,7 @@
     myPal = pals[idx]; oppPal = pals[1 - idx];
     totalTreasure = (m && m.treasures && m.treasures.length) || (gameMode === 'count' ? 10 : 1);
     scores = [0, 0]; timeLeft = COUNT_SEC; shownSec = -1; lastT = 0; elapsed = 0; raceTime = null; winner = -1;
-    owners = {}; announced = {}; annQueue = []; ann = null;
+    owners = {}; announced = {}; annQueue = []; ann = null; remotePaused = false; sentPause = false;
     renderHud(); updateTimer(true);
     hideNotice(); clearOno();
     var players = pals.map(function (n) { return { palette: n, color: pal(n).body }; });
@@ -994,7 +1000,8 @@
     clearTimeout(noticeTimer);
     els.notice.textContent = t; els.notice.classList.add('on');
     els.notice.classList.toggle('big', !!big);
-    if (big) noticeTimer = setTimeout(function () { els.notice.classList.remove('big'); }, 4500);
+    // 大きいお知らせは 4.5秒で消す（小さく残すと 上の カウントダウン・説明の場所に かかるため）
+    if (big) noticeTimer = setTimeout(hideNotice, 4500);
   }
   function hideNotice() { clearTimeout(noticeTimer); els.notice.classList.remove('on'); els.notice.classList.remove('big'); }
 
@@ -1316,7 +1323,7 @@
     var lab = KIND_NAME[kind] + (opp === 'cpu' ? '・' + OPP_NAME.cpu + '・' + LEVEL_NAME[curLevel] : (opp === 'net' ? '・' + OPP_NAME.net : ''));
     els.endRec.innerHTML = '<span class="rc-ico">' + SETICO.trophy + '</span><span class="rc-col"><b></b><span class="rc-n"></span></span>';
     els.endRec.querySelector('b').textContent = lab;
-    els.endRec.querySelector('.rc-n').innerHTML = recLines(kind, rr || record.solo).map(function (t) { return '<span class="rl">' + t + '</span>'; }).join('');
+    els.endRec.querySelector('.rc-n').innerHTML = recLines(kind, rr || record.solo, opp).map(function (t) { return '<span class="rl">' + t + '</span>'; }).join('');
     els.endTitle.textContent = m.title || '';
     els.endYomi.textContent = (m.reading && m.reading !== m.title) ? m.reading : '';
     els.endTitle.parentNode.style.display = m.title ? '' : 'none';
@@ -1404,6 +1411,7 @@
     if (k === 'reset') { applyPause(); resetRecord(); return; }
     if (k === 'quit') { // タイトル画面：Quit へ移って window.close() を ためす
       isPaused = false; doc.body.classList.remove('paused');
+      call('Sfx', 'pause', false); call('Sfx', 'stopAll');
       stopGame(); closeNet(); go('quit');
       try { window.close(); } catch (e) {}
       return;
@@ -1411,8 +1419,16 @@
     resetGame();
   }
   // モーダルと縦持ち：isPaused で ゲームループ・タイマー・BGM・演出・カウントダウンを止める
+  // 通信のプレイ中は ともだちの画面も止める：自分が止めた／動かしたことを {t:'pause', on} で知らせる。
+  // ともだちが止めている間は こちらも止めて「ともだちが まっているよ」を出す（自分のモーダルは いつでも開ける）
   function applyPause() {
-    var p = modalOpen || (state === 'play' && isPortrait());
+    var mine = modalOpen || (state === 'play' && isPortrait());
+    var playNet = state === 'play' && netOn;
+    if (playNet && mine !== sentPause) { sentPause = mine; netSend({ t: 'pause', on: mine }); }
+    if (!playNet) { remotePaused = false; sentPause = false; }
+    var waiting = playNet && remotePaused;
+    if (els.waitnote) els.waitnote.classList.toggle('on', waiting);
+    var p = mine || waiting;
     if (p === isPaused) return;
     isPaused = p;
     doc.body.classList.toggle('paused', p);
@@ -1427,6 +1443,7 @@
     if (running) call('World', 'freeze', false);
     stopGame();                                   // ゲームループ
     closeNet();                                   // 通信
+    call('Sfx', 'pause', false);                  // モーダルで止めた音の「一時停止」を先に解く（解かないとタイトルの BGM も鳴らない）
     call('Sfx', 'stopAll');                       // BGM・効果音・ループ
     phase = 'idle'; counting = false; cdT = 0; cdStep = -1;          // カウントダウン
     ann = null; annQueue = []; owners = {}; announced = {};           // 獲得宣言
@@ -1434,6 +1451,7 @@
     ended = false; recorded = false;                                  // 終了フラグ
     sel = null; loading = false; gameMode = 'solo'; opp = ''; netRole = ''; code = ''; remotePal = null; map = null; // 選択状態
     modalOpen = false; isPaused = false; els.modal.classList.remove('on');
+    remotePaused = false; sentPause = false; if (els.waitnote) els.waitnote.classList.remove('on');
     doc.body.classList.remove('counting', 'announcing', 'frozen', 'endwait', 'camtop', 'paused');
     doc.body.setAttribute('data-mode', 'solo');
     hideNotice(); hideTip(); clearOno(); renderHud(); updateTimer(true);
@@ -1492,7 +1510,7 @@
   /* ===== U24. 初期化と window.App ===== */
   function init() {
     ['stage', 'nav', 'home', 'modal', 'setting', 'sethead', 'cards', 'preview', 'keypad', 'codein', 'codeshow', 'msgface', 'msgtext',
-      'cam', 'notice', 'confetti', 'swipe', 'tip', 'recchip', 'ending', 'timer', 'maptag', 'swatches', 'ann'].forEach(function (id) { els[id] = $(id); });
+      'cam', 'notice', 'confetti', 'swipe', 'tip', 'recchip', 'ending', 'timer', 'maptag', 'swatches', 'ann', 'waitnote'].forEach(function (id) { els[id] = $(id); });
     els.endFound = $('end-found'); els.endRec = $('end-rec'); els.endTeam = $('end-team');
     els.ptTitle = $('pt-title'); els.ptYomi = $('pt-yomi');
     els.camIco = $('cam-ico'); els.camLabel = $('cam-label');
@@ -1587,7 +1605,7 @@
     resetGame: function () { resetGame(); },
     get state() { return state; },
     // 確認用の手がかり（ゲームの進行には使わない）
-    _info: function () { return { mode: gameMode, opp: opp, level: curLevel, phase: phase, left: timeLeft, elapsed: elapsed, raceTime: raceTime, scores: scores.slice(), total: totalTreasure, ended: ended, paused: isPaused, cdT: cdT, ann: ann ? { idx: ann.idx, ti: ann.ti, t: ann.t } : null, owners: JSON.parse(JSON.stringify(owners)), myPal: myPal, oppPal: oppPal, netRole: netRole, netOn: netOn }; },
+    _info: function () { return { mode: gameMode, opp: opp, level: curLevel, phase: phase, left: timeLeft, elapsed: elapsed, raceTime: raceTime, scores: scores.slice(), total: totalTreasure, ended: ended, paused: isPaused, remotePaused: remotePaused, cdT: cdT, ann: ann ? { idx: ann.idx, ti: ann.ti, t: ann.t } : null, owners: JSON.parse(JSON.stringify(owners)), myPal: myPal, oppPal: oppPal, netRole: netRole, netOn: netOn }; },
     _setTime: function (sec) { timeLeft = Math.max(0, +sec || 0); shownSec = -1; updateTimer(true); },
     _gemHit: function (idx, ti) { onGemHit(idx, ti); },
     _onomato: function (k) { onOnomato(k); },

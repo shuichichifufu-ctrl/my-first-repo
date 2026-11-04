@@ -216,7 +216,24 @@ const E = Math.PI / 2; // heading：0=北(-z)、-E=東(+x)、E=西、PI=南
   ok("CPU が壊すと 'gemHit'(1, ti)（CPU も UI の award を待つ）", JSON.stringify(gh) === '[[1,0]]' && (await dbg()).treasures[0].owner === -1, JSON.stringify(gh) + ' ' + JSON.stringify(await ev(() => World._cpu())));
   await ev(() => World.award(1, 0));
   ok("CPU の award で 'collect'(1,0,[0,1])", JSON.stringify(await ev(() => events.collect)) === '[[1,0,[0,1]]]');
-  ok('CPU の加速の上限：むずかしい=3段', (await ev(() => World._cpu().speed)) === 2.88 && await ev(() => World.CPU_LEVELS.hard.accelMax === 0.3));
+  ok('CPU の速さ：むずかしい＝人の基本の速さ×CPU_LEVELS.hard.speed（加速の上限は人の+50%より小さい）', await ev(() => Math.abs(World._cpu().speed - 2.88 * World.CPU_LEVELS.hard.speed) < 1e-6 && World.CPU_LEVELS.hard.accelMax < 0.5), JSON.stringify(await ev(() => [World._cpu().speed, World.CPU_LEVELS.hard])));
+
+  // CPU のソナーは人の画面と同じ：円の中は全部、円の外は いちばん近い1つの向きだけ（'light' は光の柱で全部の向き）
+  {
+    const r = await ev(() => {
+      const m = flatMap(60, 60, [{ x: 10, z: 30, gem: 0 }, { x: 40, z: 30, gem: 1 }, { x: 50, z: 50, gem: 2 }, { x: 22, z: 5, gem: 3 }]);
+      [[10, 30], [40, 30], [50, 50], [22, 5]].forEach(([x, z]) => m.box(x, z, 1, 1, 4));
+      m.starts = [{ x: 2, z: 2, dir: 1 }, { x: 25, z: 30, dir: 1 }];
+      const out = {};
+      for (const s of ['light', 'sonar']) { loadMap(m, { cpu: { level: 'hard' }, mode: 'count', search: s }); out[s] = World._cpuSense(); }
+      World._setCpuPose(37.5, 30.5, 0); out.near = World._cpuSense(); // 宝1は円の中、ほかは外
+      return out;
+    });
+    // CPU(25,30) から：宝0=15、宝1=15、宝2=32、宝3=25 → 円の外。いちばん近いのは 宝0 か 宝1（同じ距離）
+    ok('CPU のソナー（円の外）：いちばん近い1つの向きだけ', r.sonar.length === 1 && !r.sonar[0].dist && [0, 1].includes(r.sonar[0].key), JSON.stringify(r.sonar));
+    ok("CPU の 'light'：光の柱で全部の向き", r.light.length === 4, JSON.stringify(r.light));
+    ok('CPU のソナー（円の中＋外の1つ）', r.near.length === 2 && r.near.some(q => q.key === 1 && q.dist) && r.near.some(q => !q.dist), JSON.stringify(r.near));
+  }
 
   // ---------- 7. 目じるし・色 ----------
   await ev(() => { window.autoAward = true; const m = MapGen.fromPreset('ie', { treasureCount: 1 }); window.mIe = m; loadMap(m, { cpu: { level: 'normal' }, mode: 'race', players: [{ palette: 3 }, { palette: 3 }] }); World.setCamera(2); });

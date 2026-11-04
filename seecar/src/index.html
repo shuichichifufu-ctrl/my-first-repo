@@ -23,6 +23,8 @@
 </head>
 <body data-state="boot" data-mode="solo">
 <div id="app">
+  <!-- 3D の絵は ステージの外に置き、画面いっぱいに描く（4:3 の iPad でも上下に帯が出ない。中央の 16:9 は ステージと同じ見え方） -->
+  <div id="worldbox"></div>
   <div id="stage">
     <!-- ===== H02. 背景：ブロック世界のジオラマ（空・雲・浮かぶブロックの島。ui.js が SVG を入れる） ===== -->
     <div id="bg" aria-hidden="true">
@@ -30,7 +32,6 @@
       <div class="cloud c1"></div><div class="cloud c2"></div><div class="cloud c3"></div>
       <div class="isles" id="isles"></div>
     </div>
-    <div id="worldbox"></div>
 
     <!-- ===== H03. 画面1 Boot（教材について・まなびかた・スタートボタン） ===== -->
     <section id="boot" class="screen">
@@ -165,6 +166,8 @@
           <div class="ann-what" id="ann-what"></div>
         </div>
       </div>
+      <!-- 通信：ともだちが ホームのモーダルを開いている間（こちらも止まる） -->
+      <div id="waitnote" aria-live="polite"><div class="wn-card"><i class="wn-dots"><b></b><b></b><b></b></i><span>ともだちを まっているよ</span><small>すこし まってね</small></div></div>
     </section>
 
     <!-- ===== H07. 画面5 エンディング（けっか・シーカーの台・きろく・ちずの絵） ===== -->
