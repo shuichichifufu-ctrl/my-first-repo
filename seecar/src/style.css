@@ -38,20 +38,21 @@
 html,body{height:100vh;height:100dvh;position:fixed;inset:0;}
 html,body{margin:0;padding:0;background:#000;overflow:hidden;overscroll-behavior:none}
 body{width:100%;font-family:var(--font);font-weight:700;color:var(--ink);-webkit-font-smoothing:antialiased}
-#app{position:fixed;inset:0;height:100vh;height:100dvh;background:linear-gradient(180deg,var(--sky-top) 0,var(--sky-top) 50%,var(--horizon) 50%,var(--horizon) 100%)} /* 4:3 の iPad で ステージの上下に出る余白も 空の色に */
+/* 空は #app に 1まいだけ ぬる（画面全体で ひとつづき）。4:3 の iPad でも ステージの上下の帯との あいだに 線が出ない */
+#app{position:fixed;inset:0;height:100vh;height:100dvh;background:
+  radial-gradient(ellipse 60% 55% at 78% 12%,rgba(255,236,190,.85),rgba(255,236,190,0) 70%),
+  radial-gradient(ellipse 70% 40% at 50% 104%,rgba(255,250,240,1),rgba(255,250,240,0) 70%),
+  linear-gradient(180deg,var(--sky-top) 0%,var(--sky-mid) 42%,var(--sky-low) 72%,var(--horizon) 100%)}
 button{font-family:inherit;font-weight:inherit;color:inherit;border:0;padding:0;margin:0;background:none;cursor:pointer;outline:none}
 svg{display:block}
 #stage{position:absolute;left:50%;top:50%;transform:translate(-50%,-50%);
   width:min(100vw,177.7778vh);height:min(100vh,56.25vw);
   width:min(100vw,177.7778dvh);height:min(100dvh,56.25vw);
-  container-type:size;overflow:hidden;background:var(--cream)}
+  container-type:size;overflow:hidden;background:transparent}
 
 /* ===== C03. 背景：空・雲・浮かぶブロックの島（ゆっくり漂う） ===== */
 #bg{position:absolute;inset:0;overflow:hidden}
-#bg .sky{position:absolute;inset:0;background:
-  radial-gradient(ellipse 60% 55% at 78% 12%,rgba(255,236,190,.85),rgba(255,236,190,0) 70%),
-  radial-gradient(ellipse 70% 40% at 50% 104%,rgba(255,250,240,1),rgba(255,250,240,0) 70%),
-  linear-gradient(180deg,var(--sky-top) 0%,var(--sky-mid) 42%,var(--sky-low) 72%,var(--horizon) 100%)}
+#bg .sky{position:absolute;inset:0;background:none} /* 空の色は #app（C02）。ここは 雲と島の うしろの 入れものだけ */
 .cloud{position:absolute;border-radius:50%;background:radial-gradient(closest-side,rgba(255,255,255,.95),rgba(255,255,255,0));will-change:transform}
 .cloud.c1{width:70cqmin;height:16cqmin;left:-10cqmin;top:14cqmin;animation:drift var(--drift) linear infinite}
 .cloud.c2{width:54cqmin;height:12cqmin;left:60cqmin;top:4cqmin;opacity:.8;animation:drift calc(var(--drift)*1.3) linear infinite;animation-delay:-40s}
@@ -124,6 +125,8 @@ body[data-state=title] #nav{gap:3.4cqmin;bottom:14cqmin}
   font-size:6.4cqmin;line-height:1;padding:0;
   font-family:"Apple Color Emoji","Segoe UI Emoji","Noto Color Emoji",var(--font)}
 #home.down{transform:translateY(.4cqmin);box-shadow:0 .3cqmin .8cqmin rgba(0,0,0,.28)}
+/* Boot ではホームボタンを出さない（Boot から進むのは「タップしてスタート」の click だけ。§2-2） */
+body[data-state=boot] #home{display:none}
 #modal{position:absolute;inset:0;z-index:200;display:none;align-items:center;justify-content:center;
   background: rgba(0,0,0,0.45); backdrop-filter: blur(8px); -webkit-backdrop-filter: blur(8px);}
 #modal.on{display:flex}
@@ -254,7 +257,8 @@ body.paused #play *,body.paused #play{animation-play-state:paused !important}
 .grp .row{flex:1;display:grid;grid-template-columns:repeat(var(--n,4),minmax(0,1fr));gap:2cqmin;min-height:0;padding:0 .4cqmin 1.4cqmin}
 .card{border-radius:var(--r-m);display:flex;flex-direction:column;align-items:center;justify-content:center;gap:.8cqmin;overflow:visible;text-align:center;padding:0 .4cqmin;--lip:.9cqmin}
 .card .kan{font-size:5cqmin;line-height:1.1;font-weight:800;color:var(--ink);white-space:nowrap}
-.card .yomi{font-size:var(--fs-min);line-height:1.1;white-space:nowrap;color:var(--ink-2);letter-spacing:-.08em;transform:scaleX(.84)}
+.card .yomi{font-size:var(--fs-min);line-height:1.1;white-space:nowrap;color:var(--ink-2)}
+.card .yomi.two{line-height:1.05}
 .card .ic{display:block;width:9cqmin;height:9cqmin}.card .ic svg,.card .ic img{width:100%;height:100%;object-fit:contain;display:block}
 .card.illust .kan{font-size:4.6cqmin}
 .maps.dense .card.yoji .kan{font-size:4.4cqmin}.maps.dense .card.illust .kan{font-size:3.8cqmin}.maps.dense .card .ic{width:7.6cqmin;height:7.6cqmin}
@@ -344,7 +348,8 @@ body.paused #play *,body.paused #play{animation-play-state:paused !important}
 #sonar,#hud,#maptag,#notice,#tip,.onozone,#count,#ann{pointer-events:none}
 /* 配置（cqmin。ステージ 177.78×100）：重ならないことは test/e2e4.js で数値を確かめる
    ホーム 右上 / カメラ その下 / ソナー 左上 / 時間とかず 上中央 / ちずの名前 ソナーの下
-   擬音 左の帯（ソナーの下）と 右の帯（カメラの下） / カウントダウン 中央の上 / 獲得宣言 中央の下 / 操作ボタン 下 */
+   擬音 左の帯（ソナーの下）と 右の帯（カメラの下） / カウントダウン 中央の上 / 獲得宣言 画面中央 / 操作ボタン 下
+   カウントダウン・擬音・説明・ちずの名前 と 獲得宣言 は 同じ時に出ないので 場所が かさなってよい（test/e2e4.js で明記して確かめる） */
 #sonar{position:absolute;left:max(env(safe-area-inset-left),2.5cqmin);top:3cqmin;width:30cqmin;height:30cqmin;border-radius:50%;
   box-shadow:0 1cqmin 2.4cqmin rgba(20,40,60,.35)}
 #sonar canvas{display:block;width:100%;height:100%}
@@ -373,8 +378,9 @@ body[data-mode=count] #scorebar{display:flex}
 #notice.big{top:60cqmin;font-size:5.6cqmin;font-weight:800;padding:2.4cqmin 5cqmin;border-radius:var(--r-l);text-align:center;line-height:1.4;white-space:normal;width:max-content;max-width:80cqmin;box-shadow:var(--sh-3)}
 @keyframes fadeUp{from{opacity:0;margin-top:2cqmin}to{opacity:1;margin-top:0}}
 #tip{position:absolute;left:50%;top:25cqmin;word-break:keep-all;transform:translateX(-50%);display:none;align-items:center;gap:2cqmin;background:rgba(255,250,240,.95);border-radius:var(--r-pill);
-  padding:1.2cqmin 4cqmin 1.2cqmin 2.6cqmin;font-size:var(--fs-s);line-height:1.3;color:var(--ink);width:max-content;max-width:80cqmin;box-shadow:var(--sh-2)}
+  padding:1.2cqmin 4cqmin 1.2cqmin 2.6cqmin;font-size:var(--fs-s);line-height:1.3;color:var(--ink);width:max-content;max-width:60cqmin;box-shadow:var(--sh-2)}
 #tip.on{display:flex;animation:fadeUp var(--t-mid) var(--ease)}
+#tip span{word-break:keep-all;overflow-wrap:anywhere}
 #tip i{display:block;width:7cqmin;height:7cqmin;flex:none}#tip i svg{width:100%;height:100%}
 
 /* ===== C13. プレイ：操作ボタン（左下「すすむ」、右下にジャンプ・ドリルアタック、その上にジャンプドリル） ===== */
@@ -436,28 +442,36 @@ body.counting #count{display:flex}
 @keyframes countIn{0%{opacity:0;transform:scale(.4)}60%{opacity:1}100%{opacity:1;transform:scale(1)}}
 @keyframes goIn{0%{opacity:0;transform:scale(.5)}30%{opacity:1;transform:scale(1.06)}55%{opacity:1;transform:scale(1)}100%{opacity:0;transform:scale(1.18)}}
 
-/* ===== C16. 獲得宣言（3.5秒。中央の下。宝石の色でやわらかく光る） ===== */
-#ann{position:absolute;left:42cqmin;top:57cqmin;width:82cqmin;height:36cqmin;display:none;align-items:center;justify-content:center;--g:#ffd54f;--gc:#ffffff}
+/* ===== C16. 獲得宣言（3.5秒。画面中央に大きく。宝石の色でやわらかく光る） =====
+   位置：x 31.9〜145.9（ステージの中央 88.9 を中心に 114）、y 33.5〜58.5。
+   上（y 12〜30）は あける：3Dの宝石が シーカーの上に 浮き上がるのが 見えるように。
+   カウントダウン・擬音の帯・ちずの名前とは 同じ時に出ない（宣言を はじめるとき 消す／かくす）ので 場所を わけあう。 */
+#ann{position:absolute;left:50%;top:33.5cqmin;width:114cqmin;height:25cqmin;transform:translateX(-50%);display:none;align-items:center;justify-content:center;--g:#ffd54f;--gc:#ffffff}
 body.announcing #ann{display:flex}
-.ann-card{position:relative;width:100%;display:flex;align-items:center;gap:3cqmin;padding:2.4cqmin 4.4cqmin 2.4cqmin 3cqmin;border-radius:var(--r-xl);background:rgba(255,250,240,.96);
+body.announcing #maptag{visibility:hidden}
+.ann-card{position:relative;width:100%;height:100%;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:.6cqmin;padding:1.4cqmin 4cqmin;border-radius:var(--r-xl);background:rgba(255,250,240,.96);
   box-shadow:0 0 0 .7cqmin var(--g),0 0 6cqmin 1.6cqmin var(--g),var(--sh-3);animation:annIn .6s var(--ease-pop) both}
-.ann-card::before{content:"";position:absolute;inset:-6cqmin;border-radius:var(--r-xl);background:radial-gradient(closest-side,var(--g),transparent);opacity:.45;z-index:-1;animation:glow 2.4s ease-in-out infinite}
-.ann-gem{display:block;width:16cqmin;height:16cqmin;flex:none;animation:gemSpin 3.5s var(--ease) both}
+.ann-card::before{content:"";position:absolute;inset:-3cqmin;border-radius:var(--r-xl);background:radial-gradient(closest-side,var(--g),transparent);opacity:.45;z-index:-1;animation:glow 2.4s ease-in-out infinite}
+.ann-row{display:flex;align-items:center;justify-content:center;gap:2cqmin;max-width:100%}
+.ann-gem{display:block;width:10.4cqmin;height:10.4cqmin;flex:none;animation:gemSpin 3.5s var(--ease) both}
 .ann-gem svg{width:100%;height:100%;overflow:visible}
-.ann-text{display:flex;flex-direction:column;gap:.6cqmin;min-width:0}
-.ann-who{font-size:5.4cqmin;line-height:1.15;font-weight:800;color:var(--ink-2);white-space:nowrap}
-.ann-what{font-size:6.2cqmin;line-height:1.2;font-weight:900;color:var(--ink);word-break:keep-all}
+.ann-who{font-size:8cqmin;line-height:1.15;font-weight:800;color:var(--ink-2);white-space:nowrap}
+.ann-what{font-size:8cqmin;line-height:1.15;font-weight:900;color:var(--ink);white-space:nowrap;text-align:center}
 .ann-what em{font-style:normal;color:var(--gd,var(--ink))}
 @keyframes annIn{0%{opacity:0;transform:scale(.6) translateY(3cqmin)}100%{opacity:1;transform:scale(1) translateY(0)}}
 @keyframes glow{0%,100%{transform:scale(.92);opacity:.35}50%{transform:scale(1.06);opacity:.6}}
 @keyframes gemSpin{0%{transform:rotateY(0) scale(.5)}20%{transform:rotateY(180deg) scale(1.1)}40%{transform:rotateY(360deg) scale(1)}100%{transform:rotateY(720deg) scale(1)}}
 
 /* ===== C17. エンディング ===== */
-.endleft{position:absolute;left:4cqmin;top:4cqmin;width:84cqmin;bottom:27cqmin;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:1.8cqmin;text-align:center}
+/* 左の列は 上から ならべる（見出しが 上で 切れない。justify-content:center だと あふれた分が 上に はみ出す）。入りきらないときは ui.js fitEnding() が 見出しを 小さくする */
+.endleft{position:absolute;z-index:1;left:4cqmin;top:4cqmin;width:84cqmin;bottom:27cqmin;display:flex;flex-direction:column;align-items:center;justify-content:flex-start;gap:1.8cqmin;text-align:center;padding-top:1cqmin}
+/* 入りきるときは 上下のまん中に（auto の余白は 足りないとき 0 になり、上が切れることはない） */
+.endleft>:first-child{margin-top:auto}.endleft>:last-child{margin-bottom:auto}
 .found{font-size:9.6cqmin;font-weight:900;line-height:1.15;color:#fff;word-break:keep-all;
   text-shadow:0 .4cqmin 0 var(--orange-lo),0 .8cqmin 0 var(--orange-lo),0 1.2cqmin 0 var(--orange-lip),0 2.4cqmin 2.4cqmin rgba(20,30,50,.25);
   -webkit-text-stroke:.4cqmin var(--orange);paint-order:stroke fill;animation:floatSm 3.6s ease-in-out infinite}
-.found.long{font-size:7cqmin}
+.found.long{font-size:7.6cqmin}
+.found.xlong{font-size:6.4cqmin}
 #ending[data-res=opp] .found{text-shadow:0 .4cqmin 0 var(--sky-lo),0 .8cqmin 0 var(--sky-lo),0 1.2cqmin 0 var(--sky-lip),0 2.4cqmin 2.4cqmin rgba(20,30,50,.25);-webkit-text-stroke-color:var(--sky)}
 #ending[data-res=same] .found{color:var(--gold-hi);text-shadow:0 .4cqmin 0 #e0a100,0 .8cqmin 0 #e0a100,0 1.2cqmin 0 #b98200,0 2.4cqmin 2.4cqmin rgba(20,30,50,.25);-webkit-text-stroke-color:#f0b400}
 .team{display:flex;align-items:flex-end;justify-content:center;gap:4cqmin}
@@ -475,14 +489,14 @@ body.announcing #ann{display:flex}
 .endrec .rc-ico{width:6cqmin;height:6cqmin}.endrec .rc-col{display:flex;flex-direction:column;align-items:flex-start;gap:.4cqmin}
 .endrec b{font-size:var(--fs-min);font-weight:800;white-space:nowrap;color:var(--ink)}
 .endrec .rc-n{display:flex;flex-wrap:wrap;gap:0 2.4cqmin}.endrec .rl{white-space:nowrap}
-.endmap{display:flex;align-items:baseline;gap:1.6cqmin}
+.endmap{display:flex;align-items:baseline;justify-content:center;gap:1.6cqmin;max-width:100%;background:rgba(255,250,240,.9);border-radius:var(--r-pill);padding:.6cqmin 3.4cqmin;box-shadow:var(--sh-1);white-space:nowrap}
 .endtitle{font-size:6cqmin;font-weight:800;color:var(--ink);line-height:1.1}
 .endyomi{font-size:var(--fs-s);color:var(--ink-2)}
 /* ちずの絵：ホームボタン（右上 y 3〜15cqmin）にかからないよう 19cqmin より下から */
-.endpic{position:absolute;left:92cqmin;right:5cqmin;top:19cqmin;bottom:27cqmin;display:flex;align-items:center;justify-content:center}
+.endpic{position:absolute;z-index:1;left:92cqmin;right:5cqmin;top:19cqmin;bottom:27cqmin;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:2.4cqmin}
 .endpic img{max-width:100%;max-height:100%;object-fit:contain;box-sizing:border-box;background:#fff;padding:1.6cqmin;border-radius:var(--r-m);box-shadow:var(--sh-3);transform:rotate(1.5deg)}
 .endpic img.pix{image-rendering:crisp-edges;image-rendering:pixelated}
-#confetti{position:absolute;inset:0;overflow:hidden;pointer-events:none}
+#confetti{position:absolute;z-index:0;inset:0;overflow:hidden;pointer-events:none} /* 文字と絵の うしろを とおる */
 #confetti i{position:absolute;top:-6cqmin;width:2.4cqmin;height:2.4cqmin;border-radius:.5cqmin;opacity:.9;animation:fall linear infinite}
 @keyframes fall{to{transform:translateY(112cqmin) rotate(360deg)}}
 body[data-state=ending] #nav{bottom:5cqmin}

@@ -49,8 +49,12 @@
   function paletteOf(n) { n = n | 0; return PALETTES[n >= 0 && n < PALETTES.length ? n : 0]; }
 
   /* ===== K02. トゥーン調の材質・輪郭線・形の部品 ===== */
-  /* ---- トゥーン調（段々の陰影）と黒い輪郭線 ---- */
-  var grad = new T.DataTexture(new Uint8Array([90, 170, 255]), 3, 1, T.LuminanceFormat);
+  /* ---- トゥーン調（段々の陰影）と、ごく細い墨色の輪郭 ----
+     SPEC4 §3「輪郭の太い線は使わない」：元のモデルの太い黒いふち（反転法線の殻）は、ごく細い墨色（#2b2f3a）にした。
+     陰の段も やわらかく（暗い段を明るめに）して、メニューの絵のシーカー・プレイ画面の積み木とそろえる。 */
+  var INK = 0x2b2f3a, INK_RGB = '0.169,0.184,0.227';
+  var OUTLINE = 0.006;       // 輪郭の太さ（元の単位。もとは 0.016）
+  var grad = new T.DataTexture(new Uint8Array([150, 205, 255]), 3, 1, T.LuminanceFormat);
   grad.minFilter = grad.magFilter = T.NearestFilter;
   grad.needsUpdate = true;
   function toon(c, extra) {
@@ -58,7 +62,7 @@
     if (extra) for (var k in extra) o[k] = extra[k];
     return new T.MeshToonMaterial(o);
   }
-  var inkBasic = new T.MeshBasicMaterial({ color: 0x000000 });
+  var inkBasic = new T.MeshBasicMaterial({ color: INK });
   var inkCache = {};
   function inkMaterial(t) {
     var key = String(t);
@@ -66,7 +70,7 @@
       inkCache[key] = new T.ShaderMaterial({
         uniforms: { t: { value: t } },
         vertexShader: 'uniform float t; void main(){ gl_Position = projectionMatrix * modelViewMatrix * vec4(position + normal * t, 1.0); }',
-        fragmentShader: 'void main(){ gl_FragColor = vec4(0.0,0.0,0.0,1.0); }',
+        fragmentShader: 'void main(){ gl_FragColor = vec4(' + INK_RGB + ',1.0); }',
         side: T.BackSide
       });
     }
@@ -94,7 +98,7 @@
   }
   /* 反転法線の輪郭線（元の方式） */
   function withInk(mesh, t) {
-    var o = new T.Mesh(weld(mesh.geometry), inkMaterial(t === undefined ? 0.015 : t));
+    var o = new T.Mesh(weld(mesh.geometry), inkMaterial(t === undefined ? OUTLINE : t));
     o.userData.ink = true;
     mesh.add(o);
     return mesh;
@@ -264,7 +268,7 @@
 
     var bodyMat = toon(color), capMat = toon(pal.accent), frameMat = toon(pal.track);
     var body = new T.Mesh(new T.CylinderGeometry(R, R, LEN, 48).rotateZ(Math.PI / 2), [bodyMat, capMat, capMat]);
-    body.position.y = CY; withInk(body, 0.016);
+    body.position.y = CY; withInk(body);
     inner.add(body, makeEnd(1), makeEnd(-1));
 
     // バイザーと緑の目（正面 +Z）
@@ -283,7 +287,7 @@
     var pole = new T.Mesh(new T.CylinderGeometry(0.04, 0.04, 1, 10), inkBasic);   // 高さ1 を伸縮して長さにする
     pole.name = 'pole';
     var cone = new T.Mesh(new T.ConeGeometry(HAT_R, HAT_H, 40, 1, false), toon(0xffffff, { map: stripeTex }));
-    withInk(cone, 0.016);
+    withInk(cone);
     hatPivot.add(pole, cone);
     rig.add(hatPivot);
 

@@ -244,6 +244,15 @@
       '<rect x="10" y="44" width="14" height="22" rx="7" fill="#ffd54f"/><rect x="100" y="44" width="14" height="22" rx="7" fill="#ffd54f"/>' +
       '<rect x="34" y="82" width="56" height="11" rx="5.500" fill="#6b7480"/></svg>';
   }
+  // よみ：7文字以上は まん中で 2行に わける（小さい「ゃゅょっ」の前では わけない）。横に つぶさない
+  function setYomi(el, t) {
+    el.textContent = '';
+    if (t.length < 7) { el.textContent = t; el.classList.remove('two'); return; }
+    var k = Math.floor(t.length / 2);
+    while (k < t.length - 1 && /[ゃゅょっぁぃぅぇぉャュョッァィゥェォー]/.test(t.charAt(k))) k++;
+    el.appendChild(doc.createTextNode(t.slice(0, k))); el.appendChild(doc.createElement('br')); el.appendChild(doc.createTextNode(t.slice(k)));
+    el.classList.add('two');
+  }
   function nest(svg, x, y, w, h) { return svg.replace('<svg viewBox', '<svg x="' + x + '" y="' + y + '" width="' + w + '" height="' + h + '" viewBox'); }
   function inner(svg) { return svg.replace(/^<svg[^>]*>/, '').replace(/<\/svg>$/, ''); }
   // 宝石（ファセットのある形。輪郭線なし。色の明暗で立体に）
@@ -295,23 +304,10 @@
       depth +
       '<text x="292" y="' + base + '" ' + TL + '>' + tsp(false) + '</text>' +
       '</g>' +
-      '<g transform="translate(572 140)">' + emblem() + '</g>' +
+      // マスコット：文字の列から はなして 右上（「見つけて！」の となり）に のせる。目とキャタピラのある 乗りもの
+      nest(mascot(pal(0)), 434, 0, 112, 97.5) +
       '</svg>';
   }
-  // ロゴの右の しるし（シーカーの端面＋ドリルハット）
-  function emblem() {
-    var a = nid('ea'), c = nid('ec');
-    return '<defs><linearGradient id="' + a + '" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#ffe2a8"/><stop offset="1" stop-color="#eab35c"/></linearGradient>' +
-      '<clipPath id="' + c + '"><path d="M-28-34h56L0-96z"/></clipPath></defs>' +
-      '<ellipse cx="0" cy="66" rx="44" ry="7" fill="rgba(43,47,58,.12)"/>' +
-      '<g clip-path="url(#' + c + ')"><rect x="-30" y="-98" width="60" height="66" fill="#2a9fd4"/><path d="M-30-40 30-70M-30-58 30-88M-30-22 30-52" stroke="#ffd54f" stroke-width="9"/><path d="M0-96 28-34H0z" fill="rgba(0,0,0,.12)"/></g>' +
-      '<rect x="-4" y="-36" width="8" height="14" rx="3" fill="' + INK + '"/>' +
-      '<ellipse cx="0" cy="22" rx="50" ry="54" fill="#d96a00"/>' +
-      '<ellipse cx="0" cy="17" rx="50" ry="54" fill="url(#' + a + ')"/>' +
-      '<ellipse cx="0" cy="18" rx="30" ry="36" fill="#fff"/>' +
-      '<path d="M0-4l7.600 15.600 17.200 2-12.700 11.800 3.500 17-15.600-8.600-15.600 8.600 3.500-17L-24.800 13.600l17.200-2z" fill="#ef6c8f"/>';
-  }
-
   var ICON = { // 進行ボタンのアイコン（文字の色）
     play: '<svg viewBox="0 0 24 24"><path d="M7 4.200c0-1 1.100-1.600 1.900-1.100l11 7.300c.8.500.8 1.700 0 2.200l-11 7.300C8.100 20.400 7 19.800 7 18.800z"/></svg>',
     go: '<svg viewBox="0 0 24 24"><path d="M3 5.200c0-.9 1-1.400 1.700-.9L12 9.600V5.200c0-.9 1-1.400 1.700-.9l8 6c.6.500.6 1.400 0 1.900l-8 6c-.7.500-1.700 0-1.700-.9v-4.400l-7.300 5.300C4 18.200 3 17.700 3 16.800z"/></svg>',
@@ -693,7 +689,7 @@
         var th = cls === 'illust' ? thumb(p.id) : '';
         c.innerHTML = (th ? '<i class="ic"><img alt="" src="' + th + '"></i>' : (cls === 'illust' && ILLUST[p.title] ? '<i class="ic">' + ILLUST[p.title] + '</i>' : '')) + '<span class="kan"></span><span class="yomi"></span>';
         c.querySelector('.kan').textContent = p.title;
-        c.querySelector('.yomi').textContent = cls === 'illust' ? '' : (p.reading || '');
+        setYomi(c.querySelector('.yomi'), cls === 'illust' ? '' : (p.reading || ''));
         tap(c, function () { choosePreset(p); });
         row.appendChild(c);
       });
@@ -935,6 +931,7 @@
     els.ptTitle.textContent = m.title || '';
     els.ptYomi.textContent = (m.reading && m.reading !== m.title) ? m.reading : '';
     els.maptag.classList.toggle('none', !m.title);
+    if (els.sOpName) els.sOpName.textContent = opp === 'cpu' ? 'コンピューター' : 'あいて'; // 宣言・結果と おなじ よびかた
     camMode = 1; updateCam();
     doc.body.classList.add('camtop');
     go('play');
@@ -1042,16 +1039,36 @@
     phase = 'announce';
     call('World', 'freeze', true);
     releaseAll(); sw = null; hideTip();
+    // カウントダウン・擬音とは 同時に出さない（同じ場所を つかうため）
+    if (counting) { counting = false; doc.body.classList.remove('counting'); if (els.countN) { els.countN.textContent = ''; els.countN.className = ''; } }
+    clearOno();
     els.annGem.innerHTML = bigGem(gm);
     els.annWho.textContent = whoName(idx) + 'が';
     els.annWhat.textContent = gm.name + 'を ゲットした！';
     els.ann.style.setProperty('--g', gm.glow);
     doc.body.classList.add('announcing', 'frozen');
+    fitAnn();
     // アニメーションを はじめから
     var card = els.ann.querySelector('.ann-card'); card.style.animation = 'none'; void card.offsetWidth; card.style.animation = '';
     els.annGem.style.animation = 'none'; void els.annGem.offsetWidth; els.annGem.style.animation = '';
     sfx('fanfare');
     refreshScores();
+  }
+  // 宣言の文字：8cqmin 以上で 2行。書体の差で はばが足りないときだけ 少し小さくする（下限 7cqmin）
+  function fitAnn() {
+    [els.annWho, els.annWhat].forEach(function (el) {
+      el.style.fontSize = '';
+      var card = els.ann.querySelector('.ann-card'), cs = getComputedStyle(card);
+      var avail = card.clientWidth - parseFloat(cs.paddingLeft) - parseFloat(cs.paddingRight);
+      if (el === els.annWho) avail -= els.annGem.offsetWidth + parseFloat(getComputedStyle(el.parentNode).columnGap || 0);
+      var r = doc.createRange(); r.selectNodeContents(el);
+      var k = card.getBoundingClientRect().width / (card.offsetWidth || 1) || 1; // 出てくる途中の 拡大・縮小を のぞく
+      var w = r.getBoundingClientRect().width / k, fs = parseFloat(getComputedStyle(el).fontSize);
+      if (w > avail && w > 0) {
+        var cq = els.stage.getBoundingClientRect(); cq = Math.min(cq.width, cq.height) / 100;
+        el.style.fontSize = Math.max(7, fs * avail / w / cq - 0.05).toFixed(2) + 'cqmin';
+      }
+    });
   }
   function stepAnnounce(dt) {
     if (!ann) return;
@@ -1238,7 +1255,7 @@
   }
 
   /* ===== U19. エンディング（争いの言葉なし。同数は「へいわの しょうり」） ===== */
-  var END_BOX_W = 76, END_BOX_H = 50; // .endpic の中に入る大きさ（cqmin）
+  var END_BOX_W = 76, END_BOX_H = 42; // .endpic の中に入る大きさ（cqmin）
   function showEndPic(src) {
     var img = els.endPic;
     img.onload = function () {
@@ -1286,7 +1303,9 @@
     els.ending.setAttribute('data-res', res);
     els.ending.setAttribute('data-kind', kind);
     els.endFound.textContent = head;
-    els.endFound.classList.toggle('long', head.length > 10);
+    els.endFound.classList.toggle('long', head.length > 7 && head.length <= 11);
+    els.endFound.classList.toggle('xlong', head.length > 11);
+    els.endFound.style.fontSize = '';
     els.endTeam.innerHTML = teamHTML;
     var pe = els.endTeam.querySelectorAll('.ped');
     for (var i = 0; i < pe.length; i++) pe[i].textContent = peds[i] || '';
@@ -1307,14 +1326,26 @@
     var cols = res === 'same' ? [pal(myPal).body, pal(oppPal).body, '#ffd54f', '#ef6c8f', '#ffffff'] : ['#ff9800', '#2a9fd4', '#ffd54f', '#3dbb85', '#ef6c8f', '#ffffff'];
     for (var j = 0; j < 24; j++) {
       var sp = doc.createElement('i');
-      sp.style.left = (j * 4.1 + Math.random() * 3) + '%';
+      // 文字の列（左がわ）の上は とおらない：左のはし と 右がわ（ちずの絵のまわり）だけ
+      sp.style.left = (j < 3 ? j * 2.4 + Math.random() : 50 + (j - 3) * 2.3 + Math.random() * 1.5) + '%';
       sp.style.background = cols[j % cols.length];
       sp.style.animationDuration = (6 + Math.random() * 4) + 's';
       sp.style.animationDelay = (-Math.random() * 8) + 's';
       c.appendChild(sp);
     }
+    fitEnding();
     call('Sfx', 'engine', 'idle', 0);
     call('Sfx', 'jingle', jingle);
+  }
+  // 結果の左の列：上から ならべ、入りきらないときは 見出しを 小さくする（上も下も 切れない）
+  function fitEnding() {
+    var box = doc.querySelector('.endleft'); if (!box || !box.clientHeight) return;
+    var cq = els.stage.getBoundingClientRect(); cq = Math.min(cq.width, cq.height) / 100;
+    for (var n = 0; n < 12 && box.scrollHeight > box.clientHeight + 1; n++) {
+      var fs = parseFloat(getComputedStyle(els.endFound).fontSize) / cq;
+      if (fs <= 5.2) break;
+      els.endFound.style.fontSize = (fs - 0.4).toFixed(2) + 'cqmin';
+    }
   }
 
   /* ===== U20. スワイプ（プレイ中の画面なぞり） ===== */
@@ -1352,6 +1383,7 @@
   /* ===== U21. ホームボタン・確認モーダル・resetGame() ===== */
   function openModal(kind) {
     if (modalOpen) return;
+    if (state === 'boot') return; // Boot から先へ進むのは「タップしてスタート」の click だけ
     modalKind = kind === 'reset' ? 'reset' : (state === 'title' ? 'quit' : 'back');
     var t = { reset: 'きろくを ぜんぶ けしますか？', quit: 'しゅうりょうしますか？', back: 'タイトルへもどりますか？' }[modalKind];
     $('m-title').textContent = t;
@@ -1467,7 +1499,7 @@
     els.endWho = $('end-who'); els.endTitle = $('end-title'); els.endYomi = $('end-yomi'); els.endPic = $('end-pic');
     els.sonarCv = $('sonar-cv'); els.tVal = $('t-val'); els.sMe = $('s-me'); els.sOp = $('s-op');
     els.countN = $('count-n'); els.annGem = $('ann-gem'); els.annWho = $('ann-who'); els.annWhat = $('ann-what');
-    els.onoL = $('ono-l'); els.onoR = $('ono-r');
+    els.onoL = $('ono-l'); els.onoR = $('ono-r'); els.sOpName = $('s-op-n');
 
     document.addEventListener('contextmenu', e => { if(e.target.tagName !== 'INPUT') e.preventDefault(); }, { passive: false });
     ['gesturestart', 'gesturechange', 'gestureend', 'dblclick'].forEach(function (n) { doc.addEventListener(n, function (e) { e.preventDefault(); }); });

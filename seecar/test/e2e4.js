@@ -127,6 +127,23 @@ async function fontCheck(p, tag) {
   ok(`${tag}：文字は 3.4cqmin 以上`, r.length === 0, r);
 }
 
+// 結果画面：見出しが上で切れない・左の列からはみ出さない・ちずの名前は絵の下・紙ふぶきは文字の後ろ
+async function endingCheck(p, tag) {
+  const r = await p.evaluate(() => {
+    const st = document.getElementById('stage').getBoundingClientRect(), cq = Math.min(st.width, st.height) / 100;
+    const box = document.querySelector('.endleft'), bb = box.getBoundingClientRect(), fe = document.getElementById('end-found'), f = fe.getBoundingClientRect();
+    const kids = [...box.children].filter((e) => getComputedStyle(e).display !== 'none').map((e) => e.getBoundingClientRect());
+    const map = document.querySelector('.endmap'), pic = document.querySelector('.endpic');
+    const z = (s) => +getComputedStyle(document.querySelector(s)).zIndex || 0;
+    return { top: +((f.top - st.top) / cq).toFixed(1), fs: +(parseFloat(getComputedStyle(fe).fontSize) / cq).toFixed(2),
+      inside: kids.every((k) => k.top >= bb.top - 1 && k.bottom <= bb.bottom + 1), over: box.scrollHeight - box.clientHeight,
+      mapInPic: pic.contains(map), confettiBehind: z('#confetti') < z('.endleft') && z('#confetti') < z('.endpic'),
+      lines: Math.round(f.height / (parseFloat(getComputedStyle(fe).lineHeight) || 1)) };
+  });
+  ok(`${tag}：見出しが上で切れない（y ${r.top}cqmin・${r.fs}cqmin・${r.lines}行）・左の列からはみ出さない`, r.top >= 0 && r.inside && r.over <= 1, r);
+  ok(`${tag}：ちずの名前は ちずの絵の下・紙ふぶきは文字と絵の後ろ`, r.mapInPic && r.confettiBehind, r);
+}
+
 /* ---------- 1. 静的な確認 ---------- */
 function staticChecks() {
   const html = fs.readFileSync(path.join(SRC, 'index.html'), 'utf8');
@@ -150,6 +167,8 @@ function staticChecks() {
   const bad = strip.match(/(つちのやま|土の山|ドリルジャンプ|まけ|ひきわけ)/g);
   ok('ソースの文字に禁止の言葉がない（つちのやま・ドリルジャンプ・まけ・ひきわけ）', !bad, bad);
   ok('ジャンプドリルの名前', html.includes('ジャンプ<br>ドリル') && html.includes('data-act="jumpDrill"'));
+  ok('.card .yomi を横につぶさない（scaleX・字間つめ なし）', !/\.card \.yomi\{[^}]*(scaleX|letter-spacing:-)/.test(css));
+  ok('Boot ではホームボタンを出さない・押してもモーダルを開かない', css.includes('body[data-state=boot] #home{display:none}') && /function openModal[^]*?if \(state === 'boot'\) return;/.test(ui));
   ok('連番のコメントブロック', /===== U01\./.test(ui) && /===== C01\./.test(css) && /===== H01\./.test(html));
   ok('Boot の文面（§9）', ['覚えたい言葉や絵の中を探検し、形の特徴に気付いて親しむ。', '立体的なマップを理解し、地図を見ながら目的地を探す力を養う。', '「すすむ」で まえへ。がめんを よこに なぞると むきが かわるよ', '「そら」で ちず ぜんたいを みて、ソナーで たからの ほうこうを たしかめよう', 'ドリルで ブロックを ほって、たからを みつけよう', '「ジャンプドリル」で ジャンプしながら したへ ほりすすめるよ'].every((t) => html.includes(t)));
 }
@@ -211,6 +230,11 @@ async function soloFlow() {
   await click(p, '.howcard[data-kind=solo]');
   await click(p, '.card[data-id]', 1500);
   await fontCheck(p, 'ちずえらび');
+  const yo = await p.evaluate(() => [...document.querySelectorAll('.card .yomi')].filter((e) => e.textContent).map((e) => {
+    const c = e.closest('.card').getBoundingClientRect(), r = e.getBoundingClientRect();
+    return { t: e.textContent, tf: getComputedStyle(e).transform, in: r.left >= c.left - 1 && r.right <= c.right + 1 && r.top >= c.top - 1 && r.bottom <= c.bottom + 1 };
+  }));
+  ok('ちずえらび：よみは つぶさず カードの中に収まる（長いよみは 2行）', yo.length > 0 && yo.every((y) => y.tf === 'none' && y.in), yo.filter((y) => !(y.tf === 'none' && y.in)));
   await clearLog(p);
   await nav(p, 'しゅっぱつ！', 400);
   const lo = await p.evaluate(() => window.__loadOpts);
@@ -252,10 +276,15 @@ async function soloFlow() {
   await sleep(1200);
   ok('擬音：短い時間で消える', (await p.evaluate(() => document.querySelectorAll('.ono').length)) === 0);
   await fontCheck(p, 'プレイ'); await wordCheck(p, 'プレイ');
-  // 獲得
+  // 獲得（直前に 擬音と説明を出しておく → 宣言が はじまると 消える）
+  await p.evaluate(() => { window.__emit('onomato', 'drill'); document.getElementById('tip').classList.add('on'); }); await sleep(100);
   await clearLog(p);
   const el0 = (await info(p)).elapsed;
   await p.evaluate(() => window.__emit('gemHit', 0, 0)); await sleep(500);
+  await p.evaluate(() => window.__emit('onomato', 'jump')); await sleep(50);
+  const together = await p.evaluate(() => ({ counting: document.body.classList.contains('counting'), ono: document.querySelectorAll('#ono-l .ono,#ono-r .ono').length,
+    tip: document.getElementById('tip').classList.contains('on'), maptag: getComputedStyle(document.getElementById('maptag')).visibility }));
+  ok('獲得宣言：カウントダウン・擬音・説明・ちずの名前とは 同時に出ない（宣言中は 擬音も出ない）', !together.counting && together.ono === 0 && !together.tip && together.maptag === 'hidden', together);
   const i1 = await info(p);
   ok('獲得：World.award(0,0)・freeze(true)・ファンファーレ', (await logOf(p, 'World.award')).length === 1 && (await logOf(p, 'World.freeze')).some((l) => l[1] === true) && (await logOf(p, 'Sfx.play')).some((l) => l[1] === 'fanfare'));
   ok('獲得：宣言「あなたが …を ゲットした！」', (await txt(p, '#ann-who')) === 'あなたが' && /を ゲットした！$/.test(await txt(p, '#ann-what')), await txt(p, '#ann-what'));
@@ -274,6 +303,7 @@ async function soloFlow() {
   const endpic = await p.evaluate(() => { const a = document.querySelector('.endpic').getBoundingClientRect(), h = document.getElementById('home').getBoundingClientRect(); return { a: [a.left, a.top, a.right, a.bottom], h: [h.left, h.top, h.right, h.bottom], hit: a.left < h.right && h.left < a.right && a.top < h.bottom && h.top < a.bottom }; });
   ok('結果：.endpic がホームボタンにかからない', !endpic.hit, endpic);
   await shot(p, '11ending_solo');
+  await endingCheck(p, '結果（ひとり）');
   await fontCheck(p, '結果'); await wordCheck(p, '結果');
   // 結果のモーダル → resetGame
   await clearLog(p);
@@ -306,6 +336,16 @@ async function cpuRace() {
   await waitFor(async () => (await st(p)) === 'ending', 6000);
   ok('CPU：結果「コンピューターが はやかった」と lose のジングル', (await txt(p, '#end-found')) === 'コンピューターが はやかった' && (await logOf(p, 'Sfx.jingle')).some((l) => l[1] === 'lose'));
   await shot(p, '15ending_cpu_race');
+  await endingCheck(p, '結果（コンピューターが はやかった）');
+  // 結果の見出し 全種類：上から並べて 切れない（fillEnding と同じ 大きさの きまり）
+  const heads = ['みつけた！', 'きみが はやかった！', 'コンピューターが はやかった', 'ともだちが はやかった', 'きみの ほうが おおかった！', 'コンピューターの ほうが おおかった', 'ともだちの ほうが おおかった', 'みんな なかよし！ へいわの しょうり！'];
+  const hr = await p.evaluate((hs) => hs.map((h) => {
+    const f = document.getElementById('end-found'), st = document.getElementById('stage').getBoundingClientRect(), cq = Math.min(st.width, st.height) / 100;
+    f.textContent = h; f.style.fontSize = ''; f.classList.toggle('long', h.length > 7 && h.length <= 11); f.classList.toggle('xlong', h.length > 11);
+    const box = document.querySelector('.endleft'), r = f.getBoundingClientRect();
+    return { h, top: +((r.top - st.top) / cq).toFixed(1), over: box.scrollHeight - box.clientHeight, w: r.width <= box.getBoundingClientRect().width + 1 };
+  }), heads);
+  ok('結果の見出し 全8種類：上が切れず 列からはみ出さない', hr.every((x) => x.top >= 0 && x.over <= 1 && x.w), hr);
   await wordCheck(p, 'CPU 結果');
   // もういちど → プレイ中にホーム → resetGame
   await nav(p, 'もういちど');
@@ -345,6 +385,7 @@ async function cpuCount() {
   await click(p, '.card[data-id]', 1800);
   await nav(p, 'しゅっぱつ！', 300);
   await waitFor(async () => (await info(p)).phase === 'run', 7000);
+  ok('おおい（CPU）：スコアの名前は「コンピューター」', (await txt(p, '#s-op-n')) === 'コンピューター', await txt(p, '#s-op-n'));
   await sleep(1200);
   const t0 = (await info(p)).left;
   await p.evaluate(() => { window.__emit('gemHit', 0, 0); window.__emit('gemHit', 1, 1); }); await sleep(800);
@@ -364,6 +405,7 @@ async function cpuCount() {
   ok('おおい：同数は「みんな なかよし！ へいわの しょうり！」＋ peace', head === 'みんな なかよし！ へいわの しょうり！' && (await logOf(p, 'Sfx.jingle')).some((l) => l[1] === 'peace'), head);
   ok('おおい：全員が勝者の見た目（全員に かんむり）', await p.evaluate(() => document.querySelectorAll('#end-team figure.top').length === 2));
   await shot(p, '18ending_peace');
+  await endingCheck(p, '結果（へいわの しょうり）');
   await wordCheck(p, 'へいわ');
   await fontCheck(p, 'へいわ');
   ok('エラーなし（おおい）', errors.length === 0, errors);
@@ -374,10 +416,17 @@ async function cpuCount() {
 async function modalBoot() {
   const { page: p, errors, context } = await open();
   await sleep(300);
-  await click(p, '#home');
-  ok('Boot：モーダル「タイトルへもどりますか？」', (await txt(p, '#m-title')) === 'タイトルへもどりますか？');
-  await click(p, '#m-yes', 500);
-  ok('Boot：はい → resetGame → タイトル', (await st(p)) === 'title');
+  // Boot：ホームボタンは出ない。押す操作をしても モーダルは開かず Boot のまま（じゅんびちゅう… と 読み込み後の どちらも）
+  const tapHome = () => p.evaluate(() => { const h = document.getElementById('home'); ['pointerdown', 'pointerup', 'click'].forEach((n) => h.dispatchEvent(new PointerEvent(n, { bubbles: true, cancelable: true }))); });
+  ok('Boot：ホームボタンは 出ていない', await p.evaluate(() => getComputedStyle(document.getElementById('home')).display === 'none'));
+  await tapHome(); await sleep(300);
+  ok('Boot（じゅんびちゅう）：ホームを押しても モーダルは開かず Boot のまま', !(await p.evaluate(() => document.getElementById('modal').classList.contains('on'))) && (await st(p)) === 'boot');
+  await waitFor(async () => !(await p.evaluate(() => document.getElementById('bootbtn').disabled)), 8000);
+  await tapHome(); await sleep(300);
+  ok('Boot（タップしてスタート）：ホームを押しても モーダルは開かず Boot のまま', !(await p.evaluate(() => document.getElementById('modal').classList.contains('on'))) && (await st(p)) === 'boot');
+  await click(p, '#bootbtn', 500);
+  ok('Boot：進むのは「タップしてスタート」の click だけ', (await st(p)) === 'title');
+  ok('タイトル：ホームボタンが 出る', await p.evaluate(() => getComputedStyle(document.getElementById('home')).display !== 'none'));
   await context.close();
   const { page: q, context: c2 } = await open({ width: 600, height: 900 });
   await sleep(500);
@@ -398,10 +447,17 @@ async function overlap() {
     await click(p, '.card[data-id]', 1500);
     await nav(p, 'しゅっぱつ！', 400);
     await waitFor(async () => (await info(p)).phase === 'run', 7000);
+    if (vp.width === 1280) { // GO! の表示中に 宝石を取っても カウントダウンは すぐ消え、同時には出ない
+      await p.evaluate(() => window.__emit('gemHit', 1, 2)); await sleep(150);
+      const g = await p.evaluate(() => ({ counting: document.body.classList.contains('counting'), announcing: document.body.classList.contains('announcing'), n: document.getElementById('count-n').textContent, who: document.getElementById('ann-who').textContent }));
+      ok('GO! のすぐ後の獲得：カウントダウンを消してから 宣言（同時に出ない）・「コンピューターが」', !g.counting && g.announcing && g.n === '' && g.who === 'コンピューターが', g);
+      await sleep(700); await shot(p, '24announce_centre');
+      await waitFor(async () => (await info(p)).phase === 'run', 6000);
+    }
     const r = await p.evaluate(() => {
-      document.body.classList.add('counting', 'announcing');
+      document.body.classList.add('counting', 'announcing'); document.getElementById('tip').classList.add('on');
       const st = document.getElementById('stage').getBoundingClientRect(), cq = Math.min(st.width, st.height) / 100;
-      const ids = { home: '#home', sonar: '#sonar', 'timer+score': '#hud', maptag: '#maptag', camera: '#cam', 'すすむ': '#fwd', 'ジャンプ': '#b-jump', 'ドリルアタック': '#b-attack', 'ジャンプドリル': '#b-jd', '擬音(左)': '#ono-l', '擬音(右)': '#ono-r', '獲得宣言': '#ann', 'カウントダウン': '#count' };
+      const ids = { home: '#home', sonar: '#sonar', 'timer+score': '#hud', maptag: '#maptag', camera: '#cam', 'すすむ': '#fwd', 'ジャンプ': '#b-jump', 'ドリルアタック': '#b-attack', 'ジャンプドリル': '#b-jd', '擬音(左)': '#ono-l', '擬音(右)': '#ono-r', '獲得宣言': '#ann', 'カウントダウン': '#count', '説明': '#tip' };
       const R = {};
       for (const k in ids) { const b = document.querySelector(ids[k]).getBoundingClientRect(); R[k] = [b.left - st.left, b.top - st.top, b.right - st.left, b.bottom - st.top].map((v) => +(v / cq).toFixed(1)); }
       // 擬音の文字そのもの（いちばん大きくなる瞬間）と、カウントダウン「GO!」・宣言の箱の中身が 帯の中に収まるか
@@ -423,22 +479,42 @@ async function overlap() {
       const ac = document.querySelector('.ann-card'); ac.style.animation = 'none';
       if (!inZone(ac.getBoundingClientRect(), document.getElementById('ann').getBoundingClientRect())) fits.push('ann-card');
       ac.style.animation = '';
-      document.body.classList.remove('counting', 'announcing');
-      const keys = Object.keys(R), hits = [];
+      // 獲得宣言の文字：8cqmin・いちばん長い文でも 2行（だれが／なにを ゲットした！）でカードに収まる
+      ac.style.animation = 'none'; // 拡大の途中ではなく 止まった大きさで はかる
+      const card = ac.getBoundingClientRect(), cs = getComputedStyle(ac), inner = card.width - parseFloat(cs.paddingLeft) - parseFloat(cs.paddingRight);
+      const rw = (el) => { const rg = document.createRange(); rg.selectNodeContents(el); return rg.getBoundingClientRect().width; };
+      const aw = document.getElementById('ann-what'), awho = document.getElementById('ann-who'), annT = [];
+      const lines = (el) => Math.round(el.getBoundingClientRect().height / parseFloat(getComputedStyle(el).lineHeight));
+      ['アクアマリンを ゲットした！', 'ダイヤモンドを ゲットした！'].forEach((t) => { aw.textContent = t; annT.push({ t, fs: +(parseFloat(getComputedStyle(aw).fontSize) / cq).toFixed(2), w: +(rw(aw) / cq).toFixed(1), inner: +(inner / cq).toFixed(1), lines: lines(aw) }); });
+      annT.push({ t: 'コンピューターが', fs: +(parseFloat(getComputedStyle(awho).fontSize) / cq).toFixed(2), w: +((rw(awho) + document.getElementById('ann-gem').getBoundingClientRect().width) / cq).toFixed(1), inner: +(inner / cq).toFixed(1), lines: lines(awho) });
+      ac.style.animation = '';
+      document.body.classList.remove('counting', 'announcing'); document.getElementById('tip').classList.remove('on');
+      // 同じ時には出ないので 場所が かさなってよい組（ui.js：宣言を はじめるとき カウントダウンを終わらせ・擬音を消し・説明を消し・ちずの名前を かくす。
+      // 宣言中は 擬音を出さない。説明は GO! が消えてから 出す）。この組は「重なり 0」の数から はずし、別に 時間で わかれていることを確かめる
+      const NEVER_TOGETHER = ['獲得宣言', 'カウントダウン', '擬音(左)', '擬音(右)', 'maptag', '説明'];
+      const allowed = (x, y) => (x === '獲得宣言' || y === '獲得宣言') ? NEVER_TOGETHER.includes(x) && NEVER_TOGETHER.includes(y)
+        : ((x === 'カウントダウン' && y === '説明') || (x === '説明' && y === 'カウントダウン'));
+      const keys = Object.keys(R), hits = [], shared = [];
       let minGap = 1e9, minPair = '';
       for (let i = 0; i < keys.length; i++) for (let j = i + 1; j < keys.length; j++) {
-        const a = R[keys[i]], b = R[keys[j]];
+        const a = R[keys[i]], b = R[keys[j]], pair = keys[i] + '×' + keys[j];
         const gx = Math.max(b[0] - a[2], a[0] - b[2]), gy = Math.max(b[1] - a[3], a[1] - b[3]), gap = Math.max(gx, gy);
-        if (gap < 0) hits.push(keys[i] + '×' + keys[j]);
-        if (gap < minGap) { minGap = gap; minPair = keys[i] + '×' + keys[j]; }
+        if (allowed(keys[i], keys[j])) { if (gap < 0) shared.push(pair); continue; }
+        if (gap < 0) hits.push(pair);
+        if (gap < minGap) { minGap = gap; minPair = pair; }
       }
       const inside = keys.filter((k) => R[k][0] < -0.1 || R[k][1] < -0.1 || R[k][2] > st.width / cq + 0.1 || R[k][3] > 100.1);
-      return { R, hits, fits, minGap: +minGap.toFixed(1), minPair, inside, stage: [Math.round(st.width), Math.round(st.height)] };
+      return { R, hits, shared, annT, fits, minGap: +minGap.toFixed(1), minPair, inside, stage: [Math.round(st.width), Math.round(st.height)] };
     });
     ok(`重なり ${vp.width}×${vp.height}：絶対配置の要素どうしが重ならない（最小のすきま ${r.minGap}cqmin：${r.minPair}）`, r.hits.length === 0, r.hits);
     ok(`重なり ${vp.width}×${vp.height}：すべて 16:9 のステージの中`, r.inside.length === 0, r.inside);
+    const A = r.R['獲得宣言'], cx = (A[0] + A[2]) / 2, cy = (A[1] + A[3]) / 2, sw = r.stage[0] / Math.min(r.stage[0], r.stage[1]) * 100;
+    ok(`獲得宣言 ${vp.width}×${vp.height}：画面中央（中心 x ${cx.toFixed(1)}/${(sw / 2).toFixed(1)}・y ${cy.toFixed(1)}）、上の y 12〜30 は 3Dの宝石のために あける`, Math.abs(cx - sw / 2) < 1 && cy > 40 && cy < 52 && A[1] >= 30, A);
+    ok(`獲得宣言 ${vp.width}×${vp.height}：文字 8cqmin・2行（だれが／なにを ゲットした！）でカードに収まる`, r.annT.every((x) => x.fs >= 8 && x.lines === 1 && x.w <= x.inner + 0.2), r.annT);
+    ok(`重なり ${vp.width}×${vp.height}：場所を わけあうのは 同時に出ない組だけ（${r.shared.join('・')}）`, r.shared.every((x) => /獲得宣言|カウントダウン×説明|説明×カウントダウン/.test(x)), r.shared);
     ok(`重なり ${vp.width}×${vp.height}：擬音（最大の瞬間）・GO!・3・宣言の箱が 自分の帯の中に収まる`, r.fits.length === 0, r.fits);
-    report.push({ vp: `${vp.width}x${vp.height}`, stage: r.stage, minGap: r.minGap, minPair: r.minPair, rects: r.R });
+    report.push({ vp: `${vp.width}x${vp.height}`, stage: r.stage, minGap: r.minGap, minPair: r.minPair, rects: r.R, annText: r.annT,
+      sharedNeverTogether: r.shared, note: 'sharedNeverTogether の組は 画面に同時に出ない（ui.js beginAnnounce がカウントダウンを終わらせ・擬音と説明を消し・ちずの名前をかくす。宣言中は擬音を出さない。説明は GO! が消えてから）。それ以外の組は 重なり 0（minGap）' });
     if (vp.height === 768) await shot(p, '20play_ipad43');
     ok(`エラーなし（重なり ${vp.width}×${vp.height}）`, errors.length === 0, errors);
     await context.close();
@@ -494,6 +570,7 @@ async function netFlow() {
     ok('通信：両方 結果へ', await waitFor(async () => (await st(h)) === 'ending' && (await st(g)) === 'ending', 6000));
     ok('通信：結果 ホスト「ともだちが はやかった」・クライアント「きみが はやかった！」', (await txt(h, '#end-found')) === 'ともだちが はやかった' && (await txt(g, '#end-found')) === 'きみが はやかった！', [await txt(h, '#end-found'), await txt(g, '#end-found')]);
     await shot(g, '23net_guest_ending');
+  await endingCheck(g, '結果（きみが はやかった！・通信）');
     ok('エラーなし（通信）', H.errors.length === 0 && G.errors.length === 0, H.errors.concat(G.errors));
   } finally {
     await H.context.close(); await G.context.close();

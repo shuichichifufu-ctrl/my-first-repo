@@ -6,10 +6,15 @@
   'use strict';
 
   /* ===== W01. 定数（見た目・動き・ドリル・宝石） ===== */
-  // 見た目の高さ：1段 = STEP_H。高さ0と1は「紙に塗った色」（平ら）、2〜10が積み木。壁（10）は 9段 = 1.8 の高さ（約2マス分）。
+  // 見た目の高さ：1段 = STEP_H。高さ0と1は「床のタイルの色」（平ら）、2〜10が積み木。壁（10）は 9段 = 1.8 の高さ（約2マス分）。
   var STEP_H = 0.2;
   function vis(h) { return h <= 1 ? 0 : (h - 1) * STEP_H; }
   var FLOOR_SAT = 1.9; // 床の色の鮮やかさ（1で元の色）
+  // ---- 見た目の色（メニュー画面の「ブロック世界のジオラマ」とそろえる。style.css のデザイントークンと同じ値）----
+  var SKY_TOP = '#9fd8f5';          // 空の上（--sky-top）
+  var HAZE = 0xf3f8f4;              // 遠くのかすみ（空の地平線近くの色。明るく澄んだ空気）
+  var CREAM = [1.0, 0.98, 0.94];    // 床の白（地図の白）＝クリームホワイト #fffaf0
+  var ISLAND_SIDE = 0xeebd8c;       // 地図の島の側面（メニューの浮かぶ島と同じ、やわらかい土の色）
   var DX = [0, 1, 0, -1];
   var DZ = [-1, 0, 1, 0];
 
@@ -113,33 +118,17 @@
   var T = null;
   function buildSharedTextures() {
     T = {};
-    // クレヨンで塗った紙のざらざら（白地に薄い灰色のすじ）
-    var c = makeCanvas(128, 128), g = c.getContext('2d');
-    g.fillStyle = '#fff'; g.fillRect(0, 0, 128, 128);
-    for (var i = 0; i < 520; i++) {
-      var x = Math.random() * 128, y = Math.random() * 128, l = rand(6, 22), a = rand(-0.9, -0.5);
-      var v = Math.floor(rand(205, 245));
-      g.strokeStyle = 'rgba(' + v + ',' + v + ',' + v + ',' + rand(0.25, 0.6).toFixed(2) + ')';
-      g.lineWidth = rand(0.6, 2.2);
-      g.beginPath(); g.moveTo(x, y); g.lineTo(x + Math.cos(a) * l, y + Math.sin(a) * l); g.stroke();
-    }
-    for (i = 0; i < 1600; i++) {
-      var v2 = Math.floor(rand(190, 255));
-      g.fillStyle = 'rgba(' + v2 + ',' + v2 + ',' + v2 + ',0.35)';
-      g.fillRect(Math.random() * 128, Math.random() * 128, 1, 1);
-    }
-    T.crayonCanvas = c;
-    T.crayon = new THREE.CanvasTexture(c);
-    T.crayon.wrapS = T.crayon.wrapT = THREE.RepeatWrapping;
-    T.crayon.anisotropy = 4;
-    T.detail = buildDetailTexture();
-
+    var c, g, i;
     // ぼかした丸（影・煙・光）
     c = makeCanvas(64, 64); g = c.getContext('2d');
     var gr = g.createRadialGradient(32, 32, 0, 32, 32, 32);
     gr.addColorStop(0, 'rgba(255,255,255,1)'); gr.addColorStop(0.45, 'rgba(255,255,255,0.55)'); gr.addColorStop(1, 'rgba(255,255,255,0)');
     g.fillStyle = gr; g.fillRect(0, 0, 64, 64);
     T.soft = new THREE.CanvasTexture(c);
+    // ぼかした四角（地図の島の下の影）
+    c = makeCanvas(128, 128); g = c.getContext('2d');
+    g.shadowColor = '#fff'; g.shadowBlur = 14; g.fillStyle = '#fff'; g.fillRect(20, 20, 88, 88);
+    T.softRect = new THREE.CanvasTexture(c);
 
     // 煙のもくもく（少しでこぼこ）
     c = makeCanvas(64, 64); g = c.getContext('2d');
@@ -178,107 +167,21 @@
     g.fillStyle = gr; g.fillRect(0, 0, 4, 128);
     T.beam = new THREE.CanvasTexture(c);
 
-    // 空（上は水色、下は白っぽい）
-    c = makeCanvas(4, 256); g = c.getContext('2d');
+    // 空：メニュー画面（style.css #bg .sky）と同じ色の並び。上は明るい水色、地平線の近くはクリーム色。右上にやわらかい日だまり
+    c = makeCanvas(256, 256); g = c.getContext('2d');
     gr = g.createLinearGradient(0, 0, 0, 256);
-    gr.addColorStop(0, '#5fb8f0'); gr.addColorStop(0.6, '#bfe6fb'); gr.addColorStop(1, '#f4fbff');
-    g.fillStyle = gr; g.fillRect(0, 0, 4, 256);
+    gr.addColorStop(0, SKY_TOP); gr.addColorStop(0.42, '#cfeefb'); gr.addColorStop(0.72, '#eef9fd'); gr.addColorStop(1, '#fffaf0');
+    g.fillStyle = gr; g.fillRect(0, 0, 256, 256);
+    gr = g.createRadialGradient(200, 30, 0, 200, 30, 150);
+    gr.addColorStop(0, 'rgba(255,236,190,0.7)'); gr.addColorStop(1, 'rgba(255,236,190,0)');
+    g.fillStyle = gr; g.fillRect(0, 0, 256, 256);
     T.sky = new THREE.CanvasTexture(c);
-
-    // 机（地図の外側）
-    c = makeCanvas(128, 128); g = c.getContext('2d');
-    g.fillStyle = '#e9d2a8'; g.fillRect(0, 0, 128, 128);
-    for (i = 0; i < 60; i++) {
-      g.strokeStyle = 'rgba(160,110,60,' + rand(0.08, 0.2).toFixed(2) + ')'; g.lineWidth = rand(1, 3);
-      var yy = Math.random() * 128; g.beginPath(); g.moveTo(0, yy); g.bezierCurveTo(40, yy + rand(-4, 4), 90, yy + rand(-4, 4), 128, yy); g.stroke();
-    }
-    T.desk = new THREE.CanvasTexture(c);
-    T.desk.wrapS = T.desk.wrapT = THREE.RepeatWrapping;
   }
 
-  /* ===== W05. 紙とクレヨンの質感（シェーダー） ===== */
-  // 起動時に1回だけ作る 256×256 のくり返し模様。色ではなく「明るさの手がかり」を3つのチャンネルに入れる：
-  //   R = 紙のざらつきと繊維（細かい）、G = クレヨンの塗りの筋（高い所＝ろうがのっている、低い所＝紙の目が見える）、
-  //   B = 大きなむら（ゆっくり変わる）。床と積み木のシェーダーで、地図の色に掛けあわせて使う（地図の色そのものは変えない）。
-  function buildDetailTexture() {
-    var N = 256;
-    function tiled(g, x, y, r, fn) { // 端をまたぐ形は反対側にも描く（つなぎ目が見えないように）
-      for (var ox = -N; ox <= N; ox += N) for (var oy = -N; oy <= N; oy += N) {
-        if (x + ox + r < 0 || x + ox - r > N || y + oy + r < 0 || y + oy - r > N) continue;
-        g.save(); g.translate(ox, oy); fn(); g.restore();
-      }
-    }
-    function layer(bg, draw) { var c = makeCanvas(N, N), g = c.getContext('2d'); g.fillStyle = bg; g.fillRect(0, 0, N, N); draw(g); return g.getImageData(0, 0, N, N).data; }
-    // R：紙の繊維
-    var R = layer('rgb(150,150,150)', function (g) {
-      g.lineCap = 'round';
-      for (var i = 0; i < 900; i++) {
-        var x = Math.random() * N, y = Math.random() * N, l = rand(3, 14), a = Math.random() * Math.PI * 2, bend = rand(-4, 4);
-        var light = Math.random() < 0.55;
-        g.strokeStyle = light ? 'rgba(255,255,255,' + rand(0.2, 0.45).toFixed(2) + ')' : 'rgba(40,40,40,' + rand(0.12, 0.3).toFixed(2) + ')';
-        g.lineWidth = rand(0.5, 1.3);
-        tiled(g, x, y, l + 4, function () {
-          g.beginPath(); g.moveTo(x, y);
-          g.quadraticCurveTo(x + Math.cos(a) * l * 0.5 - Math.sin(a) * bend, y + Math.sin(a) * l * 0.5 + Math.cos(a) * bend, x + Math.cos(a) * l, y + Math.sin(a) * l);
-          g.stroke();
-        });
-      }
-    });
-    // G：クレヨンでなぞった筋（ななめの平行線のまとまり。ところどころ かすれる）
-    var G = layer('rgb(150,150,150)', function (g) {
-      for (var k = 0; k < 80; k++) {
-        var cx = Math.random() * N, cy = Math.random() * N, ang = -0.62 + rand(-0.3, 0.3), len = rand(30, 90), n = Math.floor(rand(4, 10)), gap = rand(2.5, 4.5);
-        var ux = Math.cos(ang), uy = Math.sin(ang), vx = -uy, vy = ux;
-        for (var s = 0; s < n; s++) {
-          var off = (s - n / 2) * gap, sx = cx + vx * off - ux * len / 2, sy = cy + vy * off - uy * len / 2, l2 = len * rand(0.7, 1.05);
-          var bright = Math.random() < 0.8;
-          for (var t = 0; t < l2; t += 1.8) {
-            if (Math.random() < 0.22) continue; // かすれ
-            var px = sx + ux * t + rand(-0.6, 0.6), py = sy + uy * t + rand(-0.6, 0.6), sz = rand(2, 3.6);
-            g.fillStyle = bright ? 'rgba(255,255,255,' + rand(0.25, 0.55).toFixed(2) + ')' : 'rgba(60,60,60,' + rand(0.2, 0.4).toFixed(2) + ')';
-            tiled(g, px, py, 3, function () { g.fillRect(px, py, sz, sz * 0.7); });
-          }
-        }
-      }
-      // 紙の目（ろうがのらない小さな穴）
-      for (var i = 0; i < 1700; i++) { g.fillStyle = 'rgba(0,0,0,' + rand(0.15, 0.45).toFixed(2) + ')'; g.fillRect(Math.random() * N, Math.random() * N, rand(0.8, 1.8), rand(0.8, 1.4)); }
-    });
-    // B：大きなむら
-    var B = layer('rgb(128,128,128)', function (g) {
-      for (var i = 0; i < 46; i++) {
-        var x = Math.random() * N, y = Math.random() * N, r = rand(18, 70);
-        var gr = g.createRadialGradient(x, y, 0, x, y, r), col = Math.random() < 0.5 ? '255,255,255' : '0,0,0';
-        gr.addColorStop(0, 'rgba(' + col + ',' + rand(0.15, 0.3).toFixed(2) + ')'); gr.addColorStop(1, 'rgba(' + col + ',0)');
-        g.fillStyle = gr;
-        tiled(g, x, y, r, function () { g.fillRect(x - r, y - r, r * 2, r * 2); });
-      }
-    });
-    var c = makeCanvas(N, N), cg = c.getContext('2d'), img = cg.createImageData(N, N), d = img.data;
-    for (var p = 0; p < N * N * 4; p += 4) {
-      d[p] = clamp(R[p] + rand(-26, 26), 0, 255);
-      d[p + 1] = G[p];
-      d[p + 2] = B[p];
-      d[p + 3] = 255;
-    }
-    cg.putImageData(img, 0, 0);
-    var tex = new THREE.CanvasTexture(c);
-    tex.wrapS = tex.wrapT = THREE.RepeatWrapping;
-    tex.anisotropy = 4;
-    return tex;
-  }
-
-  // 床：地図の色 × 紙のざらつき × 白いクレヨンの筋 × 温かい白（画用紙の色）。明かりで白がとばないよう少しおさえる
-  var FLOOR_FRAG = [
-    '{',
-    '  vec2 fu = vUv * uRep;',
-    '  vec3 dt = texture2D(uDetail, fu).rgb;',
-    '  float mott = texture2D(uDetail, fu * 0.093 + vec2(0.31, 0.67)).b;',
-    '  float paper = 0.94 + 0.06 * dt.r;',
-    '  float wax = 1.0 - 0.07 * smoothstep(0.5, 0.95, dt.g);',
-    '  diffuseColor.rgb *= paper * wax * (0.96 + 0.06 * mott) * vec3(0.8, 0.778, 0.74);',
-    '}'
-  ].join('\n');
-  // 積み木：クレヨンで塗りつぶした面（筋とすき間から紙が少し見える）、上面と側面の明暗、出っぱったふちの柔らかいハイライト、足元のかげ
+  /* ===== W05. ブロックのやわらかい陰影（シェーダー） ===== */
+  // メニュー画面の「ブロック世界のジオラマ」と同じ見た目：平らな色＋面ごとの明るさの違い＋角のやわらかい面取りの光＋足元のかげ。
+  // 模様のテクスチャは使わない（紙やクレヨンの質感はやめた）。描画命令の数は変わらない。
+  var SIDE_X = 0.76, SIDE_Z = 0.86;  // 側面の明るさ（上面=1）。東西の面を少し暗く
   var BLOCK_VERT = [
     '{',
     '  vec4 cw = vec4(transformed, 1.0);',
@@ -291,43 +194,48 @@
     '  vWP = (modelMatrix * cw).xyz;',
     '  vNl = normal;',
     '  vEdge = aEdge;',
-  '  vFade = aFade;',
+    '  vFade = aFade;',
     '}'
   ].join('\n');
   var BLOCK_FRAG = [
     '{',
     '  float isTop = step(0.5, vNl.y);',
-    '  vec2 tc = isTop > 0.5 ? vWP.xz : (abs(vNl.x) > 0.5 ? vWP.zy : vWP.xy);',
-    '  vec3 dt = texture2D(uDetail, tc * 0.34, 0.7).rgb;',
-    // 辺の印（1=北 2=東 4=南 8=西）
+    // 辺の印（1=北 2=東 4=南 8=西）＝となりが低い（出っぱった）辺
     '  float e = vEdge;',
     '  float bN = mod(e, 2.0); e = floor(e / 2.0);',
     '  float bE = mod(e, 2.0); e = floor(e / 2.0);',
     '  float bS = mod(e, 2.0); e = floor(e / 2.0);',
     '  float bW = mod(e, 2.0);',
-    // となりと接している（見えないはずの）側面は、上面と同じ明るさにする。
-    // となりの積み木との境目のすき間から内側の側面が見えて、壁の上に細い縦すじが出ていたため
+    // となりと接している（見えないはずの）側面は、上面と同じ明るさにする（すき間の細い縦すじを出さない）
     '  float sideOpen = vNl.x > 0.5 ? bE : (vNl.x < -0.5 ? bW : (vNl.z < -0.5 ? bN : bS));',
     '  float hidden = (1.0 - isTop) * (1.0 - sideOpen);',
-    // （明かりは頂点ごとに計算されるので、上面との日ざしの差も おおよそ埋める：環境光0.88＋日ざし0.5）
-    '  if (hidden > 0.5) diffuseColor.rgb *= 1.29 / ((abs(vNl.x) > 0.5 ? 0.62 : 0.72) * (0.88 + 0.5 * max(dot(vNl, vec3(-0.455, 0.827, -0.331)), 0.0)));',
-    '  float mott = texture2D(uDetail, tc * 0.11 + vec2(0.5, 0.2)).b;',
-    '  float shade = (isTop > 0.5 || hidden > 0.5) ? 1.0 : (abs(vNl.x) > 0.5 ? 0.62 : 0.72);',
-    '  vec3 paperC = vec3(0.86, 0.84, 0.8) * shade;',
-    '  float cov = mix(0.74, 1.0, smoothstep(0.22, 0.8, dt.g)) * mix(0.94, 1.0, mott);',
-    '  diffuseColor.rgb = mix(paperC, diffuseColor.rgb, cov);',
-    '  diffuseColor.rgb *= 0.93 + 0.1 * dt.r;',
-    '  float rim = 0.0;',
+    '  if (hidden > 0.5) diffuseColor.rgb *= 1.29 / ((abs(vNl.x) > 0.5 ? ' + SIDE_X.toFixed(2) + ' : ' + SIDE_Z.toFixed(2) + ') * (0.88 + 0.5 * max(dot(vNl, vec3(-0.455, 0.827, -0.331)), 0.0)));',
+    '  float lum = dot(diffuseColor.rgb, vec3(0.299, 0.587, 0.114));',
+    '  float dark = 1.0 - smoothstep(0.12, 0.42, lum);',      // 墨色の壁ほど 1
+    '  float lx = vWP.x - vCell.x, lz = vWP.z - vCell.z;',
+    // 継ぎ目は近くだけ（遠く・上からの視点では細かい線がざらついて見えるので消す）
+    '  float near = 1.0 - smoothstep(10.0, 26.0, distance(vWP, cameraPosition));',
     '  if (isTop > 0.5) {',
-    '    float lx = vWP.x - vCell.x, lz = vWP.z - vCell.z;',
-    '    rim = max(max(bN * (1.0 - smoothstep(0.0, 0.15, lz)), bS * (1.0 - smoothstep(0.0, 0.15, 1.0 - lz))),',
-    '              max(bW * (1.0 - smoothstep(0.0, 0.15, lx)), bE * (1.0 - smoothstep(0.0, 0.15, 1.0 - lx))));',
+    // 上面：墨色の積み木は上面を少し明るい青みの灰色に（暗い壁でも形が読めるように）
+    '    diffuseColor.rgb += dark * vec3(0.12, 0.125, 0.15);',
+    // 出っぱった辺のやわらかい面取りの光
+    '    float rim = max(max(bN * (1.0 - smoothstep(0.0, 0.11, lz)), bS * (1.0 - smoothstep(0.0, 0.11, 1.0 - lz))),',
+    '                    max(bW * (1.0 - smoothstep(0.0, 0.11, lx)), bE * (1.0 - smoothstep(0.0, 0.11, 1.0 - lx))));',
+    '    diffuseColor.rgb += rim * mix(0.13, 0.17, dark) * vec3(1.0, 0.98, 0.94);',
+    // となりとの境目（ブロックの継ぎ目）をごく淡く
+    '    float sx = min(lx, 1.0 - lx), sz = min(lz, 1.0 - lz);',
+    '    float seam = max((1.0 - bW) * (1.0 - smoothstep(0.0, 0.025, lx)) + (1.0 - bE) * (1.0 - smoothstep(0.0, 0.025, 1.0 - lx)),',
+    '                     (1.0 - bN) * (1.0 - smoothstep(0.0, 0.025, lz)) + (1.0 - bS) * (1.0 - smoothstep(0.0, 0.025, 1.0 - lz)));',
+    '    diffuseColor.rgb *= 1.0 - 0.07 * near * clamp(seam, 0.0, 1.0);',
     '  } else if (hidden < 0.5) {',
-    '    rim = (1.0 - smoothstep(0.0, 0.09, vCell.y - vWP.y)) * 0.55;',
-    '    diffuseColor.rgb *= mix(0.7, 1.0, smoothstep(0.0, 0.4, vWP.y));',
+    // 側面：上のふちに細い面取りの光、足元へゆっくり暗く（地面とのかげ）、縦の継ぎ目をごく淡く
+    '    float fromTop = vCell.y - vWP.y;',
+    '    diffuseColor.rgb += dark * vec3(0.03, 0.032, 0.04);',
+    '    diffuseColor.rgb += (1.0 - smoothstep(0.0, 0.06, fromTop)) * mix(0.07, 0.12, dark) * vec3(1.0, 0.98, 0.94);',
+    '    diffuseColor.rgb *= mix(0.8, 1.0, smoothstep(0.0, 0.45, vWP.y));',
+    '    float t = abs(vNl.x) > 0.5 ? lz : lx;',
+    '    diffuseColor.rgb *= 1.0 - 0.06 * near * (1.0 - smoothstep(0.0, 0.02, min(t, 1.0 - t)));',
     '  }',
-    '  rim *= 0.5 + 0.5 * smoothstep(0.2, 0.8, dt.g);',
-    '  diffuseColor.rgb += rim * 0.2 * vec3(1.0, 0.97, 0.9);',
     '}'
   ].join('\n');
   // カメラとシーカーの間にある積み木を、網目に抜いて薄く透かす（aFade 0..1。並べ替え不要で描画命令も増えない）
@@ -337,27 +245,18 @@
     '  if (vFade > (2.0 * bx + 3.0 * by - 4.0 * bx * by) / 4.0 + 0.125) discard;',
     '}'
   ].join('\n');
-  // MeshLambertMaterial にクレヨンの質感を足す（描画命令の数は変わらない）
-  function crayonize(mat, mode, rep) {
-    var uDetail = { value: T.detail }, uRep = { value: rep || new THREE.Vector2(1, 1) };
-    mat.userData.uRep = uRep;
+  // MeshLambertMaterial に積み木の陰影を足す（描画命令の数は変わらない）
+  function blockShade(mat) {
     mat.onBeforeCompile = function (sh) {
-      sh.uniforms.uDetail = uDetail; sh.uniforms.uRep = uRep;
-      if (mode === 'floor') {
-        sh.fragmentShader = sh.fragmentShader
-          .replace('#include <common>', '#include <common>\nuniform sampler2D uDetail;\nuniform vec2 uRep;')
-          .replace('#include <map_fragment>', '#include <map_fragment>\n' + FLOOR_FRAG);
-      } else {
-        sh.vertexShader = sh.vertexShader
-          .replace('#include <common>', '#include <common>\nattribute float aEdge;\nattribute float aFade;\nvarying float vFade;\nvarying vec3 vWP;\nvarying vec3 vNl;\nvarying float vEdge;\nvarying vec3 vCell;')
-          .replace('#include <begin_vertex>', '#include <begin_vertex>\n' + BLOCK_VERT);
-        sh.fragmentShader = sh.fragmentShader
-          .replace('#include <common>', '#include <common>\nuniform sampler2D uDetail;\nvarying float vFade;\nvarying vec3 vWP;\nvarying vec3 vNl;\nvarying float vEdge;\nvarying vec3 vCell;')
-          .replace('#include <clipping_planes_fragment>', '#include <clipping_planes_fragment>\n' + BLOCK_DITHER)
-          .replace('#include <color_fragment>', '#include <color_fragment>\n' + BLOCK_FRAG);
-      }
+      sh.vertexShader = sh.vertexShader
+        .replace('#include <common>', '#include <common>\nattribute float aEdge;\nattribute float aFade;\nvarying float vFade;\nvarying vec3 vWP;\nvarying vec3 vNl;\nvarying float vEdge;\nvarying vec3 vCell;')
+        .replace('#include <begin_vertex>', '#include <begin_vertex>\n' + BLOCK_VERT);
+      sh.fragmentShader = sh.fragmentShader
+        .replace('#include <common>', '#include <common>\nvarying float vFade;\nvarying vec3 vWP;\nvarying vec3 vNl;\nvarying float vEdge;\nvarying vec3 vCell;')
+        .replace('#include <clipping_planes_fragment>', '#include <clipping_planes_fragment>\n' + BLOCK_DITHER)
+        .replace('#include <color_fragment>', '#include <color_fragment>\n' + BLOCK_FRAG);
     };
-    mat.customProgramCacheKey = function () { return 'seecar-crayon-' + mode; };
+    mat.customProgramCacheKey = function () { return 'seecar-block-soft'; };
     return mat;
   }
 
@@ -545,7 +444,7 @@
     camMode: 1, camBlendT: 1, camFrom: null, chaseLift: 0, camY: 0, intro: null, topFlag: null,
     shake: 0, stateAcc: 0, over: false, treasures: [], scores: [0, 0],
     fx: null, mapVer: 0, pitch: 0, pitchV: 0, aim: null, swipeV: 0,
-    sideK: 1, orbitK: 0, idleT: 0, faceHold: 0, atkK: 0, atkHold: 0, hints: null, moved: false,
+    sideK: 1, orbitK: 0, idleT: 0, faceHold: 0, atkK: 0, atkHold: 0, hints: null, moved: false, gemCam: null, gemCamK: 0,
     ono: { drill: 0, bump: 0, brk: 0 } // 擬音の間隔（自分だけ）
   };
   var handlers = { found: [], collect: [], terrain: [], state: [], action: [], cam: [], done: [], gemHit: [], onomato: [] };
@@ -596,12 +495,13 @@
 
     var sc = new THREE.Scene();
     sc.background = T.sky;
+    sc.fog = new THREE.Fog(HAZE, 40, 120); // 遠くだけ ほんのり かすむ（距離はカメラの高さに合わせて updateCamera で変える）
     S.scene = sc;
     S.camera = new THREE.PerspectiveCamera(55, 16 / 9, 0.05, 400);
     S.camera.position.set(0, 10, 10);
 
-    // 明かり：やわらかい環境光＋左上からの日ざし（色をつけない：壁は黒く、紙は白く見せる）
-    sc.add(new THREE.HemisphereLight(0xffffff, 0xf0f0f2, 0.88));
+    // 明かり：やわらかい環境光＋左上からの日ざし（色はほぼつけない：壁は墨色、床はクリーム色のまま見せる）
+    sc.add(new THREE.HemisphereLight(0xffffff, 0xf2eee6, 0.88));
     var sun = new THREE.DirectionalLight(0xffffff, 0.5);
     sun.position.set(-0.55, 1, -0.4);
     sc.add(sun);
@@ -633,7 +533,7 @@
   function buildFx() {
     var fx = {};
     var dg = new THREE.BoxGeometry(1, 1, 1);
-    var dm = new THREE.MeshLambertMaterial({ map: T.crayon });
+    var dm = new THREE.MeshLambertMaterial();
     fx.debris = new THREE.InstancedMesh(dg, dm, DEBRIS_MAX);
     fx.debris.instanceMatrix.setUsage(THREE.DynamicDrawUsage);
     fx.debris.frustumCulled = false;
@@ -823,6 +723,7 @@
     if (S.cpu) disposeActor(S.cpu);
     for (var k in S.remotes) disposeActor(S.remotes[k]);
     S.level = null; S.me = null; S.cpu = null; S.remotes = {}; S.map = null; S.treasures = []; S.aim = null; S.hints = null;
+    S.gemCam = null; S.gemCamK = 0;
     if (S.gemLight) S.gemLight.intensity = 0;
   }
 
@@ -884,7 +785,7 @@
       }
     }
     S.camBlendT = 1; S.chaseLift = 0; S.camY = S.me.y;
-    S.sideK = 1; S.orbitK = 0; S.idleT = 0; S.faceHold = 0; S.atkK = 0; S.atkHold = 0; S.moved = false;
+    S.sideK = 1; S.orbitK = 0; S.idleT = 0; S.faceHold = 0; S.atkK = 0; S.atkHold = 0; S.moved = false; S.gemCam = null; S.gemCamK = 0;
     S.camera.far = overheadHeight() * 1.6 + 60; S.camera.updateProjectionMatrix();
     S.camMode = 1; S.intro = { t: 0 }; S.topFlag = null; // 開始演出：真上から → おいかけへ
     var pose = poseFor(2);
@@ -895,11 +796,11 @@
   }
 
   /* ===== W13. 積み木（色と形） ===== */
-  // 積み木の色：地図の色を少し鮮やかに。明るさが低い（黒に近い）色だけ、ほぼ真っ黒にする。
-  // 高さ10（壁）のマスは、色の平均（字のふちはカーキや灰色になる）ではなく、いつも黒で塗る。
+  // 積み木の色：地図の色を少し鮮やかに。明るさが低い（黒に近い）色だけ、墨色（#2b2f3a）にする。
+  // 高さ10（壁）のマスは、色の平均（字のふちはカーキや灰色になる）ではなく、いつも墨色で塗る。
   // 高さは「その画素でいちばん濃い色」で決めているので、壁の縁のマスは平均色が明るく出てしまうため。
   var hsl = { h: 0, s: 0, l: 0 };
-  var WALL_RGB = [0.18, 0.18, 0.2]; // 上の面＝こい灰色、側面（下の陰影で約0.6倍）＝ほぼ黒
+  var WALL_RGB = [0.169, 0.184, 0.227]; // 墨色 #2b2f3a。上の面はシェーダーで少し明るく、側面は少し暗く（真っ黒にはしない）
   // 第2期：高さ9以下でも、高い（8以上）か暗い色のマスは黒系に。くすんだ色（カーキ・灰色）は高さに応じて黒へ寄せ、
   // 「壁と同じくらい高いカーキ色の積み木」を残さない（高さは画素のいちばん濃い色で決まるので、平均色が明るく出ることがある）
   function blockColor(c, hh, i) {
@@ -914,20 +815,21 @@
       return c;
     }
     // くすんだ色（カーキ・灰色）は鮮やかにしない。はっきりした色の積み木だけ鮮やかに
-    var sat = hsl.s < 0.3 ? hsl.s * 0.6 : clamp(hsl.s * 1.6, 0, 1);
-    c.setHSL(hsl.h, sat, clamp(hsl.l * 0.92, 0.22, 0.68));
+    // ジオラマの積み木らしく、色はそのままに少しだけやわらかく（真っ黄色・真っ赤のぎらぎらをおさえる）
+    var sat = hsl.s < 0.3 ? hsl.s * 0.6 : clamp(hsl.s * 1.35, 0, 0.86);
+    c.setHSL(hsl.h, sat, clamp(hsl.l * 0.98, 0.3, 0.7));
     return c;
   }
   function buildTerrain(L, add) {
     var w = S.w, h = S.h, n = 0, i;
-    for (i = 0; i < w * h; i++) if (S.heights[i] > 1) n++; // 高さ0・1は紙の色（床に塗る）
+    for (i = 0; i < w * h; i++) if (S.heights[i] > 1) n++; // 高さ0・1は床の色（床に塗る）
     var geo = new THREE.BoxGeometry(1, 1, 1);
     geo.translate(0, 0.5, 0);
     // 側面を少し暗く（上の面=明るい、側面=やや暗い、底=暗い）
     var pos = geo.attributes.position, nor = geo.attributes.normal, cols = new Float32Array(pos.count * 3);
     for (i = 0; i < pos.count; i++) {
       var ny = nor.getY(i), nx = nor.getX(i), v;
-      if (ny > 0.5) v = 1; else if (ny < -0.5) v = 0.5; else v = nx !== 0 ? 0.62 : 0.72; // 側面をはっきり暗く（立体の形と壁の上面が読みとれるように）
+      if (ny > 0.5) v = 1; else if (ny < -0.5) v = 0.5; else v = nx !== 0 ? SIDE_X : SIDE_Z; // 側面はやわらかく暗く（立体の形と上面が読みとれるように）
       cols[i * 3] = cols[i * 3 + 1] = cols[i * 3 + 2] = v;
     }
     geo.setAttribute('color', new THREE.BufferAttribute(cols, 3));
@@ -939,7 +841,7 @@
     var fadeAttr = new THREE.InstancedBufferAttribute(new Float32Array(Math.max(1, n)), 1);
     fadeAttr.setUsage(THREE.DynamicDrawUsage);
     geo.setAttribute('aFade', fadeAttr);
-    var mat = crayonize(new THREE.MeshLambertMaterial({ vertexColors: true }), 'block');
+    var mat = blockShade(new THREE.MeshLambertMaterial({ vertexColors: true }));
     var mesh = new THREE.InstancedMesh(geo, mat, Math.max(1, n));
     mesh.instanceMatrix.setUsage(THREE.DynamicDrawUsage);
     var cellToInst = new Int32Array(w * h).fill(-1);
@@ -950,7 +852,7 @@
       m.makeScale(1, vis(hh), 1); m.setPosition(x + 0.5, 0, z + 0.5);
       mesh.setMatrixAt(k, m);
       cellColor(i, c);
-      // 積み木は側面も含めて地図の色で塗る。壁（高さ10）と黒に近い色だけ黒にする
+      // 積み木は側面も含めて地図の色で塗る。壁（高さ10）と黒に近い色だけ墨色にする
       blockColor(c, hh, i);
       mesh.setColorAt(k, c);
       edgeArr[k] = edgeMask(x, z);
@@ -973,9 +875,10 @@
     return m;
   }
 
-  /* ===== W14. 床（紙） ===== */
-  // 床：地図の色から作ったCanvasTexture（影・マスの手描き線・壁ぎわのクレヨンのにじみ）。
-  // 紙のざらつきとクレヨンの筋は、細かいのでシェーダー（crayonize 'floor'）で重ねる。
+  /* ===== W14. 床（クリーム色のタイル）と地図の島 ===== */
+  // 床：地図の色から作った CanvasTexture（白＝クリームホワイト、マスの継ぎ目のごく淡い線、積み木のやわらかい影とすみの影）。
+  // 地図全体は、メニュー画面の浮かぶ島と同じ「土の色の側面をもつ板」に乗せ、外側は空とかすみ（机や紙はやめた）。
+  var FLOOR_LIT = 0xc6c6c6; // 床の明かり（環境光0.88＋日ざし約0.41＝1.29）を打ち消して、塗った色がそのまま見えるように
   function buildFloor(L, add) {
     var w = S.w, h = S.h;
     var px = clamp(Math.floor(1024 / Math.max(w, h)), 4, 16);
@@ -987,45 +890,39 @@
     L.floorTex = tex;
     paintFloor();
     var fg = new THREE.PlaneGeometry(w, h); fg.rotateX(-Math.PI / 2);
-    var fm = crayonize(new THREE.MeshLambertMaterial({ map: tex }), 'floor', new THREE.Vector2(w / 2, h / 2)); // 2マスで模様1つ
+    var fm = new THREE.MeshLambertMaterial({ map: tex, color: FLOOR_LIT });
     var floor = new THREE.Mesh(fg, fm); floor.position.set(w / 2, 0, h / 2);
     add(floor);
-    // 紙のふちの影：紙の外側だけの「わく」の形にする。
-    // （前は紙の下に全面の板を置いていたため、上から遠く見ると奥行きの精度が足りず、紙の上に斜めの灰色の三角形として出ていた）
-    var es = new THREE.Shape();
-    es.moveTo(-0.35, -0.35); es.lineTo(w + 0.85, -0.35); es.lineTo(w + 0.85, h + 0.85); es.lineTo(-0.35, h + 0.85); es.lineTo(-0.35, -0.35);
-    var hole = new THREE.Path();
-    hole.moveTo(0, 0); hole.lineTo(0, h); hole.lineTo(w, h); hole.lineTo(w, 0); hole.lineTo(0, 0);
-    es.holes.push(hole);
-    var eg = new THREE.ShapeGeometry(es); eg.rotateX(Math.PI / 2);
-    var em = new THREE.MeshBasicMaterial({ color: 0x8a7458, transparent: true, opacity: 0.35, depthWrite: false, side: THREE.DoubleSide });
-    var edge = new THREE.Mesh(eg, em); edge.position.y = -0.01; add(edge);
-    var size = Math.max(w, h) * 6 + 200;
-    var dg = new THREE.PlaneGeometry(size, size); dg.rotateX(-Math.PI / 2);
-    var dtex = T.desk.clone(); dtex.needsUpdate = true; dtex.repeat.set(size / 12, size / 12);
-    var dm = new THREE.MeshLambertMaterial({ map: dtex });
-    var desk = new THREE.Mesh(dg, dm); desk.position.set(w / 2, -0.4, h / 2); add(desk); // 紙から十分はなす（重なってちらつかないように）
-    L.dispose.push(tex, fg, fm, eg, em, dg, dm, dtex);
+    // 地図の島：床のすぐ下に、土の色の厚い板（上のふちに細いクリーム色の帯）。側面は日ざしで面ごとに明るさが変わる
+    var TH = 1.4;
+    var ig = new THREE.BoxGeometry(w + 0.06, TH, h + 0.06); ig.translate(0, -TH / 2 - 0.004, 0);
+    var ipos = ig.attributes.position, icol = new Float32Array(ipos.count * 3), side = new THREE.Color(ISLAND_SIDE), lip = new THREE.Color(0xfff3dc);
+    for (var i = 0; i < ipos.count; i++) {
+      var yy = ipos.getY(i), k = yy > -0.05 ? 1 : 0, cc = k ? lip : side;
+      var dk = yy < -TH + 0.01 ? 0.86 : 1; // 下のほうを少し暗く
+      icol[i * 3] = cc.r * dk; icol[i * 3 + 1] = cc.g * dk; icol[i * 3 + 2] = cc.b * dk;
+    }
+    ig.setAttribute('color', new THREE.BufferAttribute(icol, 3));
+    var im = new THREE.MeshLambertMaterial({ vertexColors: true });
+    var island = new THREE.Mesh(ig, im); island.position.set(w / 2, 0, h / 2); add(island);
+    // 島の下のやわらかい影（空に浮かんでいるように。メニューの島の下の影と同じ）
+    var sg = new THREE.PlaneGeometry(1, 1); sg.rotateX(-Math.PI / 2);
+    var sm = new THREE.MeshBasicMaterial({ map: T.softRect, color: 0x5d7f9a, transparent: true, opacity: 0.42, depthWrite: false });
+    var ish = new THREE.Mesh(sg, sm); ish.scale.set((w + 2) * 1.46, 1, (h + 2) * 1.46); ish.position.set(w / 2 + 1.2, -TH - 3, h / 2 + 1.6); add(ish);
+    L.dispose.push(tex, fg, fm, ig, im, sg, sm);
   }
 
-  // マスの境目の、ごく淡い手描きの鉛筆線（少しゆれる）。地図ごとに1回だけ作る
+  // マスの境目の、ごく淡いまっすぐな継ぎ目（タイルの目地）。地図ごとに1回だけ作る
   function buildGridLayer(w, h, px) {
     var c = makeCanvas(w * px, h * px), g = c.getContext('2d');
-    g.lineCap = 'round'; g.lineJoin = 'round';
-    function line(horiz, i) {
-      var len = horiz ? w : h, base = i * px + rand(-0.4, 0.4), drift = 0;
-      g.strokeStyle = 'rgba(112,98,82,' + rand(0.045, 0.085).toFixed(3) + ')';
-      g.lineWidth = rand(0.7, 1.1);
-      g.beginPath();
-      for (var t = 0; t <= len; t += 1.5) {
-        drift = clamp(drift + rand(-0.25, 0.25), -0.7, 0.7);
-        var a = t * px, b = base + drift;
-        if (t === 0) { if (horiz) g.moveTo(a, b); else g.moveTo(b, a); } else if (horiz) g.lineTo(a, b); else g.lineTo(b, a);
-      }
-      g.stroke();
-    }
-    for (var x = 1; x < w; x++) line(false, x);
-    for (var z = 1; z < h; z++) line(true, z);
+    g.fillStyle = 'rgba(150,128,96,0.075)';
+    var lw = Math.max(1, Math.round(px * 0.07));
+    for (var x = 1; x < w; x++) g.fillRect(x * px - lw / 2, 0, lw, h * px);
+    for (var z = 1; z < h; z++) g.fillRect(0, z * px - lw / 2, w * px, lw);
+    // タイルの左上にごく淡い明るい縁（ほんの少しだけ盛り上がって見える）
+    g.fillStyle = 'rgba(255,255,255,0.18)';
+    for (x = 0; x < w; x++) g.fillRect(x * px + lw, 0, lw, h * px);
+    for (z = 0; z < h; z++) g.fillRect(0, z * px + lw, w * px, lw);
     return c;
   }
 
@@ -1036,25 +933,26 @@
     var img = sctx.createImageData(w, h), d = img.data;
     for (var z = 0; z < h; z++) for (var x = 0; x < w; x++) {
       var i = z * w + x, hh = S.heights[i], r, g, b;
-      if (hh <= 1 && S.dug[i]) { r = 232; g = 225; b = 212; } // 壊したあと：消しゴムでこすったような跡
-      else if (hh > 1) { r = 40; g = 40; b = 42; } // 積み木の下：にじんで足元の影になる
+      if (hh <= 1 && S.dug[i]) { r = 240; g = 226; b = 200; } // 壊したあと：少し濃いクリーム（砂の色）
+      else if (hh > 1) { r = 150; g = 152; b = 164; } // 積み木の下：となりの床へ、足元のやわらかいかげとしてにじむ
       else {
         r = S.colors[i * 3]; g = S.colors[i * 3 + 1]; b = S.colors[i * 3 + 2];
-        // 塗った色をはっきり見せる（白は紙の白のまま。色のついたところだけ少し濃く）
+        // 塗った色をはっきり見せる（白はクリームホワイト。色のついたところだけ少し濃く）
         var lum = 0.299 * r + 0.587 * g + 0.114 * b, sat = FLOOR_SAT;
-        r = clamp(lum + (r - lum) * sat, 0, 255); g = clamp(lum + (g - lum) * sat, 0, 255); b = clamp(lum + (b - lum) * sat, 0, 255);
+        r = clamp(lum + (r - lum) * sat, 0, 255) * CREAM[0]; g = clamp(lum + (g - lum) * sat, 0, 255) * CREAM[1]; b = clamp(lum + (b - lum) * sat, 0, 255) * CREAM[2];
       }
       // 柔らかい影：左上（北西）の高い物が、右下へ影を落とす
       var sh = 1;
       for (var k = 1; k <= 4; k++) {
         var hx = vis(hAt(x - k, z - k)) - vis(hh);
-        if (hx > k * 0.35) { sh = Math.min(sh, 0.72 + k * 0.045); break; }
+        if (hx > k * 0.35) { sh = Math.min(sh, 0.8 + k * 0.035); break; }
       }
       // まわりが高いとほんのり暗く（すみっこの影）
       var ao = 0;
       if (hAt(x - 1, z) > hh) ao++; if (hAt(x + 1, z) > hh) ao++; if (hAt(x, z - 1) > hh) ao++; if (hAt(x, z + 1) > hh) ao++;
-      sh *= 1 - ao * 0.05;
-      d[i * 4] = r * sh; d[i * 4 + 1] = g * sh; d[i * 4 + 2] = b * sh; d[i * 4 + 3] = 255;
+      sh *= 1 - ao * 0.04;
+      // 影は少しだけ青みに（澄んだ空気の、空の色が映った影）
+      d[i * 4] = r * sh; d[i * 4 + 1] = g * (sh + (1 - sh) * 0.12); d[i * 4 + 2] = b * (sh + (1 - sh) * 0.35); d[i * 4 + 3] = 255;
     }
     sctx.putImageData(img, 0, 0);
     var big = L.floorBig, g2 = big.getContext('2d');
@@ -1072,27 +970,6 @@
     g2.imageSmoothingEnabled = true;
     g2.drawImage(L.floorSmall, 0, 0, big.width, big.height);
     g2.drawImage(L.floorGrid, 0, 0);
-    // 壁ぎわのクレヨンのにじみ：床のマスのうち、となりが積み木の辺に、少しゆれた濃い線
-    g2.lineCap = 'round';
-    g2.strokeStyle = 'rgba(38,36,34,0.2)';
-    g2.lineWidth = Math.max(1, px * 0.2);
-    g2.beginPath();
-    for (z = z0; z <= z1; z++) for (x = x0; x <= x1; x++) {
-      var hh2 = S.heights[z * w + x];
-      if (hh2 > 1) continue;
-      for (var dd = 0; dd < 4; dd++) {
-        var nx = x + DX[dd], nz = z + DZ[dd];
-        if (!inMap(nx, nz) || S.heights[nz * w + nx] <= 1) continue;
-        // 辺の両はし（ピクセル）。少し床側へ寄せ、ゆらす
-        var ax, az, bx, bz, inset = px * 0.12;
-        if (dd === 0) { ax = x; az = z; bx = x + 1; bz = z; } else if (dd === 2) { ax = x; az = z + 1; bx = x + 1; bz = z + 1; }
-        else if (dd === 1) { ax = x + 1; az = z; bx = x + 1; bz = z + 1; } else { ax = x; az = z; bx = x; bz = z + 1; }
-        var ix = -DX[dd] * inset, iz = -DZ[dd] * inset;
-        g2.moveTo(ax * px + ix + rand(-0.5, 0.5), az * px + iz + rand(-0.5, 0.5));
-        g2.lineTo(bx * px + ix + rand(-0.5, 0.5), bz * px + iz + rand(-0.5, 0.5));
-      }
-    }
-    g2.stroke();
     g2.restore();
     L.floorTex.needsUpdate = true;
   }
@@ -1330,6 +1207,7 @@
     S.scores[who] = (S.scores[who] || 0) + 1;
     var a = actorOf(who);
     if (a === S.me && (S.mode !== 'count' || !S.held.fwd)) S.faceHold = S.mode === 'count' ? 1.3 : 30; // 顔を見せる
+    if (a === S.me) startGemCam(tr); // 浮き上がる宝石とシーカーの両方が見える位置へカメラを引く
     spawnStars(tr.x + 0.5, vis(S.heights[idx(tr.x, tr.z)]) + 0.2, tr.z + 0.5, 10, [new THREE.Color(tr.def.glow).getHex(), 0xffffff, 0xffd23f]);
     sfx('gemRise');
     emit('collect', who, ti, scoresView());
@@ -2079,6 +1957,8 @@
       tg.set(px + fx * ah + rx * 0.25, py + 0.35 + pv * (pv > 0 ? 1.1 : 0.4) + S.chaseLift * 0.5, pz + fz * ah + rz * 0.25);
       if (ak > 0) { tg.x += rx * ak * 0.5; tg.z += rz * ak * 0.5; }
       if (ok > 0) tg.lerp(tmpV.set(px, py + 0.6, pz), ok);
+      var gk = ease(clamp(S.gemCamK, 0, 1));
+      if (gk > 0.001 && gemCamPose(a, gcP, gcT)) { p.lerp(gcP, gk); tg.lerp(gcT, gk); }
       poseM.lookAt(p, tg, UP);
     } else {
       var hh = overheadHeight(), sx = overheadShift(hh);
@@ -2102,6 +1982,56 @@
       lift = Math.max(lift, needH - (S.camY + up));
     }
     return clamp(lift, 0, 2.6);
+  }
+  // 宝石の獲得（自分）：浮き上がる 3.5 秒の間、宝石が画面の上のほう（上から約 25%）、シーカーが下のほうに入るよう、
+  // 横ななめ前から少し引いて見る。獲得宣言のカード（画面の中央）にどちらも隠れない。向きは壁で隠れにくい方向を award のときに1回だけ選ぶ
+  var GEMCAM_R = 6.4, GEMCAM_UP = 2.6, GEMCAM_NDC = 0.56;
+  var gcP = new THREE.Vector3(), gcT = new THREE.Vector3();
+  function gemPeak(tr) { return tr.anim ? tr.anim.y0 + GEM_RISE : vis(S.heights[idx(tr.x, tr.z)]) + 0.15 + GEM_RISE; }
+  function startGemCam(tr) {
+    var a = S.me; if (!a) return;
+    var gx = tr.group.position.x, gz = tr.group.position.z;
+    if (Math.hypot(gx - a.wx, gz - a.wz) > 4) { S.gemCam = null; return; } // 遠くの宝石（確認用など）はいつものカメラのまま
+    var fx = -Math.sin(a.heading), fz = -Math.cos(a.heading);
+    var mx = (gx + a.wx) / 2, mz = (gz + a.wz) / 2, gy = gemPeak(tr), cy = a.y + GEMCAM_UP;
+    var best = null, bestScore = -1e9;
+    for (var k = 0; k < 16; k++) {
+      var an = k / 16 * Math.PI * 2, dx = Math.cos(an), dz = Math.sin(an);
+      var cx = mx + dx * GEMCAM_R, cz = mz + dz * GEMCAM_R;
+      // 壁にさえぎられる量（カメラ→宝石、カメラ→シーカーの頭）
+      var occ = 0;
+      [[gx, gy, gz], [a.wx, a.y + 0.9, a.wz], [a.wx, a.y + 0.3, a.wz]].forEach(function (q) {
+        for (var t = 0.08; t < 0.95; t += 0.06) {
+          var x = cx + (q[0] - cx) * t, y = cy + (q[1] - cy) * t, z = cz + (q[2] - cz) * t;
+          if (groundTopAt(x, z) > y) occ++;
+        }
+      });
+      var inside = inMap(Math.floor(cx), Math.floor(cz)) ? 0 : 1;
+      var front = dx * fx + dz * fz;                      // シーカーの顔の側から見たい
+      var gxv = gx - a.wx, gzv = gz - a.wz, gl = Math.hypot(gxv, gzv);
+      var across = gl > 0.3 ? 1 - Math.abs((dx * gxv + dz * gzv) / gl) : 1; // 宝石とシーカーが横に並んで見える向き
+      var score = -occ * 3 - inside * 2 + front * 1.2 + across * 1.5;
+      if (score > bestScore) { bestScore = score; best = [dx, dz]; }
+    }
+    S.gemCam = { tr: tr, dx: best[0], dz: best[1] };
+  }
+  function gemCamOn() {
+    var G = S.gemCam; if (!G || !G.tr.anim || G.tr.owner < 0) return false;
+    return !G.tr.anim.done && G.tr.anim.t < GEM_SHOW + GEM_FLY * 0.6;
+  }
+  function gemCamPose(a, outP, outT) {
+    var G = S.gemCam; if (!G) return false;
+    var tr = G.tr, gx = tr.group.position.x, gz = tr.group.position.z, gy = gemPeak(tr);
+    var mx = (gx + a.wx) / 2, mz = (gz + a.wz) / 2, py = S.camY;
+    outP.set(mx + G.dx * GEMCAM_R, Math.max(py + GEMCAM_UP, gy - 0.4), mz + G.dz * GEMCAM_R);
+    var tn = Math.tan(THREE.MathUtils.degToRad(S.camera.fov / 2));
+    var eG = Math.atan2(gy - outP.y, Math.hypot(gx - outP.x, gz - outP.z));
+    var eS = Math.atan2(py + 0.05 - outP.y, Math.hypot(a.wx - outP.x, a.wz - outP.z));
+    // 宝石を画面の上から約 22% に（獲得宣言のカードは画面の中央 30〜70%）。ただしシーカーの足元が画面の下からはみ出さない範囲で
+    var pitch = Math.min(eG - Math.atan(GEMCAM_NDC * tn), eS + Math.atan(0.72 * tn));
+    var hx = mx - outP.x, hz = mz - outP.z, hl = Math.hypot(hx, hz) || 1, cp = Math.cos(pitch);
+    outT.set(outP.x + hx / hl * cp * 5, outP.y + Math.sin(pitch) * 5, outP.z + hz / hl * cp * 5);
+    return true;
   }
   function setCamera(mode) {
     mode = ((mode | 0) % 3 + 3) % 3;
@@ -2133,6 +2063,9 @@
       var rate = want ? (S.faceHold > 0 ? 2.6 : 1.1) : 6;
       S.orbitK += (want - S.orbitK) * (1 - Math.exp(-dt * rate));
       if (!want && S.orbitK < 0.002) S.orbitK = 0;
+      var gw = S.camMode === 1 && gemCamOn() ? 1 : 0;
+      S.gemCamK += (gw - S.gemCamK) * (1 - Math.exp(-dt * (gw ? 3.2 : 2.2)));
+      if (!gw && S.gemCamK < 0.002) { S.gemCamK = 0; S.gemCam = null; }
     }
   }
   // カメラとシーカーの間で、シーカーを隠している積み木を薄く透かす
@@ -2143,9 +2076,11 @@
     if (me && S.camMode === 1 && !S.intro && me.root.visible) {
       var cp = S.camera.position, mcx = Math.floor(me.wx), mcz = Math.floor(me.wz);
       var sx = Math.cos(me.heading) * 0.35, sz = -Math.sin(me.heading) * 0.35; // シーカーの左右の幅
-      for (var r = 0; r < 5; r++) {
+      var gcm = S.gemCam && S.gemCamK > 0.3 ? S.gemCam.tr : null; // 獲得の間は、浮き上がった宝石もさえぎらないように
+      for (var r = 0; r < (gcm ? 6 : 5); r++) {
         var ty = me.y + (r === 0 ? 0.25 : r === 2 ? 1.05 : 0.65), ox = r === 3 ? sx : r === 4 ? -sx : 0, oz = r === 3 ? sz : r === 4 ? -sz : 0;
         var bx = me.wx + ox, bz = me.wz + oz;
+        if (r === 5) { bx = gcm.group.position.x; bz = gcm.group.position.z; ty = gemPeak(gcm); }
         var dx = cp.x - bx, dy = cp.y - ty, dz = cp.z - bz, len = Math.hypot(dx, dy, dz);
         var n = Math.ceil(len / 0.15);
         for (var i = 1; i < n; i++) {
@@ -2170,6 +2105,9 @@
   function fitNear() {
     var want = Math.max(0.05, (S.camera.position.y - 10) * 0.25);
     if (Math.abs(want - S.camera.near) > S.camera.near * 0.03 + 1e-4) { S.camera.near = want; S.camera.updateProjectionMatrix(); }
+    // かすみ：おいかけ視点では遠くの積み木だけ空の色へ溶ける。上から見るときは地図全体がくっきり見えるよう遠ざける
+    var fog = S.scene && S.scene.fog;
+    if (fog) { fog.near = 26 + Math.max(0, S.camera.position.y) * 1.6; fog.far = fog.near + 70; }
   }
   function updateCamera(dt) {
     if (!S.camera) return;
@@ -2222,7 +2160,7 @@
       if (!a) return;
       var sky = camH - a.y > 10, isMe = a === S.me, s, op;
       if (sky) { s = camH / 30 * 2.0; op = clamp((camH - a.y - 10) / 6, 0.6, 0.95); }
-      else if (isMe) { s = 0.42; op = S.camMode === 0 ? 0 : 0.85 * (1 - clamp(S.orbitK * 1.5, 0, 1)); } // 顔を見せる回りこみの間は消す
+      else if (isMe) { s = 0.42; op = S.camMode === 0 ? 0 : 0.85 * (1 - clamp(Math.max(S.orbitK, S.gemCamK) * 1.5, 0, 1)); } // 顔を見せる回りこみ・宝石の獲得の間は消す
       else { s = clamp(Math.hypot(cp.x - a.wx, cp.z - a.wz) * 0.05, 0.45, 1.3); op = 0.9; }
       a.marker.visible = op > 0;
       if (!a.marker.visible) return;
