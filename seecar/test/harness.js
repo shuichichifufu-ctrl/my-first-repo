@@ -1,5 +1,5 @@
 // 検査用の共通部品。CDNへの読み込みを手元のファイルに差し替えてブラウザで開く。
-// 使い方: const {openPage, startPeerServer} = require('/home/user/my-first-repo/seecar/test/harness.js');
+// 使い方: const {openPage, startPeerServer} = require('C:/Users/s9h0u/.claude/my-first-repo/seecar/test/harness.js');
 //   const {browser, page, errors} = await openPage('/abs/path/to/file.html', {query:'?peerhost=localhost&peerport=9000&peerpath=/myapp'});
 //   ... await page.screenshot({path}) ... await browser.close();
 const { chromium } = require('playwright');
@@ -17,7 +17,8 @@ function startStatic() {
   if (server) return Promise.resolve(serverPort);
   return new Promise((res) => {
     server = http.createServer((req, resp) => {
-      const p = decodeURIComponent(req.url.split('?')[0]);
+      let p = decodeURIComponent(req.url.split('?')[0]);
+      if (/^\/[A-Za-z]:/.test(p)) p = p.slice(1); // Windows: /C:/... → C:/...
       fs.readFile(p, (err, data) => {
         if (err) { resp.writeHead(404); resp.end(); return; }
         const ext = path.extname(p);
@@ -31,7 +32,7 @@ function startStatic() {
 
 async function openPage(absHtmlPath, opts = {}) {
   const port = await startStatic();
-  const browser = opts.browser || await chromium.launch({ args: ['--use-gl=swiftshader', '--enable-webgl', '--ignore-gpu-blocklist'] });
+  const browser = opts.browser || await chromium.launch(process.platform === 'win32' ? { channel: process.env.PW_CHANNEL || 'chrome', headless: false, args: ['--headless=new', '--enable-webgl', '--ignore-gpu-blocklist', '--autoplay-policy=no-user-gesture-required'] } : { args: ['--use-gl=swiftshader', '--enable-webgl', '--ignore-gpu-blocklist'] });
   const context = await browser.newContext({ viewport: opts.viewport || { width: 1280, height: 720 }, hasTouch: !!opts.touch, isMobile: !!opts.mobile });
   const page = await context.newPage();
   const errors = [];
@@ -44,7 +45,7 @@ async function openPage(absHtmlPath, opts = {}) {
     errors.push('unrouted CDN request: ' + url);
     return route.abort();
   });
-  await page.goto(`http://127.0.0.1:${port}${absHtmlPath}${opts.query || ''}`);
+  await page.goto(`http://127.0.0.1:${port}${String(absHtmlPath).split(String.fromCharCode(92)).join('/').replace(/^([A-Za-z]:)/, '/$1')}${opts.query || ''}`);
   return { browser, context, page, errors };
 }
 
