@@ -175,7 +175,9 @@ body.easy.home #easyPanel{display:none}
 body.easy .knob{display:none!important}
 #easyPanel .nav{position:sticky;bottom:-16px;background:var(--panel);padding-bottom:6px;z-index:2}
 #easyPanel .pair{display:grid;grid-template-columns:repeat(auto-fit,minmax(340px,1fr));gap:10px}
-.cards{grid-template-columns:repeat(auto-fit,minmax(168px,1fr))}
+.cards{grid-template-columns:repeat(3,minmax(0,1fr));max-width:900px}
+@media (min-width:1300px){.cards{grid-template-columns:repeat(6,minmax(0,1fr));max-width:1280px}}
+.cards button{min-height:170px}
 
 #tip{position:fixed;z-index:90;background:#000c;color:#fff;font-size:12px;padding:3px 8px;border-radius:5px;pointer-events:none;display:none;font-variant-numeric:tabular-nums}
 </style>
@@ -248,6 +250,7 @@ body.easy .knob{display:none!important}
         <button data-task="pitch"><span class="ic">🎹</span><b>高さ（キー）を変える</b><span>歌いやすい高さに上げたり下げたりします。速さはそのままです。</span></button>
         <button data-task="mix"><span class="ic">🎶</span><b>2つの音を重ねる</b><span>曲と声、BGMと効果音などを重ねて、1つの音にします。</span></button>
         <button data-task="rec"><span class="ic">🎙️</span><b>録音する</b><span>パソコンで鳴っている音や、マイクの声を録音します。</span></button>
+        <button data-task="vocal"><span class="ic">🎤</span><b>歌声を大きく・小さく</b><span>曲の中の歌声だけを大きくしたり、小さくしたり（カラオケ風に）します。</span></button>
         <button data-task="cut"><span class="ic">✂️</span><b>一部分だけ切り取る</b><span>曲の好きなところだけを残したり、いらないところを消したりします。</span></button>
       </div>
       <div class="foot" id="eHomeFoot"></div>
@@ -440,7 +443,24 @@ function resampleCh(chans,p,outLen,prog){
   }
   return res;
 }
+// 簡易ボーカル調整：左右の真ん中の音（M=(L+R)/2）のうち、歌声の音域（約150Hz〜7kHz）だけを g 倍にする
+function biquad(type,f,sr,Q){var w=2*Math.PI*f/sr,cs=Math.cos(w),al=Math.sin(w)/(2*Q),b0,b1,b2;
+  if(type==='hp'){b0=(1+cs)/2;b1=-(1+cs);b2=(1+cs)/2;}else{b0=(1-cs)/2;b1=1-cs;b2=(1-cs)/2;}
+  var a0=1+al;return [b0/a0,b1/a0,b2/a0,-2*cs/a0,(1-al)/a0];}
+function filt1(x,c){var y=new Float32Array(x.length),x1=0,x2=0,y1=0,y2=0;for(var i=0;i<x.length;i++){var v=x[i],o=c[0]*v+c[1]*x1+c[2]*x2-c[3]*y1-c[4]*y2;x2=x1;x1=v;y2=y1;y1=o;y[i]=o;}return y;}
+function filtfilt(x,c){var y=filt1(x,c);y.reverse();y=filt1(y,c);y.reverse();return y;}
+function vocalAdjust(chans,sr,g){
+  var L=chans[0],R=chans[1]||chans[0],n=L.length,M=new Float32Array(n),S=new Float32Array(n);
+  for(var i=0;i<n;i++){M[i]=(L[i]+R[i])/2;S[i]=(L[i]-R[i])/2;}
+  var band=filtfilt(filtfilt(M,biquad('hp',150,sr,0.707)),biquad('lp',7000,sr,0.707));
+  var k=g-1;for(var i=0;i<n;i++)M[i]+=k*band[i];
+  if(chans.length===1)return [M];
+  var a=new Float32Array(n),b=new Float32Array(n);for(var i=0;i<n;i++){a[i]=M[i]+S[i];b[i]=M[i]-S[i];}
+  return [a,b];
+}
 function processAudio(m,prog){
+  if(m.kind!=='resample'&&m.vocal!=null&&Math.abs(m.vocal-1)>1e-6){m=Object.assign({},m,{chans:vocalAdjust(m.chans,m.sr,m.vocal)});}
+  if(m.kind==='tape'&&Math.abs(m.speed-1)<1e-9)return m.chans;
   if(m.kind==='resample'){var K=sincTable(m.step);return m.chans.map(function(x){return resampleAt(x,m.pos0,m.step,m.count,K);});}
   if(m.kind==='tape')return resampleCh(m.chans,m.speed,Math.max(1,Math.round(m.chans[0].length/m.speed)),prog);
   var p=Math.pow(2,m.semis/12),r=p/m.speed,y=m.chans,doW=Math.abs(r-1)>1e-6,doR=Math.abs(p-1)>1e-6;
@@ -561,11 +581,21 @@ async function addFiles(files,trackId,at){
 
 // ================= 速さ・高さの処理 =================
 const procCache=new Map();
+const monoCache=new Map();
+function isMonoLike(srcId){
+  if(monoCache.has(srcId))return monoCache.get(srcId);const s=sources.get(srcId);if(!s)return false;const b=s.buffer;
+  let r=true;if(b.numberOfChannels>1){const L=b.getChannelData(0),R=b.getChannelData(1);let m=0,d=0;for(let i=0;i<L.length;i+=16){const a=L[i]+R[i],e=L[i]-R[i];m+=a*a;d+=e*e;}r=d<m*0.0005;}
+  monoCache.set(srcId,r);return r;
+}
+const VOCALS=[[0,'消す'],[0.4,'小さく'],[1,'元のまま'],[1.8,'大きく'],[2.6,'とても大きく']];
+function vocalName(v){let best=VOCALS[2],bd=9;for(const x of VOCALS){const d=Math.abs(x[0]-v);if(d<bd){bd=d;best=x;}}return best[1];}
+function vocalOf(c){return c.vocal==null?1:c.vocal;}
 function procKey(c){
-  if(c.mode==='tape')return Math.abs(c.speed-1)<1e-9?null:c.srcId+'|tape|'+c.speed.toFixed(5);
+  const v=vocalOf(c),vs=Math.abs(v-1)>1e-6?'|v'+v.toFixed(2):'';
+  if(c.mode==='tape')return Math.abs(c.speed-1)<1e-9&&!vs?null:c.srcId+'|tape|'+c.speed.toFixed(5)+vs;
   const p=c.semis+c.cents/100;
-  if(Math.abs(c.speed-1)<1e-9&&Math.abs(p)<1e-9)return null;
-  return c.srcId+'|'+c.speed.toFixed(5)+'|'+p.toFixed(3);
+  if(Math.abs(c.speed-1)<1e-9&&Math.abs(p)<1e-9&&!vs)return null;
+  return c.srcId+'|'+c.speed.toFixed(5)+'|'+p.toFixed(3)+vs;
 }
 let worker=null,jobs=new Map(),jobSeq=0,dspFb=null;
 function getWorker(){
@@ -584,9 +614,9 @@ function runFallback(msg){
     if(!dspFb)dspFb=new Function('self',$('#dspSrc').textContent+';return processAudio;')({});
     res(dspFb(msg,()=>{}));}catch(e){rej(e);}},20));
 }
-function runDSP(buf,speed,semis,onp,kind){
+function runDSP(buf,speed,semis,onp,kind,vocal){
   const chans=[];for(let i=0;i<buf.numberOfChannels;i++)chans.push(buf.getChannelData(i).slice());
-  return runJob({chans,sr:buf.sampleRate,speed,semis,kind:kind||'stretch'},onp);
+  return runJob({chans,sr:buf.sampleRate,speed,semis,kind:kind||'stretch',vocal:vocal==null?1:vocal},onp);
 }
 function runJob(msg,onp){
   onp=onp||(()=>{});
@@ -600,7 +630,7 @@ function ensureProcessed(c){
   let e=procCache.get(k);if(e)return e.promise;
   const src=sources.get(c.srcId);if(!src)return Promise.resolve();
   e={state:'pending',progress:0};procCache.set(k,e);
-  e.promise=runDSP(src.buffer,c.speed,c.semis+c.cents/100,p=>{e.progress=p;updateBusy();},c.mode==='tape'?'tape':'stretch').then(chs=>{
+  e.promise=runDSP(src.buffer,c.speed,c.semis+c.cents/100,p=>{e.progress=p;updateBusy();},c.mode==='tape'?'tape':'stretch',vocalOf(c)).then(chs=>{
     const b=ac().createBuffer(chs.length,chs[0].length,src.buffer.sampleRate);
     chs.forEach((d,i)=>b.copyToChannel(d,i));e.buffer=b;e.state='done';updateBusy();
     if(play&&play.waiting){restartIfPlaying();}
@@ -844,6 +874,7 @@ function clipLabel(c){
   const p=pitchOf(c);if(Math.abs(p)>0.005)s+=`<em>高さ ${p>0?'+':'−'}${Math.abs(p).toFixed(Math.abs(p)%1?2:0)}</em>`;
   if(c.mode==='tape'&&Math.abs(c.speed-1)>1e-6)s+='<em>テープ</em>';
   if(c.gain)s+=`<em>${fmtDb(c.gain)}</em>`;
+  if(Math.abs(vocalOf(c)-1)>1e-6)s+=`<em>歌声 ${vocalName(vocalOf(c))}</em>`;
   return s;
 }
 function escapeHtml(s){return String(s).replace(/[&<>"']/g,m=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[m]));}
@@ -862,7 +893,7 @@ function updateBusy(){
   for(const el of rowsEl.querySelectorAll('.clip')){
     const f=findClip(el.dataset.cid);if(!f)continue;const k=procKey(f.clip),b=el.querySelector('.busy');
     const e=k&&procCache.get(k);
-    if(k&&(!e||e.state!=='done')){b.style.display='block';b.textContent='速さ・高さを処理中 '+Math.round((e?e.progress:0)*100)+'%';}
+    if(k&&(!e||e.state!=='done')){b.style.display='block';b.textContent='音を準備中 '+Math.round((e?e.progress:0)*100)+'%';}
     else b.style.display='none';
   }
 }
@@ -1199,6 +1230,10 @@ function renderInspector(){
     <div class="line"><input type="range" data-k="centsR" min="-100" max="100" step="1"><input type="number" data-k="cents" min="-100" max="100" step="1"> セント（微調整）</div>
     <div class="line small" data-v="pitchnote"></div>
   </div>
+  <div class="box"><h4>歌声（簡易）</h4>
+    <div class="line"><span class="seg">${VOCALS.map(([v,l])=>`<button data-voc="${v}" title="左右の真ん中から聞こえる歌声の音域を${l}">${l}</button>`).join('')}</span></div>
+    <div class="line small" data-v="vocnote" style="max-width:360px"></div>
+  </div>
   <div class="box"><h4>音量とフェード</h4>
     <div class="line"><input type="range" data-k="gainR" min="-30" max="12" step="0.5"><span class="val" data-v="gain"></span></div>
     <div class="line"><label>フェードイン <input type="number" data-k="fadeIn" min="0" step="0.05" style="width:64px"> 秒</label><label>アウト <input type="number" data-k="fadeOut" min="0" step="0.05" style="width:64px"> 秒</label></div>
@@ -1228,11 +1263,12 @@ function renderInspector(){
   q('[data-k=semisR]').ondblclick=()=>{c.semis=0;changed(true);checkpoint();};
   q('[data-k=centsR]').ondblclick=()=>{c.cents=0;changed(true);checkpoint();};
   insp.querySelectorAll('[data-n]').forEach(b=>b.onclick=()=>{const n=b.dataset.n;const d=n.endsWith('beat')?(n[0]==='-'?-1:1)*(gridSec()||spb()):parseFloat(n);nudge(d);});
+  insp.querySelectorAll('[data-voc]').forEach(b=>b.onclick=()=>{c.vocal=+b.dataset.voc;changed(true);checkpoint();renderInspectorValues();});
   insp.querySelectorAll('[data-mode]').forEach(b=>b.onclick=()=>{c.mode=b.dataset.mode;changed(true);checkpoint();renderInspector();});
   insp.querySelectorAll('[data-a]').forEach(b=>b.onclick=()=>{
     const a=b.dataset.a;
     if(a==='split')splitSel();else if(a==='dup')duplicateSel();else if(a==='del')deleteSel();
-    else if(a==='reset'){Object.assign(c,{speed:1,semis:0,cents:0,mode:'keep',gain:0,fadeIn:0,fadeOut:0});changed(true);checkpoint();renderInspector();}
+    else if(a==='reset'){Object.assign(c,{speed:1,semis:0,cents:0,mode:'keep',gain:0,fadeIn:0,fadeOut:0,vocal:1});changed(true);checkpoint();renderInspector();}
     else if(a==='tobeat'){const q2=spb();c.start=Math.round(c.start/q2)*q2;layout();changed();checkpoint();}
     else if(a==='toplay'){c.start=curPos();layout();changed();checkpoint();}
     else if(a==='detect'){const s=sources.get(c.srcId);b.disabled=true;b.textContent='検出中…';setTimeout(()=>{const v=detectBPM(s.buffer,c.offset,c.dur);b.disabled=false;b.textContent='自動検出';
@@ -1271,6 +1307,8 @@ function renderInspectorValues(skipFocused){
   const tape=c.mode==='tape';
   ['semisR','semis','centsR','cents'].forEach(k=>q(`[data-k=${k}]`).disabled=tape);
   insp.querySelectorAll('[data-mode]').forEach(b=>b.classList.toggle('on',b.dataset.mode===c.mode));
+  insp.querySelectorAll('[data-voc]').forEach(b=>b.classList.toggle('on',Math.abs(+b.dataset.voc-vocalOf(c))<1e-6));
+  const vn=q('[data-v=vocnote]');if(vn)vn.textContent=isMonoLike(c.srcId)?'この音は左右が同じ（モノラル）なので、歌声だけを分けられません。真ん中の音域全体の大きさが変わります。':'左右の真ん中から聞こえる、歌声の音域だけを強めたり弱めたりします。効き方は曲によります（真ん中にある楽器も少し変わります）。';
   const p=pitchOf(c);
   q('[data-v=pitchnote]').textContent=tape?`テープ方式なので、速さに合わせて高さが ${p>=0?'+':'−'}${Math.abs(p).toFixed(2)} 半音変わります`:(Math.abs(p)<0.005?'元の高さ':`元より ${p>0?'高く':'低く'} ${Math.abs(p).toFixed(2)} 半音`);
   const s=sources.get(c.srcId);
@@ -1623,7 +1661,8 @@ const TASKS={
   pitch:{name:'高さ（キー）を変える',steps:['音を入れる','高さを決める','保存する']},
   mix:{name:'2つの音を重ねる',steps:['最初の音','重ねる音','重ね方を決める','保存する']},
   rec:{name:'録音する',steps:['録音する','保存する']},
-  cut:{name:'一部分だけ切り取る',steps:['音を入れる','残す部分を選ぶ','保存する']}
+  cut:{name:'一部分だけ切り取る',steps:['音を入れる','残す部分を選ぶ','保存する']},
+  vocal:{name:'歌声を大きく・小さく',steps:['音を入れる','歌声の大きさを決める','保存する']}
 };
 function lsGet(k){try{return localStorage.getItem(k);}catch(e){return null;}}
 function lsSet(k,v){try{localStorage.setItem(k,v);}catch(e){}}
@@ -1687,7 +1726,7 @@ function easySteps(){
 }
 function firstClip(){const c=allClips();return c.length?c[0]:null;}
 function pitchName(v){if(v===0)return '元の高さ';const a=Math.abs(v),oc=a===12?'（1オクターブ）':'';return v>0?`元より ${a}${oc} 高い`:`元より ${a}${oc} 低い`;}
-function settingsText(c){const a=[];if(Math.abs(c.speed-1)>1e-6)a.push(`速さ ${Math.round(c.speed*100)}%`);if(c.semis)a.push(pitchName(c.semis));if(c.gain)a.push('音量を変更');return a.join('・');}
+function settingsText(c){const a=[];if(Math.abs(vocalOf(c)-1)>1e-6)a.push('歌声 '+vocalName(vocalOf(c)));if(Math.abs(c.speed-1)>1e-6)a.push(`速さ ${Math.round(c.speed*100)}%`);if(c.semis)a.push(pitchName(c.semis));if(c.gain)a.push('音量を変更');return a.join('・');}
 function busyText(){
   let pend=0,prog=0;for(const c of allClips()){const k=procKey(c);if(!k)continue;const e=procCache.get(k);if(!e||e.state!=='done'){pend++;prog+=e?e.progress:0;}}
   return pend?`<span class="warn">⏳ 音を準備しています… ${Math.round(prog/pend*100)}%（終わるまで少しお待ちください）</span>`:'';
@@ -1737,6 +1776,14 @@ function renderEasy(){
   else if(last){h=easySaveHtml();}
   else if(t==='speed'&&st===0){h=stepAdd('① 速さを変えたい音を入れる','ゆっくりにしたい曲や、速くしたい曲を選んでください。')+navHtml('次へ：速さを決める',hasClips());}
   else if(t==='pitch'&&st===0){h=stepAdd('① 高さを変えたい音を入れる','キーを変えたい曲を選んでください。')+navHtml('次へ：高さを決める',hasClips());}
+  else if(t==='vocal'&&st===0){h=stepAdd('① 歌の入った曲を入れる','歌声を大きく、または小さくしたい曲を選んでください。')+navHtml('次へ：歌声の大きさを決める',hasClips());}
+  else if(t==='vocal'){
+    const c=firstClip(),v=vocalOf(c),mono=isMonoLike(c.srcId);
+    h=`<h2>② 歌声の大きさを決める</h2><p>ボタンを押して、上の <b>▶ 聴いてみる</b> で確かめてください。「消す」「小さく」にすると、カラオケのように歌が引っ込みます。</p>
+    <div class="row">${VOCALS.map(([x,l])=>`<button class="pick ${Math.abs(x-v)<1e-6?'on':''}" data-vocal="${x}">${l}</button>`).join('')}</div>
+    <div class="row"><span>今の歌声：</span><span class="now">${vocalName(v)}</span></div>
+    ${mono?'<div class="card2 warn">この曲は左右が同じ音（モノラル）なので、歌声だけを分けることができません。歌声の音域全体（楽器も含む）の大きさが変わります。</div>':'<p class="note">しくみ：多くの曲では歌声が左右の真ん中から聞こえるので、真ん中の音のうち歌声の高さの範囲だけを強めたり弱めたりします。曲によっては歌が残ったり、真ん中の楽器も一緒に変わったりします。</p>'}
+    <div id="eBusy">${busyText()}</div>`+navHtml('次へ：保存する',true);}
   else if(t==='cut'&&st===0){h=stepAdd('① 切り取りたい音を入れる','一部分だけ使いたい曲を選んでください。')+navHtml('次へ：残す部分を選ぶ',hasClips());}
   else if(t==='mix'&&st===0){h=stepAdd('① 最初の音を入れる','土台になる音（曲やBGMなど）を選んでください。')+navHtml('次へ：重ねる音',hasClips());}
   else if(t==='mix'&&st===1){
@@ -1793,7 +1840,8 @@ function genName(){
   let base=c?c.name.replace(/[\\/:*?"<>|]/g,'_').slice(0,40):'otomix';if(/[^\x20-\x7e]/.test(base))base='otomix';
   const stamp=`${String(d.getMonth()+1).padStart(2,'0')}${String(d.getDate()).padStart(2,'0')}-${String(d.getHours()).padStart(2,'0')}${String(d.getMinutes()).padStart(2,'0')}`;
   const sp=c&&Math.abs(c.speed-1)>1e-6?`_speed${Math.round(c.speed*100)}`:'',ky=c&&c.semis?`_key${c.semis>0?'+':''}${c.semis}`:'';
-  const suf=({speed:sp||'_speed100',pitch:(ky||'_key0')+sp,mix:'_mix',rec:'_rec',cut:'_cut'}[easy.task]||'')+(easy.task==='speed'?ky:'')+(base==='otomix'?'_'+stamp:'');
+  const vc=c?vocalOf(c):1,vtag=vc<1e-6?'_novocal':vc<1?'_vocal-down':vc>1?'_vocal-up':'_vocal';
+  const suf=({speed:sp||'_speed100',pitch:(ky||'_key0')+sp,mix:'_mix',rec:'_rec',cut:'_cut',vocal:vtag}[easy.task]||'')+(easy.task==='speed'?ky:'')+(base==='otomix'?'_'+stamp:'');
   return base+suf;
 }
 function easySaveHtml(){
@@ -1832,6 +1880,7 @@ function wireEasy(){
     else if(a==='del'){if(!rsel)return;deleteRange(true);easy.cutDone=true;toast('選んだ部分を消して、前後をつなげました','ok');renderEasy();}
   });
   const nm=document.getElementById('eName2');if(nm)nm.oninput=()=>{easy.nameEdited=true;easy.savedName=nm.value;};
+  q('[data-vocal]').forEach(b=>b.onclick=()=>{for(const c of allClips())c.vocal=+b.dataset.vocal;after();});
   q('[data-speed]').forEach(b=>b.onclick=()=>{for(const c of allClips()){c.speed=+b.dataset.speed/100;c.mode='keep';}after();});
   q('[data-sp]').forEach(b=>b.onclick=()=>{for(const c of allClips()){c.speed=clamp(Math.round(c.speed*100+ +b.dataset.sp)/100,0.5,2);c.mode='keep';}after();});
   q('[data-pt]').forEach(b=>b.onclick=()=>{const c0=firstClip();const nv=c0.semis+ +b.dataset.pt;if(Math.abs(nv)>12){toast('高さは上下12（1オクターブ）までです','info');return;}for(const c of allClips()){c.semis=nv;c.mode='keep';}after();});
