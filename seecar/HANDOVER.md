@@ -1,6 +1,6 @@
 # 【2026-11-05 追記】第4期（v9.0）
 
-- 山田さんから 11/4 に「v8 → v9.0 改修」の詳しい依頼（SPEC4.md）が届き、v9.0 を作って返信した（ユーザーから「確認なしで送ってよい」と言われた回）。最新版は `seecar/dist/seecar_v9.html`。
+- 山田さんから 11/4 に「v8 → v9.0 改修」の詳しい依頼（SPEC4.md）が届き、v9.0 を作って返信した（返信のメッセージID `1a1a6bb17486c55d`、スレッド `1a1a1c16620291e9`。ユーザーから「確認なしで送ってよい」と言われた回）。最新版は `seecar/dist/seecar_v9.html`。
 - 部品の取り決めは CONTRACT.md 末尾「第4期の追加」。採点表 RUBRIC4.md、採点結果 test/critic4_r1.md・critic4_r2.md、点数は SCORES.md。
 - 確認の仕組み（Windows のこのPCで動く）：`cd seecar/test && node e2e4.js <v9のhtmlの絶対パス>`（181項目）、`node world4_run.js`（3D世界）、`node mapgen4_test.js`、`node sfx4_test.js`、CPU の強さ `node world4_vsbot.js 6 easy,normal,hard light`（約25分）。harness.js は Windows ではインストール済みの Chrome（headless=new）を使う。Node 19 のため playwright は 1.48。
 - 次にやること：山田さんの返事を確認する。iPad 実機での音量・操作感・CPUの強さ・フォントの見え方が未確認。3回目の採点はしていない。
