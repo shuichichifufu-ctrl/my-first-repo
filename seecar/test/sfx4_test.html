@@ -1,0 +1,98 @@
+<!doctype html>
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<link rel="icon" href="data:,">
+<title>Sfx 第4期 テスト</title>
+<style>
+  body { font-family: sans-serif; background: #f6f3ea; color: #333; margin: 16px; }
+  h2 { font-size: 16px; margin: 18px 0 6px; }
+  button { font-size: 15px; margin: 3px; padding: 8px 12px; border-radius: 10px; border: 1px solid #bbb; background: #fff; }
+  #st { font-family: monospace; font-size: 12px; white-space: pre; background: #fff; padding: 8px; border-radius: 8px; }
+</style>
+<script>
+  // 検査用：音源の数を数える（sfx.js より前に差し込む）
+  window.__cnt = { created: 0, started: 0, active: 0 };
+  (function () {
+    var B = window.BaseAudioContext || window.AudioContext;
+    ['createOscillator', 'createBufferSource'].forEach(function (m) {
+      var orig = B.prototype[m];
+      B.prototype[m] = function () { __cnt.created++; return orig.apply(this, arguments); };
+    });
+    var S = window.AudioScheduledSourceNode;
+    var st = S.prototype.start;
+    S.prototype.start = function () {
+      if (!(this.context instanceof (window.OfflineAudioContext || function () {}))) {
+        __cnt.started++; __cnt.active++;
+        var self = this; this.addEventListener('ended', function () { __cnt.active--; });
+      }
+      return st.apply(this, arguments);
+    };
+  })();
+</script>
+<script src="../src/sfx.js"></script>
+</head>
+<body>
+<h1>見つけて！PixSee サウンド確認</h1>
+<p>最初に「unlock」を押してください。</p>
+<button id="unlock">unlock</button> <button id="stop">stopAll</button>
+<button id="pause">pause(true)</button> <button id="resume">pause(false)</button>
+<label><input type="checkbox" id="mute"> muted</label>
+<h2>効果音 play(name)</h2><div id="sfx"></div>
+<h2>走る音 engine(state, stage)</h2><div id="eng"></div>
+<h2>BGM bgm(name)</h2><div id="bgm"></div>
+<h2>ジングル jingle(name)</h2><div id="jin"></div>
+<h2>状態</h2><div id="st"></div>
+<script>
+  function btn(parent, label, fn) {
+    var b = document.createElement('button'); b.textContent = label;
+    b.addEventListener('click', function () { Sfx.unlock(); fn(); }); document.getElementById(parent).appendChild(b);
+  }
+  ['tap','count','go','jump','land','step','bump','break','drillHit','gemRise','fanfare','notice','move','turn','fire','boom','found'].forEach(function (n) {
+    btn('sfx', n, function () { Sfx.play(n); });
+  });
+  ['idle','air','turn','drill'].forEach(function (s) { btn('eng', s, function () { Sfx.engine(s, 0); }); });
+  for (var i = 0; i <= 5; i++) (function (k) { btn('eng', 'run ' + k, function () { Sfx.engine('run', k); }); })(i);
+  ['title','play1','play2','play3'].forEach(function (n) { btn('bgm', n, function () { Sfx.bgm(n); }); });
+  btn('bgm', 'null（止める）', function () { Sfx.bgm(null); });
+  ['win','lose','practice','peace'].forEach(function (n) { btn('jin', n, function () { Sfx.jingle(n); }); });
+  document.getElementById('unlock').onclick = function () { Sfx.unlock(); };
+  document.getElementById('stop').onclick = function () { Sfx.stopAll(); };
+  document.getElementById('pause').onclick = function () { Sfx.pause(true); };
+  document.getElementById('resume').onclick = function () { Sfx.pause(false); };
+  document.getElementById('mute').onchange = function (e) { Sfx.muted = e.target.checked; };
+  setInterval(function () {
+    document.getElementById('st').textContent = JSON.stringify(Sfx._debug ? Sfx._debug() : {}, null, 1) + '\n' + JSON.stringify(__cnt);
+  }, 250);
+
+  // 書き出した音のピークと RMS（dBFS）
+  window.__levels = function (buf) {
+    var peak = 0, sum = 0, n = 0, win = Math.floor(buf.sampleRate * 0.3), maxWin = 0, ws = 0, cnt = 0;
+    var L = buf.getChannelData(0), R = buf.numberOfChannels > 1 ? buf.getChannelData(1) : L;
+    for (var i = 0; i < L.length; i++) {
+      var a = Math.max(Math.abs(L[i]), Math.abs(R[i])); if (a > peak) peak = a;
+      var p = (L[i] * L[i] + R[i] * R[i]) / 2; sum += p; n++; ws += p; cnt++;
+      if (cnt === win) { maxWin = Math.max(maxWin, ws / win); ws = 0; cnt = 0; }
+    }
+    function db(x) { return x > 0 ? Math.round(10 * Math.log10(x) * 10) / 10 : -999; }
+    return { peakDb: peak > 0 ? Math.round(20 * Math.log10(peak) * 10) / 10 : -999, rmsDb: db(sum / n), loudest300msDb: db(maxWin) };
+  };
+  // 16bit ステレオ WAV を base64 で
+  window.__wav = function (buf) {
+    var ch = buf.numberOfChannels, len = buf.length, sr = buf.sampleRate;
+    var ab = new ArrayBuffer(44 + len * ch * 2), v = new DataView(ab);
+    function s(o, t) { for (var i = 0; i < t.length; i++) v.setUint8(o + i, t.charCodeAt(i)); }
+    s(0, 'RIFF'); v.setUint32(4, 36 + len * ch * 2, true); s(8, 'WAVE'); s(12, 'fmt ');
+    v.setUint32(16, 16, true); v.setUint16(20, 1, true); v.setUint16(22, ch, true); v.setUint32(24, sr, true);
+    v.setUint32(28, sr * ch * 2, true); v.setUint16(32, ch * 2, true); v.setUint16(34, 16, true); s(36, 'data'); v.setUint32(40, len * ch * 2, true);
+    var data = []; for (var c = 0; c < ch; c++) data.push(buf.getChannelData(c));
+    var o = 44;
+    for (var i = 0; i < len; i++) for (c = 0; c < ch; c++) { var x = Math.max(-1, Math.min(1, data[c][i])); v.setInt16(o, x < 0 ? x * 32768 : x * 32767, true); o += 2; }
+    var bytes = new Uint8Array(ab), bin = '', step = 0x8000;
+    for (i = 0; i < bytes.length; i += step) bin += String.fromCharCode.apply(null, bytes.subarray(i, i + step));
+    return btoa(bin);
+  };
+</script>
+</body>
+</html>

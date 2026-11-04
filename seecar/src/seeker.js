@@ -2,14 +2,17 @@
    seeker.js : 主人公シーカーの3Dモデル部品（見つけて！PixSee）
    山田さんの ref_pixsee/seeker3d.html の createSeeker を THREE r128（グローバル）に移植。
    公開は window.SeekerModel だけ。
-     SeekerModel.create({color}) -> {root, flipPivot, rig, hatPivot, pole, eyes, tracks,
-                                     stripeTex, setColor(c), update(dt, state), ...}
+     SeekerModel.create({palette:n | color}) -> {root, flipPivot, rig, hatPivot, pole, eyes, tracks,
+                                     stripeTex, setColor(c), setPalette(n), update(dt, state), ...}
+     SeekerModel.PALETTES（10色）/ SeekerModel.preview(n, sizePx)（色えらび用の2D絵）
    座標：root の原点 = 足元中央（履帯の下端が y=0）/ +Y=上 / +Z=正面（目のある側）
    大きさ：幅・奥行きとも 1 マス（1.0）以内。
    ============================================================ */
 (function () {
   'use strict';
   var T = window.THREE;
+
+  /* ===== K01. 寸法・色（車体カラー10パターン） ===== */
 
   /* ---- 寸法（山田さんの元の比率のまま作り、最後に SCALE で縮める） ---- */
   var SCALE = 0.75;          // 全体を縮める割合（元の幅1.2 → 約0.9、奥行き1.24 → 約0.93）
@@ -28,6 +31,24 @@
   var COL = { tan: 0xf0c46e, eye: 0x22e0a0, star: 0xd77fb8,
               frame: 0x3b434c, plate: 0x6d7a88, cleat: 0x6f7c89, wheel: 0xa7b3be, hub: 0x2b2f35 };
 
+  // 車体カラー：body=ボディ、accent=円柱の端面（ふち）、track=キャタピラの枠。0番が現行の配色。
+  // 色覚の違いでも見分けやすいよう、明るさ（相対輝度）をばらけさせてある：くろ≪ちゃいろ<あか<むらさき<みどり<オレンジ<ピンク≒そらいろ<きいろ≪しろ。
+  // 端面の色もすべて変えてあるので、ボディが似た明るさでも見分けられる。
+  var PALETTES = [
+    { id: 0, name: 'オレンジ',   body: '#e08524', accent: '#f0c46e', track: '#3b434c' },
+    { id: 1, name: 'そらいろ',   body: '#4fc3f0', accent: '#fff4c2', track: '#2f4a5c' },
+    { id: 2, name: 'あか',       body: '#c4172e', accent: '#ffd9c2', track: '#3a2a30' },
+    { id: 3, name: 'みどり',     body: '#2e9e4a', accent: '#f2f6b0', track: '#243d2c' },
+    { id: 4, name: 'むらさき',   body: '#8c62d8', accent: '#ffe08a', track: '#312a4a' },
+    { id: 5, name: 'きいろ',     body: '#f6d322', accent: '#ffffff', track: '#4a4528' },
+    { id: 6, name: 'ピンク',     body: '#ffa6c9', accent: '#fff2d6', track: '#5a3a4a' },
+    { id: 7, name: 'くろ',       body: '#2a2f3a', accent: '#9fe3ff', track: '#12161d' },
+    { id: 8, name: 'ちゃいろ',   body: '#6b4226', accent: '#e9c98f', track: '#2f241c' },
+    { id: 9, name: 'しろ',       body: '#f5f5f0', accent: '#ff9f43', track: '#59636e' }
+  ];
+  function paletteOf(n) { n = n | 0; return PALETTES[n >= 0 && n < PALETTES.length ? n : 0]; }
+
+  /* ===== K02. トゥーン調の材質・輪郭線・形の部品 ===== */
   /* ---- トゥーン調（段々の陰影）と黒い輪郭線 ---- */
   var grad = new T.DataTexture(new Uint8Array([90, 170, 255]), 3, 1, T.LuminanceFormat);
   grad.minFilter = grad.magFilter = T.NearestFilter;
@@ -128,6 +149,7 @@
   }
 
   /* 円柱の端面（クリーム色の輪＋白い穴＋ピンクの星） */
+  /* ===== K03. 端面・履帯・ドリル帽子 ===== */
   function makeEnd(sign) {
     var g = new T.Group();
     g.position.set(sign * LEN / 2, CY, 0);
@@ -182,7 +204,7 @@
     }
     return plateGeo;
   }
-  function makeTrack(sign) {
+  function makeTrack(sign, frameMat) {
     var group = new T.Group(); group.position.x = sign * TRK_X;
     var rb = 0.14, cy = TRK_CY, S = TRK_S;
     if (!trackBodyGeo) {
@@ -194,7 +216,7 @@
       trackBodyGeo = new T.ExtrudeGeometry(sh, { depth: TRK_W * 0.9, bevelEnabled: false, curveSegments: 16 });
       trackBodyGeo.rotateY(Math.PI / 2); trackBodyGeo.translate(-TRK_W * 0.45, 0, 0);
     }
-    var bodyMesh = new T.Mesh(trackBodyGeo, toon(COL.frame));
+    var bodyMesh = new T.Mesh(trackBodyGeo, frameMat);
     group.add(bodyMesh);
 
     var inst = new T.InstancedMesh(getPlateGeo(), toon(COL.plate), TREAD_N);
@@ -223,9 +245,11 @@
   var clamp = function (v, a, b) { return Math.max(a, Math.min(b, v)); };
   var lerp = function (a, b, k) { return a + (b - a) * k; };
 
+  /* ===== K04. シーカーを組み立てる create() ===== */
   function create(opts) {
     opts = opts || {};
-    var color = opts.color !== undefined ? opts.color : 0xe08524;
+    var pal = paletteOf(opts.palette);
+    var color = opts.color !== undefined ? opts.color : pal.body;
     var root = new T.Group(); root.name = 'seeker';
     var flipPivot = new T.Group(); flipPivot.name = 'flipPivot';
     flipPivot.scale.setScalar(SCALE);
@@ -238,8 +262,8 @@
     var inner = new T.Group(); inner.position.y = -BODY_BASE; bodyGroup.add(inner);
     rig.add(bodyGroup);
 
-    var bodyMat = toon(color);
-    var body = new T.Mesh(new T.CylinderGeometry(R, R, LEN, 48).rotateZ(Math.PI / 2), [bodyMat, toon(COL.tan), toon(COL.tan)]);
+    var bodyMat = toon(color), capMat = toon(pal.accent), frameMat = toon(pal.track);
+    var body = new T.Mesh(new T.CylinderGeometry(R, R, LEN, 48).rotateZ(Math.PI / 2), [bodyMat, capMat, capMat]);
     body.position.y = CY; withInk(body, 0.016);
     inner.add(body, makeEnd(1), makeEnd(-1));
 
@@ -264,7 +288,7 @@
     rig.add(hatPivot);
 
     // キャタピラ（左右）
-    var tracks = [makeTrack(1), makeTrack(-1)];   // [0]=+X側, [1]=-X側
+    var tracks = [makeTrack(1, frameMat), makeTrack(-1, frameMat)];   // [0]=+X側, [1]=-X側
     tracks.forEach(function (t) { rig.add(t.group); });
 
     var st = { hatA: HAT_REST, hatV: 0, blinkT: 2, prevSquash: 0, stripe: 0 };
@@ -272,13 +296,19 @@
       root: root, flipPivot: flipPivot, rig: rig, hatPivot: hatPivot, pole: pole,
       eyes: [eyeL, eyeR], tracks: tracks, stripeTex: stripeTex, bodyGroup: bodyGroup,
       setColor: function (c) { bodyMat.color.set(c); },
+      setPalette: function (n) {
+        var p = paletteOf(n);
+        bodyMat.color.set(p.body); capMat.color.set(p.accent); frameMat.color.set(p.track);
+        api.palette = p.id;
+      },
       update: function (dt, s) {
         s = s || {};
         dt = Math.min(dt || 0, 0.05);
         var move = s.move || 0, turn = s.turn || 0;
         var squash = clamp(s.squash || 0, 0, 1), flip = clamp(s.flip || 0, 0, 1);
-        var fwdK = clamp(s.hatForward || 0, 0, 1);
+        var fwdK0 = clamp(s.hatForward || 0, 0, 1);
         var spin = s.spin === undefined ? 0.15 : s.spin;
+        var fwdK = Math.max(fwdK0, clamp(s.drillHold || 0, 0, 1));   // drillHold：ドリルを正面に向けたまま保つ
 
         // キャタピラ：左右の履帯と車輪を別々に回す（その場旋回もそれらしく）
         var fwd = move * SPEED_REF;
@@ -332,11 +362,115 @@
         eyeL.scale.y = ey; eyeR.scale.y = ey;
       }
     };
+    api.palette = pal.id;
     api.tipDepth = (yPivotTop() + poleLength(0) + HAT_H - CY) * SCALE;
     api.update(0, {});
     return api;
   }
   function yPivotTop() { return CY + Math.sqrt(R * R - HAT_Z * HAT_Z); }
 
-  window.SeekerModel = { create: create, SCALE: SCALE };
+  /* ===== K05. 色えらび用のプレビュー絵（Canvas 2D・3Dは使わない） ===== */
+  // ななめ前から見た かわいい絵。n=パターン番号、size=一辺の画素。PNGのdataURLを返す。
+  var previewCache = {};
+  function mix(hex, to, k) { // 色を to（'#rrggbb'）へ k だけ近づける
+    var a = parseInt(hex.slice(1), 16), b = parseInt(to.slice(1), 16), o = 0;
+    for (var sh = 16; sh >= 0; sh -= 8) {
+      var x = (a >> sh) & 255, y = (b >> sh) & 255;
+      o = (o << 8) | Math.round(x + (y - x) * k);
+    }
+    return '#' + ('000000' + o.toString(16)).slice(-6);
+  }
+  function preview(n, sizePx) {
+    var pal = paletteOf(n), S = Math.max(16, Math.round(sizePx || 160)), key = pal.id + ':' + S;
+    if (previewCache[key]) return previewCache[key];
+    var c = document.createElement('canvas'); c.width = c.height = S;
+    var g = c.getContext('2d');
+    var u = S / 100;                                   // 100x100 の座標で描く
+    g.scale(u, u);
+    var INK = '#1b1b22', LW = 2.2;
+    g.lineJoin = 'round'; g.lineCap = 'round';
+    function stroke(w) { g.lineWidth = w || LW; g.strokeStyle = INK; g.stroke(); }
+    function pill(x0, y0, x1, y1, r) {
+      g.beginPath(); g.moveTo(x0 + r, y0); g.lineTo(x1 - r, y0); g.arc(x1 - r, y0 + r, r, -Math.PI / 2, Math.PI / 2);
+      g.lineTo(x0 + r, y1); g.arc(x0 + r, y0 + r, r, Math.PI / 2, Math.PI * 1.5); g.closePath();
+    }
+    // やわらかい影
+    g.fillStyle = 'rgba(40,50,70,0.18)'; g.beginPath(); g.ellipse(50, 92, 38, 5.5, 0, 0, 7); g.fill();
+
+    // キャタピラ（左はうしろ側・右は手前側）：手前にのびる板として、ななめに描く
+    function track(cx, cy2, len, wid, front) {
+      g.save(); g.translate(cx, cy2); g.rotate(0.62);
+      pill(-len / 2, -wid / 2, len / 2, wid / 2, wid / 2); g.fillStyle = pal.track; g.fill(); stroke();
+      g.fillStyle = front ? '#8794a2' : '#6f7b89';
+      for (var k = 0; k < 6; k++) g.fillRect(-len / 2 + 4 + k * ((len - 8) / 5) - 0.9, -wid / 2 + 1.2, 1.8, wid - 2.4);
+      g.fillStyle = '#c3ccd4';
+      for (var q = -1; q <= 1; q++) { g.beginPath(); g.arc(q * len * 0.27, 0, wid * 0.22, 0, 7); g.fill(); }
+      g.restore();
+    }
+    track(19, 82, 26, 12, false);
+
+    // ボディ（横にねかせたロールケーキ）：正面から少し右へ回した見え方
+    var bx0 = 24, bx1 = 66, cy = 60, r = 21, ex = 6.5;     // 円柱の左右・中心の高さ・半径・端面のはば
+    var body = pal.body, hi = mix(body, '#ffffff', 0.32), lo = mix(body, '#000000', 0.22);
+    // 左はしの丸み
+    g.beginPath(); g.ellipse(bx0, cy, ex, r, 0, 0, 7); g.fillStyle = lo; g.fill();
+    // 胴（段々のかげ：上＝明るい／中／下＝暗い）
+    g.beginPath(); g.rect(bx0, cy - r, bx1 - bx0, r * 2);
+    g.fillStyle = body; g.fill();
+    g.save(); g.clip();
+    g.fillStyle = hi; g.fillRect(bx0, cy - r, bx1 - bx0, r * 0.5);
+    g.fillStyle = lo; g.fillRect(bx0, cy + r * 0.45, bx1 - bx0, r);
+    g.restore();
+    // 輪郭（胴の上下の線と左はしの弧）
+    g.beginPath(); g.moveTo(bx0, cy - r); g.lineTo(bx1, cy - r); stroke();
+    g.beginPath(); g.moveTo(bx0, cy + r); g.lineTo(bx1, cy + r); stroke();
+    g.beginPath(); g.ellipse(bx0, cy, ex, r, 0, Math.PI / 2, Math.PI * 1.5); stroke();
+
+    // 右の端面：ふち（accent）→ 白い穴 → ピンクの星
+    g.beginPath(); g.ellipse(bx1, cy, ex, r, 0, 0, 7); g.fillStyle = pal.accent; g.fill(); stroke();
+    g.beginPath(); g.ellipse(bx1, cy, ex * 0.62, r * 0.62, 0, 0, 7); g.fillStyle = '#ffffff'; g.fill(); stroke(1.2);
+    g.save(); g.translate(bx1, cy + 0.6); g.scale(ex / r * 1.0, 1);
+    g.beginPath();
+    for (var i = 0; i < 10; i++) {
+      var rr = i % 2 ? 4.2 : 10, a = -Math.PI / 2 + i * Math.PI / 5;
+      if (i) g.lineTo(Math.cos(a) * rr, Math.sin(a) * rr); else g.moveTo(Math.cos(a) * rr, Math.sin(a) * rr);
+    }
+    g.closePath(); g.fillStyle = '#d77fb8'; g.fill(); g.restore();
+
+    // バイザーと緑の目
+    g.beginPath(); g.ellipse(42, cy - 1, 14, 7.5, 0, 0, 7); g.fillStyle = INK; g.fill();
+    g.fillStyle = '#22e0a0';
+    g.beginPath(); g.ellipse(37, cy - 1, 2.4, 3.9, 0, 0, 7); g.fill();
+    g.beginPath(); g.ellipse(47, cy - 1, 2.4, 3.9, 0, 0, 7); g.fill();
+    g.fillStyle = 'rgba(255,255,255,0.85)';
+    g.beginPath(); g.arc(36.2, cy - 2.6, 0.9, 0, 7); g.fill(); g.beginPath(); g.arc(46.2, cy - 2.6, 0.9, 0, 7); g.fill();
+
+    // 手前（右）のキャタピラ
+    track(68, 82, 26, 12, true);
+
+    // ドリルの帽子：黒い棒の上に、しましまの円すい（すこし うしろへ傾く）
+    var hx = 40, hy = cy - r + 1;                         // 帽子の根元（ボディの上）
+    g.fillStyle = INK; g.fillRect(hx - 1.6, hy - 4.5, 3.2, 5.5);
+    g.save(); g.translate(hx, hy - 4);
+    g.rotate(0.16);                                      // 少し傾ける
+    var tw = 15, th = 29;                                // 円すいの底のはばの半分・高さ
+    g.beginPath(); g.moveTo(-tw, 0); g.lineTo(0, -th); g.lineTo(tw, 0);
+    g.ellipse(0, 0, tw, 3.8, 0, 0, Math.PI, false); g.closePath();
+    g.save(); g.clip();
+    g.fillStyle = '#00d4ff'; g.fillRect(-tw - 2, -th - 2, tw * 2 + 4, th + 12);
+    g.fillStyle = '#ffee00';
+    for (var k = -4; k < 5; k++) {
+      g.beginPath(); g.moveTo(k * 9 - 3, 8); g.lineTo(k * 9 + 1.5, 8); g.lineTo(k * 9 + 15, -th - 2); g.lineTo(k * 9 + 10.5, -th - 2); g.closePath(); g.fill();
+    }
+    g.restore();
+    g.beginPath(); g.moveTo(-tw, 0); g.lineTo(0, -th); g.lineTo(tw, 0); g.ellipse(0, 0, tw, 3.8, 0, 0, Math.PI, false); g.closePath(); stroke();
+    g.restore();
+
+    var url = c.toDataURL('image/png');
+    previewCache[key] = url;
+    return url;
+  }
+
+  /* ===== K06. 公開 ===== */
+  window.SeekerModel = { create: create, SCALE: SCALE, PALETTES: PALETTES, preview: preview };
 })();

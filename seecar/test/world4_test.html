@@ -1,0 +1,58 @@
+<!doctype html>
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>World4 test</title>
+<style>
+  html, body { margin: 0; height: 100%; background: #000; overflow: hidden; }
+  #wrap { position: fixed; inset: 0; }
+</style>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+</head>
+<body>
+<div id="wrap"></div>
+<script>
+  // 効果音の代わり（呼ばれた名前を記録するだけ）
+  window.sfxLog = []; window.engLog = [];
+  window.Sfx = {
+    play: function (n) { window.sfxLog.push(n); },
+    engine: function (st, stg) { var k = st + ':' + stg; if (engLog[engLog.length - 1] !== k) engLog.push(k); }
+  };
+</script>
+<script src="/C:/Users/s9h0u/.claude/my-first-repo/seecar/src/mapgen.js"></script>
+<script src="/C:/Users/s9h0u/.claude/my-first-repo/seecar/src/seeker.js"></script>
+<script src="/C:/Users/s9h0u/.claude/my-first-repo/seecar/src/world.js"></script>
+<script>
+  window.resetEvents = function () { window.events = { found: [], collect: [], terrain: [], terrainT: [], action: [], done: [], gemHit: [], onomato: [], state: 0 }; window.sfxLog = []; window.engLog = []; };
+  resetEvents();
+  window.autoAward = true; // UI の代わり：gemHit を受けたら award
+  World.init(document.getElementById('wrap'));
+  World.on('found', function (i) { events.found.push(i); });
+  World.on('collect', function (i, ti, sc) { events.collect.push([i, ti, sc]); });
+  World.on('terrain', function (c) { events.terrain.push(c); events.terrainT.push(World._debug().time); });
+  World.on('action', function (n) { events.action.push(n); });
+  World.on('done', function (sc) { events.done.push(sc); });
+  World.on('gemHit', function (i, ti) { events.gemHit.push([i, ti, World._debug().time]); if (window.autoAward) World.award(i, ti); });
+  World.on('onomato', function (k) { events.onomato.push([k, World._debug().time]); });
+  World.on('state', function (s) { events.state++; window.lastState = s; });
+  // 検査用の地図（白い紙・高さ0）
+  window.flatMap = function (W, H, treasures) {
+    var heights = new Uint8Array(W * H), colors = new Uint8Array(W * H * 3).fill(248);
+    var m = { w: W, h: H, heights: heights, colors: colors, treasures: treasures || [], treasure: (treasures || [])[0], starts: [{ x: 2, z: 2, dir: 1 }, { x: 2, z: 4, dir: 1 }], title: 't', reading: 't', picture: '' };
+    m.set = function (x, z, h, rgb) { var i = z * W + x; heights[i] = h; rgb = rgb || (h >= 10 ? [18, 18, 22] : [229, 57, 53]); colors[i * 3] = rgb[0]; colors[i * 3 + 1] = rgb[1]; colors[i * 3 + 2] = rgb[2]; };
+    m.box = function (x0, z0, w, h, hh, rgb) { for (var z = z0; z < z0 + h; z++) for (var x = x0; x < x0 + w; x++) m.set(x, z, hh, rgb); };
+    return m;
+  };
+  window.loadMap = function (m, opts) {
+    resetEvents();
+    World.load(m, Object.assign({ myIndex: 0, players: [{ palette: 0 }, { palette: 1 }], net: false, mode: 'solo', search: 'light' }, opts || {}));
+    World.setCamera(0); World.setCamera(1); // 開始演出を飛ばす
+    World._step(30);
+    if (!(opts && opts.stayFrozen)) World.go();
+  };
+  World.load(flatMap(20, 20, [{ x: 10, z: 10, gem: 0 }]), { players: [{ palette: 0 }, { palette: 1 }], mode: 'solo' });
+  World.start();
+</script>
+</body>
+</html>
