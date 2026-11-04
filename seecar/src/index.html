@@ -1,11 +1,21 @@
+<!--
+################################################################################
+##                                                                            ##
+##   © 2026 ニルナーリ博士とヤクナーリくんのツールキッチン                     ##
+##   見つけて！PixSee  v9.0                                                    ##
+##                                                                            ##
+################################################################################
+-->
 <!DOCTYPE html>
 <html lang="ja">
 <head>
+<!-- ===== H01. head：文字コード・画面・CDN（three r128 と PeerJS 1.5.4 だけ） ===== -->
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,minimum-scale=1,maximum-scale=1,user-scalable=no,viewport-fit=cover">
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="mobile-web-app-capable" content="yes">
 <meta name="format-detection" content="telephone=no">
+<meta name="theme-color" content="#bfe6fa">
 <title>見つけて！PixSee</title>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
 <script src="https://unpkg.com/peerjs@1.5.4/dist/peerjs.min.js"></script>
@@ -14,29 +24,48 @@
 <body data-state="boot" data-mode="solo">
 <div id="app">
   <div id="stage">
+    <!-- ===== H02. 背景：ブロック世界のジオラマ（空・雲・浮かぶブロックの島。ui.js が SVG を入れる） ===== -->
     <div id="bg" aria-hidden="true">
-      <i class="blk b1"></i><i class="blk b2"></i><i class="blk b3"></i>
-      <i class="tw t1"></i><i class="tw t2"></i><i class="tw t3"></i><i class="tw t4"></i><i class="tw t5"></i>
+      <div class="sky"></div>
+      <div class="cloud c1"></div><div class="cloud c2"></div><div class="cloud c3"></div>
+      <div class="isles" id="isles"></div>
     </div>
     <div id="worldbox"></div>
 
-    <!-- 1 Boot -->
+    <!-- ===== H03. 画面1 Boot（教材について・まなびかた・スタートボタン） ===== -->
     <section id="boot" class="screen">
-      <div class="center">
-        <div data-logo="0.95"></div>
-        <div class="touchme"><span class="ring"></span>がめんを さわってね</div>
+      <div class="bootlogo" data-logo="1"></div>
+      <div class="bootcards">
+        <div class="infocard teacher">
+          <div class="ic-head"><i class="ic-dot"></i>教材について</div>
+          <ul>
+            <li>覚えたい言葉や絵の中を探検し、形の特徴に気付いて親しむ。</li>
+            <li>立体的なマップを理解し、地図を見ながら目的地を探す力を養う。</li>
+          </ul>
+        </div>
+        <div class="infocard kids">
+          <div class="ic-head"><i class="ic-dot"></i>まなびかた</div>
+          <ul>
+            <li>「すすむ」で まえへ。がめんを よこに なぞると むきが かわるよ</li>
+            <li>「そら」で ちず ぜんたいを みて、ソナーで たからの ほうこうを たしかめよう</li>
+            <li>ドリルで ブロックを ほって、たからを みつけよう</li>
+            <li>「ジャンプドリル」で ジャンプしながら したへ ほりすすめるよ</li>
+          </ul>
+        </div>
       </div>
+      <button type="button" id="bootbtn" class="btn btn-primary btn-boot" disabled tabindex="-1"><span id="bootbtn-t">じゅんびちゅう...</span></button>
     </section>
 
-    <!-- 2 Title -->
+    <!-- ===== H04. 画面2 タイトル（ロゴ・浮かぶ島のシーカー・記録・最下段の署名と版） ===== -->
     <section id="title" class="screen">
-      <div class="titlelogo" data-logo="0.86"></div>
-      <div class="mascot m-l" data-mascot="#e08524"></div>
-      <div class="mascot m-r" data-mascot="#2f8be0"></div>
+      <div class="titlelogo" data-logo="1"></div>
+      <div class="isle-hero l" id="hero-l"></div>
+      <div class="isle-hero r" id="hero-r"></div>
       <div id="recchip" class="recchip"></div>
+      <div class="footrow"><span class="copy">© 2026 ニルナーリ博士とヤクナーリくんのツールキッチン</span><span class="ver">v9.0</span></div>
     </section>
 
-    <!-- 3 Setting -->
+    <!-- ===== H05. 画面3 設定・選択（あそびかた・だれと・むずかしさ・ちず・つうしん・せってい） ===== -->
     <section id="setting" class="screen" data-sub="how">
       <button type="button" id="back" class="backbtn" tabindex="-1"><i></i><span>もどる</span></button>
       <div id="sethead" class="head">あそびかたを えらんでね</div>
@@ -59,6 +88,15 @@
       </div>
 
       <div class="pane sub-opts">
+        <div class="setcard wide" data-card="palette">
+          <div class="sc-head"><i class="sc-ico" data-ico="palette"></i><span>シーカーの いろ</span></div>
+          <div class="swatches" id="swatches"></div>
+        </div>
+        <div class="setcard" data-card="search">
+          <div class="sc-head"><i class="sc-ico" data-ico="search"></i><span>さがしかた</span></div>
+          <div class="seg"><button type="button" data-set="search" data-val="light" tabindex="-1"><i data-ico="beam"></i>ひかりで さがす</button><button type="button" data-set="search" data-val="sonar" tabindex="-1"><i data-ico="sonar"></i>ソナーだけで さがす</button></div>
+          <div class="sc-hint" id="hint-search"></div>
+        </div>
         <div class="setcard" data-card="swipeRev">
           <div class="sc-head"><i class="sc-ico" data-ico="swipe"></i><span>スワイプの むき</span></div>
           <div class="seg"><button type="button" data-set="swipeRev" data-val="0" tabindex="-1">ふつう</button><button type="button" data-set="swipeRev" data-val="1" tabindex="-1">はんたい</button></div>
@@ -69,22 +107,16 @@
           <div class="seg"><button type="button" data-set="binary" data-val="1" tabindex="-1">する</button><button type="button" data-set="binary" data-val="0" tabindex="-1">しない</button></div>
           <div class="sc-hint" id="hint-binary"></div>
         </div>
-        <div class="setcard wide" data-card="record">
+        <div class="setcard" data-card="record">
           <div class="sc-head"><i class="sc-ico" data-ico="trophy"></i><span>くらべっこの きろく</span></div>
-          <div class="sc-hint" id="hint-record"></div>
           <div class="seg one"><button type="button" id="reset-rec" class="danger" tabindex="-1">きろくを けす</button></div>
+          <div class="sc-hint" id="hint-record"></div>
         </div>
       </div>
 
       <div class="pane sub-choice">
-        <button type="button" class="bigcard" id="c-host" tabindex="-1">
-          <svg viewBox="0 0 64 64"><path d="M32 6 6 30h8v26h36V30h8z" fill="#ffe400" stroke="#2b2118" stroke-width="3.500" stroke-linejoin="round"/><path d="M32 22l3.500 7.500 8 1-6 5.500 1.700 8L32 39.800 24.800 44l1.700-8-6-5.500 8-1z" fill="#d97eb8" stroke="#2b2118" stroke-width="2"/></svg>
-          <span>へやを つくる</span>
-        </button>
-        <button type="button" class="bigcard" id="c-join" tabindex="-1">
-          <svg viewBox="0 0 64 64"><rect x="14" y="8" width="36" height="50" rx="4" fill="#8be6ff" stroke="#2b2118" stroke-width="3.500"/><rect x="20" y="14" width="24" height="38" rx="2" fill="#19c8f5" stroke="#2b2118" stroke-width="2"/><circle cx="39" cy="34" r="3" fill="#ffe400" stroke="#2b2118" stroke-width="1.500"/><path d="M2 34h14m-5-6 6 6-6 6" stroke="#e08524" stroke-width="5.500" fill="none" stroke-linecap="round" stroke-linejoin="round"/></svg>
-          <span>へやに はいる</span>
-        </button>
+        <button type="button" class="bigcard" id="c-host" tabindex="-1"><i class="wpic" data-art="host"></i><span>へやを つくる</span></button>
+        <button type="button" class="bigcard" id="c-join" tabindex="-1"><i class="wpic" data-art="join"></i><span>へやに はいる</span></button>
       </div>
 
       <div class="pane sub-code">
@@ -108,7 +140,7 @@
       </div>
     </section>
 
-    <!-- 4 Play -->
+    <!-- ===== H06. 画面4 プレイ（ソナー・時間とかず・カメラ・操作ボタン・擬音・カウントダウン・獲得宣言） ===== -->
     <section id="play" class="screen">
       <div id="swipe"></div>
       <div id="sonar"><canvas id="sonar-cv" width="288" height="288"></canvas></div>
@@ -118,50 +150,60 @@
       </div>
       <div id="maptag"><b id="pt-title"></b><small id="pt-yomi"></small></div>
       <div id="notice"></div>
-      <div id="pop"></div>
-      <div id="tip"><svg viewBox="0 0 64 32"><path d="M4 16h56M12 8 4 16l8 8M52 8l8 8-8 8" fill="none" stroke="#2b2118" stroke-width="5" stroke-linecap="round" stroke-linejoin="round"/></svg><span>ゆびを よこに うごかすと むきが かわるよ</span></div>
+      <div id="tip"><i data-ico="swipe"></i><span>ゆびを よこに うごかすと むきが かわるよ</span></div>
+      <div class="onozone" id="ono-l"></div>
+      <div class="onozone" id="ono-r"></div>
       <button type="button" id="fwd" class="ctl" data-act="fwd" tabindex="-1"><i data-ico="fwd"></i><span>すすむ</span></button>
       <button type="button" id="b-jump" class="ctl act" data-act="jump" tabindex="-1"><i data-ico="jump"></i><span>ジャンプ</span></button>
       <button type="button" id="b-attack" class="ctl act" data-act="drillAttack" tabindex="-1"><i data-ico="attack"></i><span>ドリル<br>アタック</span></button>
-      <button type="button" id="b-dj" class="ctl act" data-act="drillJump" tabindex="-1"><i data-ico="drilljump"></i><span>ドリル<br>ジャンプ</span></button>
+      <button type="button" id="b-jd" class="ctl act" data-act="jumpDrill" tabindex="-1"><i data-ico="jumpdrill"></i><span>ジャンプ<br>ドリル</span></button>
       <button type="button" id="cam" tabindex="-1"><i id="cam-ico"></i><span id="cam-label">おいかけ</span></button>
+      <div id="count" aria-live="assertive"><b id="count-n"></b></div>
+      <div id="ann" aria-live="assertive">
+        <div class="ann-card">
+          <i class="ann-gem" id="ann-gem"></i>
+          <div class="ann-text"><span class="ann-who" id="ann-who"></span><span class="ann-what" id="ann-what"></span></div>
+        </div>
+      </div>
     </section>
 
-    <!-- 5 Ending -->
+    <!-- ===== H07. 画面5 エンディング（けっか・シーカーの台・きろく・ちずの絵） ===== -->
     <section id="ending" class="screen">
       <div id="confetti"></div>
       <div class="endleft">
         <div class="found" id="end-found">みつけた！</div>
+        <div class="team" id="end-team"></div>
         <div class="who" id="end-who"></div>
         <div class="endrec" id="end-rec"></div>
-        <div class="endtitle" id="end-title"></div>
-        <div class="endyomi" id="end-yomi"></div>
+        <div class="endmap"><span class="endtitle" id="end-title"></span><span class="endyomi" id="end-yomi"></span></div>
       </div>
       <div class="endpic"><img id="end-pic" alt=""></div>
     </section>
 
-    <!-- 6 Quit -->
+    <!-- ===== H08. 画面6 Quit ===== -->
     <section id="quit" class="screen">
-      <div class="center">
-        <div data-logo="0.7"></div>
+      <div class="quitbox">
+        <div class="quitlogo" data-logo="1"></div>
         <div class="bye">おしまい またね！</div>
       </div>
     </section>
 
+    <!-- ===== H09. 進行ボタン・ホームボタン・確認モーダル（ホームとモーダルは固定仕様 §2-1） ===== -->
     <div id="nav"></div>
-    <button type="button" id="home" aria-label="ホーム" tabindex="-1"><svg viewBox="0 0 24 24"><path d="M12 3 1.500 12.500H5V21h5.500v-6h3v6H19v-8.500h3.500z"/></svg></button>
+    <button type="button" id="home" aria-label="ホーム" tabindex="-1">🏠</button>
 
     <div id="modal">
       <div class="mcard">
-        <div class="mtitle" id="m-title">おわりにしますか？</div>
+        <div class="mtitle" id="m-title">しゅうりょうしますか？</div>
         <div class="mbtns">
-          <button type="button" id="m-no" class="nbtn primary" tabindex="-1"><span id="m-no-t">いいえ</span></button>
-          <button type="button" id="m-yes" class="nbtn secondary" tabindex="-1"><span id="m-yes-t">はい</span></button>
+          <button type="button" id="m-no" class="mbtn no" tabindex="-1"><span id="m-no-t">いいえ</span></button>
+          <button type="button" id="m-yes" class="mbtn yes" tabindex="-1"><span id="m-yes-t">はい</span></button>
         </div>
       </div>
     </div>
   </div>
 
+  <!-- ===== H10. 縦持ちの警告 ===== -->
   <div id="portrait">
     <div class="phone"></div>
     <div class="ptext">スマホを よこに してね！</div>

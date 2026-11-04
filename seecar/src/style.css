@@ -1,301 +1,493 @@
-/* 見つけて！PixSee style.css  寸法は #stage（16:9）を基準に cqmin で指定
-   色は山田さんのデザイン画：橙・クリーム・水色と黄色のしましま・ピンクの星・緑の目・黒いふち線 */
-:root{--ink:#2b2118;--orange:#e08524;--orange2:#f5a64a;--cream:#fff4d6;--cream2:#f6dfa8;--cyan:#19c8f5;--cyan2:#8be6ff;--yellow:#ffe400;--pink:#d97eb8;--green:#22dd99;--mute:#7a5a3a}
-*{user-select:none;-webkit-user-select:none;touch-action:none;-webkit-touch-callout:none;-webkit-tap-highlight-color:transparent;box-sizing:border-box}
+/* 見つけて！PixSee v9.0  style.css
+   デザインの方向：「ブロック世界のジオラマ」。明るく澄んだ空に、ブロックでできた小さな世界が浮かぶ。
+   寸法は #stage（16:9）を基準にすべて cqmin。色・角丸・影・余白・動きの速さはデザイントークン（C01）にまとめる。
+   例外：ホームボタンと確認モーダル（C06）は §2-1 の固定仕様どおり。 */
+
+/* ===== C01. デザイントークン ===== */
+:root{
+  /* 色 */
+  --orange:#ff9800; --orange-hi:#ffb547; --orange-lo:#f57c00; --orange-lip:#d96a00; --orange-tint:#fff0d9;
+  --sky:#2a9fd4; --sky-hi:#5cc0ec; --sky-lo:#1a86bd; --sky-lip:#14699a; --sky-tint:#e3f4fc;
+  --cream:#fffaf0; --cream-2:#f7efdf; --cream-lip:#e6dac3; --white:#ffffff;
+  --ink:#2b2f3a; --ink-2:#555c6b; --ink-3:#8a90a0;
+  --gold:#ffd54f; --gold-hi:#ffe48a; --gold-lo:#f5bf1f; --gold-lip:#d39e00;
+  --mint:#3dbb85; --pink:#ef6c8f; --grass:#8fd16a;
+  --sky-top:#9fd8f5; --sky-mid:#cfeefb; --sky-low:#eef9fd; --horizon:#fffaf0;
+  /* 角丸 */
+  --r-xs:1.4cqmin; --r-s:2.2cqmin; --r-m:3.4cqmin; --r-l:5cqmin; --r-xl:7cqmin; --r-pill:50cqmin;
+  /* 影（やわらかい影。輪郭の線は使わない） */
+  --sh-1:0 .3cqmin .8cqmin rgba(43,47,58,.10),0 .1cqmin .2cqmin rgba(43,47,58,.08);
+  --sh-2:0 1cqmin 2.6cqmin rgba(43,47,58,.13),0 .3cqmin .6cqmin rgba(43,47,58,.08);
+  --sh-3:0 2cqmin 5cqmin rgba(43,47,58,.18),0 .6cqmin 1.2cqmin rgba(43,47,58,.10);
+  --lip:1.1cqmin;                     /* ブロックの側面のような「下のふち」の厚み */
+  /* 余白 */
+  --sp-1:1cqmin; --sp-2:2cqmin; --sp-3:3cqmin; --sp-4:4cqmin; --sp-6:6cqmin;
+  --edge:3cqmin;                      /* 画面のふちからの余白 */
+  /* 動き（目で追える速さ。点滅はしない） */
+  --t-press:.12s; --t-fast:.22s; --t-mid:.4s; --t-slow:.8s;
+  --ease:cubic-bezier(.2,.8,.2,1); --ease-pop:cubic-bezier(.34,1.56,.64,1);
+  --float:9s; --drift:90s;
+  /* 文字 */
+  --font:"Hiragino Maru Gothic ProN","BIZ UDPGothic","Yu Gothic",sans-serif;
+  --fs-min:3.4cqmin; --fs-s:3.8cqmin; --fs-m:4.8cqmin; --fs-l:6.4cqmin; --fs-xl:8.4cqmin;
+}
+
+/* ===== C02. 土台（§2-4 の固定の指定を含む） ===== */
+* { user-select:none; -webkit-user-select:none; -webkit-touch-callout:none; }
+*{touch-action:none;-webkit-tap-highlight-color:transparent;box-sizing:border-box}
+html,body{height:100vh;height:100dvh;position:fixed;inset:0;}
 html,body{margin:0;padding:0;background:#000;overflow:hidden;overscroll-behavior:none}
-body{position:fixed;inset:0;height:100vh;height:100dvh;width:100%;
-  font-family:"Hiragino Maru Gothic ProN","Hiragino Kaku Gothic ProN","Yu Gothic UI","Meiryo","Noto Sans CJK JP","Noto Sans JP","IPAGothic",system-ui,sans-serif;font-weight:800;color:var(--ink)}
-#app{position:fixed;inset:0;height:100vh;height:100dvh;background:#000}
+body{width:100%;font-family:var(--font);font-weight:700;color:var(--ink);-webkit-font-smoothing:antialiased}
+#app{position:fixed;inset:0;height:100vh;height:100dvh;background:linear-gradient(180deg,var(--sky-top) 0,var(--sky-top) 50%,var(--horizon) 50%,var(--horizon) 100%)} /* 4:3 の iPad で ステージの上下に出る余白も 空の色に */
 button{font-family:inherit;font-weight:inherit;color:inherit;border:0;padding:0;margin:0;background:none;cursor:pointer;outline:none}
 svg{display:block}
-
 #stage{position:absolute;left:50%;top:50%;transform:translate(-50%,-50%);
   width:min(100vw,177.7778vh);height:min(100vh,56.25vw);
   width:min(100vw,177.7778dvh);height:min(100dvh,56.25vw);
   container-type:size;overflow:hidden;background:var(--cream)}
 
-/* ---------- 背景（クレヨンと紙） ---------- */
-#bg{position:absolute;inset:0;overflow:hidden;
-  background:
-    radial-gradient(ellipse 30% 40% at 8% 88%,rgba(224,133,36,.40),transparent 70%),
-    radial-gradient(ellipse 28% 36% at 95% 85%,rgba(255,228,0,.40),transparent 70%),
-    radial-gradient(ellipse 26% 30% at 70% 98%,rgba(34,221,153,.30),transparent 70%),
-    radial-gradient(ellipse 24% 30% at 4% 12%,rgba(217,126,184,.32),transparent 70%),
-    repeating-linear-gradient(112deg,rgba(255,255,255,0) 0 .9cqmin,rgba(255,255,255,.22) .9cqmin 1.1cqmin),
-    linear-gradient(#a6e7ff 0%,#d4f2ff 38%,#fff4d6 76%,#fbe5b0 100%)}
-#bg::after{content:"";position:absolute;inset:0;opacity:.55;mix-blend-mode:multiply;pointer-events:none;
-  background-image:url("data:image/svg+xml;utf8,%3Csvg xmlns='http://www.w3.org/2000/svg' width='220' height='220'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='.85' numOctaves='2' stitchTiles='stitch'/%3E%3CfeColorMatrix values='0 0 0 0 .55 0 0 0 0 .5 0 0 0 0 .42 0 0 0 .45 0'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E")}
-.blk{position:absolute;display:block;border:.7cqmin solid var(--ink);border-radius:.8cqmin;box-shadow:.8cqmin 1cqmin 0 rgba(43,33,24,.2)}
-.b1{left:-4cqmin;bottom:-4cqmin;width:34cqmin;height:20cqmin;transform:rotate(-8deg);
-  background:repeating-linear-gradient(60deg,#e08524 0 1.2cqmin,#f5a64a 1.2cqmin 2.2cqmin)}
-.b2{right:-5cqmin;bottom:-3cqmin;width:38cqmin;height:22cqmin;transform:rotate(6deg);
-  background:repeating-linear-gradient(-55deg,#19c8f5 0 1.2cqmin,#8be6ff 1.2cqmin 2.2cqmin)}
-.b3{left:58cqmin;bottom:-9cqmin;width:30cqmin;height:16cqmin;transform:rotate(-3deg);
-  background:repeating-linear-gradient(80deg,#ffe400 0 1.2cqmin,#fff08a 1.2cqmin 2.2cqmin)}
-.tw{position:absolute;display:block;width:4cqmin;height:4cqmin;background:var(--pink);
-  clip-path:polygon(50% 0%,61% 35%,98% 35%,68% 57%,79% 91%,50% 70%,21% 91%,32% 57%,2% 35%,39% 35%);animation:twinkle 2.4s ease-in-out infinite}
-.t1{left:6cqmin;top:10cqmin}.t2{right:8cqmin;top:8cqmin;width:3cqmin;height:3cqmin;animation-delay:.5s;background:var(--yellow)}
-.t3{left:24cqmin;top:58cqmin;width:3cqmin;height:3cqmin;animation-delay:1s;background:var(--green)}
-.t4{right:20cqmin;top:52cqmin;animation-delay:1.4s;background:var(--cyan)}.t5{left:70cqmin;top:6cqmin;width:2.4cqmin;height:2.4cqmin;animation-delay:.9s;background:var(--orange2)}
-@keyframes twinkle{0%,100%{transform:scale(1) rotate(0)}50%{transform:scale(1.35) rotate(18deg)}}
+/* ===== C03. 背景：空・雲・浮かぶブロックの島（ゆっくり漂う） ===== */
+#bg{position:absolute;inset:0;overflow:hidden}
+#bg .sky{position:absolute;inset:0;background:
+  radial-gradient(ellipse 60% 55% at 78% 12%,rgba(255,236,190,.85),rgba(255,236,190,0) 70%),
+  radial-gradient(ellipse 70% 40% at 50% 104%,rgba(255,250,240,1),rgba(255,250,240,0) 70%),
+  linear-gradient(180deg,var(--sky-top) 0%,var(--sky-mid) 42%,var(--sky-low) 72%,var(--horizon) 100%)}
+.cloud{position:absolute;border-radius:50%;background:radial-gradient(closest-side,rgba(255,255,255,.95),rgba(255,255,255,0));will-change:transform}
+.cloud.c1{width:70cqmin;height:16cqmin;left:-10cqmin;top:14cqmin;animation:drift var(--drift) linear infinite}
+.cloud.c2{width:54cqmin;height:12cqmin;left:60cqmin;top:4cqmin;opacity:.8;animation:drift calc(var(--drift)*1.3) linear infinite;animation-delay:-40s}
+.cloud.c3{width:80cqmin;height:18cqmin;left:110cqmin;top:30cqmin;opacity:.7;animation:drift calc(var(--drift)*1.1) linear infinite;animation-delay:-70s}
+@keyframes drift{0%{transform:translateX(-30cqmin)}50%{transform:translateX(30cqmin)}100%{transform:translateX(-30cqmin)}}
+.isles{position:absolute;inset:0}
+.isle{position:absolute;display:block;will-change:transform;animation:float var(--float) ease-in-out infinite}
+.isle svg{width:100%;height:auto;overflow:visible}
+@keyframes float{0%,100%{transform:translateY(0)}50%{transform:translateY(-1.8cqmin)}}
+@keyframes floatSm{0%,100%{transform:translateY(0)}50%{transform:translateY(-1cqmin)}}
+/* 画面ごとの背景のちがい：タイトルは島がよく見える。ほかは控えめ */
+body:not([data-state=title]):not([data-state=boot]) .isle.far{opacity:.45}
+body[data-state=setting] .isles,body[data-state=ending] .isles{opacity:.55}
 body[data-state=play] #bg{display:none}
 
-#worldbox{position:absolute;inset:0;background:#a6e7ff;visibility:hidden}
+#worldbox{position:absolute;inset:0;background:var(--sky-mid);visibility:hidden}
 #worldbox canvas{display:block;width:100%;height:100%}
 body[data-state=play] #worldbox{visibility:visible}
 
-/* ---------- 画面の切り替え ---------- */
+/* 動きを減らす設定の端末では 漂う動きを止める */
+@media (prefers-reduced-motion: reduce){.isle,.cloud,.isle-hero,.logo .lg-letters,.nbtn.primary,.btn-boot.ready,.found,.team figure.top .sk,.team figure.top img{animation:none !important}}
+
+/* ===== C04. 画面の切り替え ===== */
 .screen{position:absolute;inset:0;display:none}
 body[data-state=boot] #boot,body[data-state=title] #title,body[data-state=setting] #setting,
 body[data-state=play] #play,body[data-state=ending] #ending,body[data-state=quit] #quit{display:block}
-.center{position:absolute;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:5cqmin}
+.screen{animation:screenIn var(--t-mid) var(--ease)}
+@keyframes screenIn{from{opacity:0}to{opacity:1}}
 
-/* ---------- ロゴ「見つけて！PixSee」 ---------- */
-[data-logo]{width:calc(var(--k,1)*100cqmin);max-width:96%}
-.logo{display:block;width:100%;height:auto;overflow:visible;filter:drop-shadow(0 1cqmin 0 rgba(43,33,24,.22));animation:bob 3s ease-in-out infinite}
-@keyframes bob{0%,100%{transform:translateY(0) rotate(-1deg)}50%{transform:translateY(-1.2cqmin) rotate(1deg)}}
-.titlelogo{position:absolute;left:0;right:0;top:2cqmin;margin:0 auto}
-.mascot{position:absolute;width:36cqmin;filter:drop-shadow(0 1cqmin 0 rgba(43,33,24,.2));animation:bob 2.6s ease-in-out infinite}
-.mascot.m-l{left:6cqmin;top:40cqmin;transform:rotate(-4deg)}
-.mascot.m-r{right:6cqmin;top:40cqmin;transform:scaleX(-1);animation-delay:.6s}
-
-/* ---------- Boot / Quit ---------- */
-.touchme{position:relative;font-size:7.4cqmin;color:var(--ink);background:var(--cream);padding:2cqmin 7cqmin;border-radius:9cqmin;border:.7cqmin solid var(--ink);box-shadow:0 1cqmin 0 rgba(43,33,24,.3);animation:blink 1.4s ease-in-out infinite}
-.touchme .ring{position:absolute;right:-5cqmin;bottom:-6cqmin;width:11cqmin;height:11cqmin;border-radius:50%;background:rgba(217,126,184,.85);border:.8cqmin solid #fff;animation:pulse 1.4s ease-out infinite}
-@keyframes blink{0%,100%{opacity:1}50%{opacity:.6}}
-@keyframes pulse{0%{transform:scale(.6);opacity:1}100%{transform:scale(1.6);opacity:0}}
-.bye{font-size:12cqmin;font-weight:900;color:var(--orange);background:var(--cream);padding:2cqmin 8cqmin;border-radius:10cqmin;border:.8cqmin solid var(--ink);box-shadow:0 1.2cqmin 0 rgba(43,33,24,.3);-webkit-text-stroke:.2cqmin var(--ink)}
-body[data-state=quit] #quit .center{padding-bottom:14cqmin}
-
-/* ---------- 進行ボタン #nav（全画面で同じ大きさ・同じホップ） ---------- */
-#nav{position:absolute;left:0;right:0;bottom:4cqmin;display:flex;flex-wrap:wrap;justify-content:center;align-items:flex-end;gap:5cqmin;z-index:50;pointer-events:none}
-.brk{flex-basis:100%;height:0}
-.nbtn{pointer-events:auto;display:flex;align-items:center;justify-content:center;gap:2cqmin;width:64cqmin;height:16cqmin;border-radius:8cqmin;
-  font-size:6.4cqmin;line-height:1;white-space:nowrap;border:.8cqmin solid #fff;box-shadow:0 0 0 .6cqmin var(--ink),0 1.5cqmin 0 .6cqmin rgba(43,33,24,.35);animation:hop 1.15s ease-in-out infinite}
-.nbtn i{display:block;width:8cqmin;height:8cqmin;flex:none}
+/* ===== C05. ボタンの共通部品（ブロックのような下のふち＋やわらかい影） ===== */
+.btn,.nbtn{pointer-events:auto;display:flex;align-items:center;justify-content:center;gap:2cqmin;white-space:nowrap;line-height:1;
+  border-radius:var(--r-pill);transition:transform var(--t-press) var(--ease),box-shadow var(--t-press) var(--ease),filter var(--t-fast)}
+.btn-primary,.nbtn.primary{color:#fff;background:linear-gradient(180deg,var(--orange-hi) 0%,var(--orange) 48%,var(--orange-lo) 100%);
+  text-shadow:0 .35cqmin 0 rgba(160,70,0,.45);
+  box-shadow:inset 0 .45cqmin 0 rgba(255,255,255,.45),inset 0 -.5cqmin 0 rgba(190,85,0,.25),0 var(--lip) 0 var(--orange-lip),0 calc(var(--lip) + 1.2cqmin) 3cqmin rgba(217,106,0,.35)}
+.btn-secondary,.nbtn.secondary{color:var(--ink);background:linear-gradient(180deg,#fff 0%,var(--cream) 100%);
+  box-shadow:inset 0 .4cqmin 0 #fff,0 var(--lip) 0 var(--cream-lip),0 calc(var(--lip) + 1cqmin) 2.6cqmin rgba(43,47,58,.16)}
+.nbtn i{display:block;width:7cqmin;height:7cqmin;flex:none}
 .nbtn i svg{width:100%;height:100%;fill:currentColor}
-.nbtn.primary{background:linear-gradient(#ffd27a,#f5a64a 45%,#e08524);color:#2b1700}
-.nbtn.secondary{background:linear-gradient(#b9f0ff,#19c8f5);color:var(--ink);animation:none} /* 跳ねるのは次に押す1つ（primary）だけ */
-@keyframes hop{0%,100%{transform:translateY(0)}35%{transform:translateY(-2cqmin)}60%{transform:translateY(0)}}
-.nbtn.down,.ctl.down,.card.down,.bigcard.down,.howcard.down,.lvcard.down,.key.down,.backbtn.down,#home.down,#cam.down,.seg button.down{animation:none;transform:translateY(.7cqmin) scale(.95);filter:brightness(.92)}
+.nbtn.secondary i{color:var(--sky)}
+.nbtn.primary i svg{filter:drop-shadow(0 .35cqmin 0 rgba(160,70,0,.45))}
+.nbtn.down,.btn.down{transform:translateY(calc(var(--lip) * .8))}
+.nbtn.primary.down,.btn-primary.down{box-shadow:inset 0 .45cqmin 0 rgba(255,255,255,.4),0 calc(var(--lip) * .2) 0 var(--orange-lip),0 .6cqmin 1.4cqmin rgba(217,106,0,.3)}
+.nbtn.secondary.down{box-shadow:inset 0 .4cqmin 0 #fff,0 calc(var(--lip) * .2) 0 var(--cream-lip),0 .6cqmin 1.4cqmin rgba(43,47,58,.14)}
+.btn[disabled]{cursor:default;color:var(--ink-2);text-shadow:none;background:linear-gradient(180deg,#f3ede2,#e9e1d1);box-shadow:0 var(--lip) 0 #d8cdb8}
+/* 次に押すボタンは ゆっくり息をするように 少しだけ大きくなる（点滅はしない） */
+.nbtn.primary:not(.down),.btn-boot.ready:not(.down){animation:breathe 2.6s ease-in-out infinite}
+@keyframes breathe{0%,100%{transform:scale(1)}50%{transform:scale(1.035)}}
 
-/* ---------- ホーム（最前面） ---------- */
-#home{position:absolute;z-index:100;top:max(2cqmin,env(safe-area-inset-top));right:max(2.4cqmin,env(safe-area-inset-right));
-  width:12cqmin;height:12cqmin;border-radius:50%;background:#fff;box-shadow:0 0 0 .5cqmin var(--ink),0 1cqmin 0 .5cqmin rgba(43,33,24,.3);border:0;display:flex;align-items:center;justify-content:center}
-#home svg{width:7.4cqmin;height:7.4cqmin;fill:var(--orange);stroke:var(--ink);stroke-width:1.2;stroke-linejoin:round}
+/* 進行ボタン #nav（全画面で同じ大きさ） */
+#nav{position:absolute;left:0;right:0;bottom:6cqmin;display:flex;flex-wrap:wrap;justify-content:center;align-items:flex-end;gap:5cqmin;z-index:50;pointer-events:none}
+.brk{flex-basis:100%;height:0}
+.nbtn{width:60cqmin;height:15cqmin;font-size:6.2cqmin;font-weight:800}
+body[data-state=title] #nav{gap:3.4cqmin;bottom:14cqmin}
+.nbtn.hero{width:80cqmin;height:18cqmin;font-size:8.4cqmin;letter-spacing:.06em;--lip:1.4cqmin}
+.nbtn.hero i{width:8.6cqmin;height:8.6cqmin}
+.nbtn.sub{width:auto;height:11cqmin;padding:0 5cqmin 0 4cqmin;gap:1.8cqmin;font-size:4.6cqmin;--lip:.9cqmin}
+.nbtn.sub i{width:5.6cqmin;height:5.6cqmin}
 
-/* ---------- モーダル ---------- */
-#modal{position:absolute;inset:0;z-index:200;display:none;align-items:center;justify-content:center;background:rgba(43,33,24,.62)}
+/* ===== C06. ホームボタンと確認モーダル（§2-1 固定仕様。独自アレンジなし） ===== */
+#home{position:absolute;z-index:100;
+  top:max(env(safe-area-inset-top) + 1.5cqmin, 3cqmin);
+  right:max(env(safe-area-inset-right) + 1.5cqmin, 2.5cqmin);
+  width:12cqmin;height:12cqmin;
+  background:rgba(255,255,255,0.95);
+  border-radius:50%;
+  border:0.25cqmin solid #333;
+  box-shadow:0 .8cqmin 1.6cqmin rgba(0,0,0,.28);
+  display:flex;align-items:center;justify-content:center;
+  font-size:6.4cqmin;line-height:1;padding:0;
+  font-family:"Apple Color Emoji","Segoe UI Emoji","Noto Color Emoji",var(--font)}
+#home.down{transform:translateY(.4cqmin);box-shadow:0 .3cqmin .8cqmin rgba(0,0,0,.28)}
+#modal{position:absolute;inset:0;z-index:200;display:none;align-items:center;justify-content:center;
+  background: rgba(0,0,0,0.45); backdrop-filter: blur(8px); -webkit-backdrop-filter: blur(8px);}
 #modal.on{display:flex}
-.mcard{background:var(--cream);border-radius:5cqmin;padding:6cqmin 6cqmin 7cqmin;display:flex;flex-direction:column;align-items:center;gap:6cqmin;border:.9cqmin solid var(--ink);box-shadow:0 2cqmin 0 rgba(0,0,0,.25)}
-.mtitle{font-size:7.6cqmin;color:var(--ink);font-weight:900;text-align:center}
-.mbtns{display:flex;gap:5cqmin}
-.mbtns .nbtn{width:50cqmin}
-#m-no{background:linear-gradient(#b8f5d4,#22dd99);color:#053b26}
-#m-yes{animation:none;background:linear-gradient(#e8dcc6,#c4b090);color:var(--ink)}
+.mcard{background:#fff;border-radius:2cqmin;border:0.3cqmin solid #444;box-shadow:0 2cqmin 5cqmin rgba(0,0,0,.35);
+  padding:6cqmin 7cqmin 6.4cqmin;display:flex;flex-direction:column;align-items:center;gap:6cqmin;min-width:96cqmin}
+.mtitle{font-size:7cqmin;font-weight:800;color:#333;text-align:center;line-height:1.3}
+.mbtns{display:flex;gap:6cqmin}
+.mbtn{width:40cqmin;height:15cqmin;border-radius:3cqmin;color:#fff;font-size:6.4cqmin;font-weight:800;display:flex;align-items:center;justify-content:center;
+  text-shadow:0 .3cqmin 0 rgba(0,0,0,.25);transition:transform var(--t-press)}
+.mbtn.yes{background:linear-gradient(145deg,#ff9800,#f57c00);box-shadow:0 1cqmin 0 #e65100}
+.mbtn.no{background:linear-gradient(145deg,#1a6baf,#2a9fd4);box-shadow:0 1cqmin 0 #0d47a1}
+.mbtn.down{transform:translateY(.8cqmin)}
+.mbtn.yes.down{box-shadow:0 .2cqmin 0 #e65100}
+.mbtn.no.down{box-shadow:0 .2cqmin 0 #0d47a1}
+/* モーダルのあいだ：演出（CSS のうごき）もすべて止める */
+body.paused #play *,body.paused #play{animation-play-state:paused !important}
 
-/* ---------- 縦持ち警告 ---------- */
-#portrait{position:fixed;inset:0;z-index:99999;display:none;flex-direction:column;align-items:center;justify-content:center;gap:8vmin;background:var(--ink);color:#fff}
-.phone{width:18vmin;height:30vmin;border:1.6vmin solid #fff;border-radius:3vmin;background:var(--orange);animation:rot 2.4s ease-in-out infinite}
-.ptext{font-size:7.6vmin;font-weight:900;text-align:center;line-height:1.4;padding:0 6vmin}
+/* ===== C07. 縦持ちの警告 ===== */
+#portrait{position:fixed;inset:0;z-index:99999;display:none;flex-direction:column;align-items:center;justify-content:center;gap:8vmin;
+  background:linear-gradient(180deg,var(--sky-top),var(--cream));color:var(--ink);font-family:var(--font)}
+.phone{width:18vmin;height:30vmin;border-radius:3.4vmin;background:linear-gradient(180deg,var(--orange-hi),var(--orange-lo));box-shadow:0 2vmin 4vmin rgba(43,47,58,.25),inset 0 0 0 1.6vmin #fff;animation:rot 2.8s var(--ease) infinite}
+.ptext{font-size:7.6vmin;font-weight:800;text-align:center;line-height:1.4;padding:0 6vmin}
 @keyframes rot{0%,20%{transform:rotate(0)}60%,100%{transform:rotate(-90deg)}}
 @media screen and (orientation: portrait){#portrait{display:flex}}
 
-/* ---------- タイトル ---------- */
-body[data-state=title] #nav{gap:2.6cqmin 3cqmin;padding:0 4cqmin;bottom:3.6cqmin}
-.nbtn.hero{display:grid;grid-template-columns:11cqmin auto;column-gap:2.4cqmin;align-content:center;justify-content:center;
-  width:96cqmin;height:20cqmin;border-radius:10cqmin;font-size:10cqmin;text-align:left;border-width:1cqmin}
-.nbtn.hero i{width:11cqmin;height:11cqmin;align-self:center}
-.nbtn.hero span{align-self:center;line-height:1}
-.nbtn.sub{width:auto;height:12.4cqmin;padding:0 4.4cqmin;gap:1.8cqmin;font-size:4.7cqmin;border-radius:6.4cqmin;border-width:.7cqmin}
-.nbtn.sub i{width:6.2cqmin;height:6.2cqmin}
-.recchip{position:absolute;left:3cqmin;bottom:3cqmin;display:flex;align-items:center;gap:1.4cqmin;background:var(--cream);border:.5cqmin solid var(--ink);box-shadow:0 .7cqmin 0 rgba(43,33,24,.25);border-radius:5cqmin;padding:.6cqmin 2.6cqmin .6cqmin 1.2cqmin;font-size:3.2cqmin;color:var(--ink);white-space:nowrap}
-.recchip b,.endrec b{font-size:3.4cqmin;background:var(--yellow);border-radius:3cqmin;padding:.2cqmin 1.6cqmin;border:.3cqmin solid var(--ink)}
-.rc-ico{display:block;width:5.6cqmin;height:5.6cqmin;flex:none}.rc-ico svg{width:100%;height:100%}
-.rc-n{font-weight:900}
+/* ===== C08. ロゴ「見つけて！PixSee」とマスコット ===== */
+[data-logo]{margin:0 auto}
+.logo{display:block;width:100%;height:auto;overflow:visible}
+.logo .lg-letters{animation:logoFloat 6s ease-in-out infinite;transform-origin:50% 60%}
+@keyframes logoFloat{0%,100%{transform:translateY(0)}50%{transform:translateY(-1.2%)}}
+.mascot svg{width:100%;height:auto;overflow:visible}
 
-/* ---------- Setting ---------- */
-.head{position:absolute;top:3cqmin;left:50%;transform:translateX(-50%);font-size:6.2cqmin;white-space:nowrap;background:linear-gradient(#fff,var(--cream));color:var(--ink);
-  padding:1.2cqmin 7cqmin;border-radius:8cqmin;border:.6cqmin solid var(--ink);box-shadow:0 1cqmin 0 rgba(43,33,24,.28)}
-.backbtn{position:absolute;left:3cqmin;top:3cqmin;height:12cqmin;min-width:25cqmin;padding:0 3cqmin;display:flex;align-items:center;justify-content:center;gap:1.4cqmin;
-  background:#fff;border-radius:6cqmin;font-size:4.8cqmin;color:var(--ink);border:0;box-shadow:0 0 0 .5cqmin var(--ink),0 1cqmin 0 .5cqmin rgba(43,33,24,.3)}
-.backbtn i{width:0;height:0;border-top:2.4cqmin solid transparent;border-bottom:2.4cqmin solid transparent;border-right:3.6cqmin solid var(--orange)}
-.pane{position:absolute;left:6cqmin;right:6cqmin;top:19cqmin;bottom:23cqmin;display:none}
-#setting[data-sub=how] .pane,#setting[data-sub=who] .pane,#setting[data-sub=level] .pane,#setting[data-sub=opts] .pane{bottom:6cqmin}
+/* ===== C09. Boot ===== */
+#boot .bootlogo{position:absolute;left:0;right:0;top:2.4cqmin;width:52cqmin}
+.bootcards{position:absolute;left:5cqmin;right:5cqmin;top:25cqmin;bottom:22cqmin;display:grid;grid-template-columns:.8fr 1.2fr;gap:3cqmin}
+.infocard{background:rgba(255,250,240,.94);border-radius:var(--r-l);box-shadow:var(--sh-2);padding:2.6cqmin 3.4cqmin;display:flex;flex-direction:column;gap:1.6cqmin;min-height:0}
+.ic-head{display:flex;align-items:center;gap:1.6cqmin;font-size:5cqmin;font-weight:800;color:var(--ink);line-height:1.1}
+.ic-dot{display:block;width:3.6cqmin;height:3.6cqmin;border-radius:1cqmin;background:var(--sky);box-shadow:0 .5cqmin 0 var(--sky-lip);transform:rotate(45deg) scale(.86)}
+.infocard.kids .ic-dot{background:var(--orange);box-shadow:0 .5cqmin 0 var(--orange-lip)}
+.infocard ul{margin:0;padding:0;list-style:none;display:flex;flex-direction:column;gap:1.2cqmin}
+.infocard li{position:relative;padding-left:3.4cqmin;font-size:3.7cqmin;line-height:1.45;color:var(--ink);font-weight:700}
+.infocard li::before{content:"";position:absolute;left:.4cqmin;top:1.25cqmin;width:1.5cqmin;height:1.5cqmin;border-radius:.4cqmin;background:var(--gold-lo)}
+.infocard.kids li{word-break:keep-all;overflow-wrap:anywhere}
+.btn-boot{position:absolute;left:50%;bottom:5.4cqmin;transform:translateX(-50%);width:76cqmin;height:13.4cqmin;font-size:6.4cqmin;font-weight:800}
+.btn-boot.down{transform:translateX(-50%) translateY(calc(var(--lip) * .8))}
+.btn-boot.ready:not(.down){animation:breatheX 2.6s ease-in-out infinite}
+@keyframes breatheX{0%,100%{transform:translateX(-50%) scale(1)}50%{transform:translateX(-50%) scale(1.035)}}
+
+/* ===== C10. タイトル ===== */
+.titlelogo{position:absolute;left:0;right:0;top:2.5cqmin;width:104cqmin}
+.isle-hero{position:absolute;width:36cqmin}
+.isle-hero.l{left:5cqmin;top:33cqmin;animation:float 8s ease-in-out infinite}
+.isle-hero.r{right:5cqmin;top:31cqmin;animation:float 9.5s ease-in-out infinite;animation-delay:-3s}
+.isle-hero svg{width:100%;height:auto;overflow:visible}
+.recchip{position:absolute;left:var(--edge);bottom:8.4cqmin;display:flex;align-items:center;gap:1.4cqmin;background:rgba(255,250,240,.92);border-radius:var(--r-pill);box-shadow:var(--sh-1);
+  padding:.9cqmin 3cqmin .9cqmin 1.4cqmin;font-size:var(--fs-min);color:var(--ink);white-space:nowrap}
+.recchip b{font-size:var(--fs-min);font-weight:800;color:var(--orange-lip)}
+.rc-ico{display:block;width:5cqmin;height:5cqmin;flex:none}.rc-ico svg{width:100%;height:100%}
+.rc-n{font-weight:700;color:var(--ink-2)}
+.footrow{position:absolute;left:0;right:0;bottom:1.6cqmin;height:4.4cqmin;pointer-events:none}
+.footrow span{position:absolute;bottom:0;font-size:3.4cqmin;line-height:1.3;color:var(--ink);opacity:.62;white-space:nowrap;font-weight:700}
+.footrow .copy{left:50%;transform:translateX(-50%)}
+.footrow .ver{right:var(--edge)}
+
+/* ===== C11. 設定・選択の共通（見出し・もどる・カード） ===== */
+.head{position:absolute;top:4.6cqmin;left:50%;transform:translateX(-50%);font-size:6.4cqmin;font-weight:800;white-space:nowrap;color:var(--ink);letter-spacing:.04em;
+  text-shadow:0 .4cqmin 0 rgba(255,255,255,.9)}
+.backbtn{position:absolute;left:var(--edge);top:3cqmin;height:12cqmin;padding:0 4cqmin 0 3cqmin;display:flex;align-items:center;justify-content:center;gap:1.6cqmin;
+  border-radius:var(--r-pill);font-size:4.6cqmin;font-weight:800;color:var(--ink);
+  background:linear-gradient(180deg,#fff,var(--cream));box-shadow:inset 0 .4cqmin 0 #fff,0 .9cqmin 0 var(--cream-lip),0 1.8cqmin 2.6cqmin rgba(43,47,58,.14);
+  transition:transform var(--t-press)}
+.backbtn i{width:0;height:0;border-top:2.2cqmin solid transparent;border-bottom:2.2cqmin solid transparent;border-right:3.2cqmin solid var(--orange);border-radius:.4cqmin}
+.backbtn.down{transform:translateY(.7cqmin)}
+.pane{position:absolute;left:6cqmin;right:6cqmin;top:19cqmin;bottom:25cqmin;display:none}
+#setting[data-sub=how] .pane,#setting[data-sub=who] .pane,#setting[data-sub=level] .pane,#setting[data-sub=choice] .pane{bottom:6cqmin}
+#setting[data-sub=opts] .pane{top:17.4cqmin;bottom:3cqmin;left:5cqmin;right:5cqmin}
 #setting[data-sub=how] .sub-how,#setting[data-sub=who] .sub-who,#setting[data-sub=level] .sub-level,
 #setting[data-sub=choice] .sub-choice,#setting[data-sub=code] .sub-code,#setting[data-sub=pick] .sub-pick,
 #setting[data-sub=keypad] .sub-keypad,#setting[data-sub=msg] .sub-msg,#setting[data-sub=error] .sub-msg{display:flex}
 #setting[data-sub=opts] .sub-opts{display:grid}
 
-/* 共通のカード：クリームの面 ＋ 黒いふち線 ＋ ふっくらした影 */
-.howcard,.lvcard,.bigcard,.card,.setcard,.preview,.key{border:0;box-shadow:0 0 0 .6cqmin var(--ink),0 1.4cqmin 0 .6cqmin rgba(43,33,24,.3)}
+/* カード：クリームの面・大きな角丸・下のふち（ブロックの側面）・やわらかい影 */
+.howcard,.lvcard,.bigcard,.card,.key{position:relative;color:var(--ink);background:linear-gradient(180deg,#fff 0%,var(--cream) 100%);
+  box-shadow:inset 0 .4cqmin 0 #fff,0 var(--lip) 0 var(--cream-lip),0 calc(var(--lip) + 1.2cqmin) 3cqmin rgba(43,47,58,.14);
+  transition:transform var(--t-press) var(--ease),box-shadow var(--t-press) var(--ease)}
+.howcard.down,.lvcard.down,.bigcard.down,.card.down,.key.down{transform:translateY(calc(var(--lip) * .8));
+  box-shadow:inset 0 .4cqmin 0 #fff,0 calc(var(--lip) * .2) 0 var(--cream-lip),0 .6cqmin 1.4cqmin rgba(43,47,58,.12)}
+/* えらんだもの：オレンジの輪と 金色のチェック */
+.card.on,.lvcard.on,.swatch.on{box-shadow:inset 0 .4cqmin 0 #fff,0 0 0 .8cqmin var(--orange),0 var(--lip) 0 .8cqmin var(--orange-lip),0 calc(var(--lip) + 1.4cqmin) 3cqmin rgba(217,106,0,.25)}
+.card.on::after,.lvcard.on::after,.swatch.on::after{content:"";position:absolute;right:-1.6cqmin;top:-1.6cqmin;width:6cqmin;height:6cqmin;border-radius:50%;
+  background:var(--gold) url("data:image/svg+xml;utf8,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Cpath d='M5 12.5l4.5 4.5L19 7.5' fill='none' stroke='%232b2f3a' stroke-width='3.4' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E") center/70% no-repeat;
+  box-shadow:0 .5cqmin 0 var(--gold-lip),0 .8cqmin 1.6cqmin rgba(43,47,58,.2);z-index:2}
 
 /* あそびかた */
-.sub-how{align-items:center;justify-content:center;gap:4cqmin}
-.howcard{flex:1;max-width:54cqmin;height:70cqmin;border-radius:5cqmin;background:linear-gradient(#fff,var(--cream));padding:2cqmin 2cqmin 2.4cqmin;
-  display:flex;flex-direction:column;align-items:center;justify-content:space-between;gap:1cqmin;color:var(--ink)}
-.howcard .hpic{display:block;width:100%;height:30cqmin;border-radius:3.4cqmin;background:var(--cyan2);padding:1.4cqmin;border:.5cqmin solid var(--ink)}
-.howcard[data-kind=count] .hpic{background:var(--cream2)}.howcard[data-kind=solo] .hpic{background:#ffd9ee}
+.sub-how{align-items:center;justify-content:center;gap:4.4cqmin}
+.howcard{flex:1;max-width:52cqmin;height:68cqmin;border-radius:var(--r-l);padding:2.4cqmin 2.4cqmin 3cqmin;display:flex;flex-direction:column;align-items:center;justify-content:space-between;gap:1cqmin}
+.howcard .hpic{display:block;width:100%;height:31cqmin;border-radius:var(--r-m);overflow:hidden;background:linear-gradient(180deg,var(--sky-mid),var(--sky-low))}
+.howcard[data-kind=count] .hpic{background:linear-gradient(180deg,#ffe9c2,var(--orange-tint))}
+.howcard[data-kind=solo] .hpic{background:linear-gradient(180deg,#d9f2e6,#f1faf5)}
 .howcard .hpic svg{width:100%;height:100%}
-.howcard b{font-size:4.9cqmin;line-height:1.1;font-weight:900;white-space:nowrap}
-.howcard small{font-size:3.3cqmin;line-height:1.35;color:var(--mute);font-weight:800;text-align:center}
+.howcard b{font-size:5cqmin;line-height:1.1;font-weight:800;white-space:nowrap}
+.howcard small{font-size:3.6cqmin;line-height:1.4;color:var(--ink-2);font-weight:700;text-align:center}
 
-/* だれと？ */
-.sub-who{align-items:center;justify-content:center;gap:9cqmin}
-.bigcard{width:62cqmin;height:56cqmin;border-radius:5cqmin;background:#fff;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:3cqmin;font-size:7.4cqmin;color:var(--ink)}
-.bigcard svg{width:24cqmin;height:24cqmin}
-.sub-who .bigcard{width:74cqmin;font-size:5.8cqmin}
-.sub-who .wpic{display:block;width:60cqmin;height:34cqmin}.sub-who .wpic svg{width:100%;height:100%}
-.sub-who [data-who=cpu]{background:linear-gradient(#fff,var(--cyan2))}.sub-who [data-who=net]{background:linear-gradient(#fff,#ffe9b0)}
-#c-host{background:linear-gradient(#fff,#fff0a8)}#c-join{background:linear-gradient(#fff,var(--cyan2))}
-.sub-choice{align-items:center;justify-content:center;gap:9cqmin}
+/* だれと？・へや */
+.sub-who,.sub-choice{align-items:center;justify-content:center;gap:8cqmin}
+.bigcard{width:70cqmin;height:58cqmin;border-radius:var(--r-l);display:flex;flex-direction:column;align-items:center;justify-content:center;gap:3cqmin;font-size:5.8cqmin;font-weight:800}
+.bigcard .wpic{display:block;width:58cqmin;height:34cqmin;border-radius:var(--r-m);overflow:hidden;background:linear-gradient(180deg,var(--sky-mid),var(--sky-low))}
+.bigcard[data-who=net] .wpic,#c-host .wpic{background:linear-gradient(180deg,#ffe9c2,var(--orange-tint))}
+.bigcard .wpic svg{width:100%;height:100%}
 
 .sub-code{flex-direction:column;align-items:center;justify-content:center;gap:5cqmin}
 .digits{display:flex;gap:3cqmin;justify-content:center}
-.digits b{width:23cqmin;height:30cqmin;border-radius:3cqmin;background:#fff;border:.8cqmin solid var(--orange);box-shadow:0 0 0 .5cqmin var(--ink),0 1cqmin 0 .5cqmin rgba(43,33,24,.25);display:flex;align-items:center;justify-content:center;font-size:21cqmin;line-height:1;color:var(--ink)}
-.digits.grid2{display:grid;grid-template-columns:repeat(2,23cqmin);gap:3cqmin;align-content:center}
-.digits.grid2 b{height:23cqmin;font-size:17cqmin}
-.waiting{font-size:6.4cqmin;background:var(--cream);padding:1.4cqmin 6cqmin;border-radius:8cqmin;border:.5cqmin solid var(--ink)}
-.dots i{font-style:normal;animation:dot 1.2s infinite}.dots i:nth-child(2){animation-delay:.2s}.dots i:nth-child(3){animation-delay:.4s}
-@keyframes dot{0%,100%{opacity:.2}50%{opacity:1}}
+.digits b{width:22cqmin;height:29cqmin;border-radius:var(--r-m);background:linear-gradient(180deg,#fff,var(--cream));box-shadow:inset 0 0 0 .6cqmin var(--orange-tint),0 var(--lip) 0 var(--cream-lip),var(--sh-2);
+  display:flex;align-items:center;justify-content:center;font-size:20cqmin;line-height:1;color:var(--ink);font-weight:800;font-variant-numeric:tabular-nums}
+.digits.grid2{display:grid;grid-template-columns:repeat(2,22cqmin);gap:3cqmin;align-content:center}
+.digits.grid2 b{height:22cqmin;font-size:16cqmin}
+.waiting{font-size:5.6cqmin;color:var(--ink);background:rgba(255,250,240,.9);padding:1.6cqmin 6cqmin;border-radius:var(--r-pill);box-shadow:var(--sh-1)}
+.dots i{font-style:normal;animation:dot 1.6s ease-in-out infinite}.dots i:nth-child(2){animation-delay:.25s}.dots i:nth-child(3){animation-delay:.5s}
+@keyframes dot{0%,100%{opacity:.25}50%{opacity:1}}
 
-/* ちずえらび：よじじゅくご／イラスト */
+/* ちずえらび */
 .sub-pick{gap:3.4cqmin;align-items:stretch}
-.card{position:relative;border-radius:4cqmin;background:#fff;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:.8cqmin;overflow:hidden;color:var(--ink);text-align:center;padding:0 .4cqmin}
-.card .kan{font-size:8.4cqmin;line-height:1.1;font-weight:900;letter-spacing:.04em;color:var(--ink)}
-.card .yomi{font-size:2.2cqmin;letter-spacing:-.02em;white-space:nowrap;color:var(--mute)}
-.card.on{background:linear-gradient(#fff9c4,var(--yellow));box-shadow:0 0 0 .6cqmin var(--ink),0 0 0 1.5cqmin var(--orange),0 1.4cqmin 0 1.5cqmin rgba(43,33,24,.3)}
-.card input[type=file]{position:absolute;inset:0;width:100%;height:100%;opacity:0;cursor:pointer;font-size:0}
-.preview{flex:1;border-radius:4cqmin;background:rgba(255,255,255,.9);display:flex;flex-direction:column;align-items:center;justify-content:center;gap:1cqmin;padding:1.6cqmin;min-width:0;overflow:hidden}
-.preview img{max-width:100%;max-height:30cqmin;object-fit:contain;border-radius:1.6cqmin;border:.6cqmin solid #fff;box-shadow:0 .8cqmin 0 rgba(43,33,24,.25);background:#fff}
-.preview .pt{font-size:5.8cqmin;line-height:1.1;color:var(--ink);font-weight:900}
-.preview .py{font-size:3.2cqmin;color:var(--mute)}
-.preview .hint{font-size:4.6cqmin;color:var(--mute);text-align:center;line-height:1.4}
-.spin{width:10cqmin;height:10cqmin;border-radius:50%;border:1.4cqmin solid #f1e2bf;border-top-color:var(--orange);animation:spin .9s linear infinite}
-@keyframes spin{to{transform:rotate(360deg)}}
-.maps{flex:3;display:flex;flex-direction:column;gap:1.6cqmin;min-width:0}
-.grp{flex:1;display:flex;flex-direction:column;gap:.8cqmin;min-height:0}
-.gl{font-size:3.8cqmin;line-height:1;color:var(--ink);align-self:flex-start;background:var(--cream);border-radius:3cqmin;padding:.7cqmin 2.6cqmin;border:.4cqmin solid var(--ink)}
-.grp.yoji .gl{background:var(--ink);color:#fff}.grp.illust .gl{background:var(--orange);color:#fff}
-.grp .row{flex:1;display:grid;grid-template-columns:repeat(var(--n,4),1fr);gap:1.8cqmin;min-height:0;padding:0 .8cqmin 1.2cqmin}
+.maps{flex:3.4;display:flex;flex-direction:column;gap:2cqmin;min-width:0}
+.grp{flex:1;display:flex;flex-direction:column;gap:1.2cqmin;min-height:0}
+.gl{display:flex;align-items:center;gap:1.2cqmin;font-size:var(--fs-s);line-height:1;font-weight:800;color:var(--ink);align-self:flex-start;padding:.2cqmin 0}
+.gl::before{content:"";width:2.8cqmin;height:2.8cqmin;border-radius:.8cqmin;background:var(--ink);transform:rotate(45deg) scale(.8)}
+.grp.illust .gl::before{background:var(--orange)}
+.grp .row{flex:1;display:grid;grid-template-columns:repeat(var(--n,4),minmax(0,1fr));gap:2cqmin;min-height:0;padding:0 .4cqmin 1.4cqmin}
+.card{border-radius:var(--r-m);display:flex;flex-direction:column;align-items:center;justify-content:center;gap:.8cqmin;overflow:visible;text-align:center;padding:0 .4cqmin;--lip:.9cqmin}
+.card .kan{font-size:5cqmin;line-height:1.1;font-weight:800;color:var(--ink);white-space:nowrap}
+.card .yomi{font-size:var(--fs-min);line-height:1.1;white-space:nowrap;color:var(--ink-2);letter-spacing:-.08em;transform:scaleX(.84)}
 .card .ic{display:block;width:9cqmin;height:9cqmin}.card .ic svg,.card .ic img{width:100%;height:100%;object-fit:contain;display:block}
-.card.illust{background:linear-gradient(#fff,#fffdf3)}
-.card.yoji .kan{font-size:5.2cqmin;letter-spacing:0;white-space:nowrap}
-.card.illust .kan{font-size:4.8cqmin;white-space:nowrap}
-.maps.dense .card.yoji .kan{font-size:4.3cqmin}.maps.dense .card.illust .kan{font-size:3.8cqmin}.maps.dense .card .ic{width:8cqmin;height:8cqmin}
-.card.file{flex:none;height:11.6cqmin;flex-direction:row;gap:1.6cqmin;border-radius:5.8cqmin;background:linear-gradient(#fff,var(--cyan2));padding:0 2cqmin;margin:0 .8cqmin}
+.card.illust .kan{font-size:4.6cqmin}
+.maps.dense .card.yoji .kan{font-size:4.4cqmin}.maps.dense .card.illust .kan{font-size:3.8cqmin}.maps.dense .card .ic{width:7.6cqmin;height:7.6cqmin}
+.card.file{flex:none;height:11cqmin;flex-direction:row;gap:1.8cqmin;border-radius:var(--r-pill);padding:0 3cqmin;margin:0 .4cqmin;background:linear-gradient(180deg,#fff,var(--sky-tint))}
 .card.file .ic{width:6.4cqmin;height:6.4cqmin}
-.card.file .kan{width:auto;font-size:4.6cqmin;color:var(--ink);white-space:nowrap}
-.card.file .bw{font-size:3cqmin;background:#222;color:#fff;border-radius:2cqmin;padding:.3cqmin 1.4cqmin}
+.card.file .kan{font-size:4.6cqmin}
+.card.file .bw{font-size:var(--fs-min);background:var(--ink);color:#fff;border-radius:var(--r-pill);padding:.4cqmin 1.8cqmin}
+.card input[type=file]{position:absolute;inset:0;width:100%;height:100%;opacity:0;cursor:pointer;font-size:0}
+.preview{flex:1;border-radius:var(--r-l);background:rgba(255,250,240,.94);box-shadow:var(--sh-2);display:flex;flex-direction:column;align-items:center;justify-content:center;gap:1cqmin;padding:1.6cqmin;min-width:0;overflow:hidden}
+.preview img.mapimg{max-width:100%;max-height:22cqmin;object-fit:contain;border-radius:var(--r-s);background:#fff;box-shadow:var(--sh-1)}
+.preview .pt{font-size:5.6cqmin;line-height:1.1;color:var(--ink);font-weight:800}
+.preview .py{font-size:var(--fs-s);color:var(--ink-2)}
+.preview .hint{font-size:4.6cqmin;color:var(--ink-2);text-align:center;line-height:1.45}
+.preview .crew{display:flex;gap:2.4cqmin;margin-top:.2cqmin;padding-top:1cqmin;border-top:.3cqmin dashed var(--cream-lip)}
+.crew figure{margin:0;display:flex;flex-direction:column;align-items:center;gap:.4cqmin}
+.crew img,.crew .sk{width:11cqmin;height:8.6cqmin;object-fit:contain;display:block}
+.crew .sk svg{width:100%;height:100%}
+.crew figcaption{font-size:var(--fs-min);color:var(--ink-2);white-space:nowrap}
+.spin{width:10cqmin;height:10cqmin;border-radius:50%;border:1.3cqmin solid var(--orange-tint);border-top-color:var(--orange);animation:spin 1.1s linear infinite}
+@keyframes spin{to{transform:rotate(360deg)}}
 
+/* つうしん：ばんごうの キー */
 .sub-keypad{gap:8cqmin;align-items:center;justify-content:center}
-.keypad{display:grid;grid-template-columns:repeat(3,18cqmin);grid-auto-rows:13.4cqmin;gap:1.8cqmin}
-.key{border-radius:3cqmin;background:#fff;font-size:8cqmin;color:var(--ink);font-weight:900;display:flex;align-items:center;justify-content:center}
-.key.del{background:linear-gradient(#ffd0e6,var(--pink));font-size:4.8cqmin}
+.keypad{display:grid;grid-template-columns:repeat(3,18cqmin);grid-auto-rows:13cqmin;gap:2cqmin}
+.key{border-radius:var(--r-m);font-size:7.6cqmin;font-weight:800;display:flex;align-items:center;justify-content:center;--lip:.9cqmin}
+.key.del{background:linear-gradient(180deg,#fff,#fde3e9);font-size:4.6cqmin;color:#b83a5c}
 .key.nul{visibility:hidden}
 .sub-msg{flex-direction:column;align-items:center;justify-content:center;gap:5cqmin}
-.msgtext{font-size:6.6cqmin;line-height:1.5;text-align:center;background:var(--cream);padding:2.4cqmin 7cqmin;border-radius:6cqmin;max-width:150cqmin;border:.5cqmin solid var(--ink)}
+.msgtext{font-size:6cqmin;line-height:1.5;text-align:center;background:rgba(255,250,240,.94);padding:2.6cqmin 7cqmin;border-radius:var(--r-l);max-width:150cqmin;box-shadow:var(--sh-2)}
 .msgface svg{width:20cqmin;height:20cqmin}
 
-/* ---- 難しさえらび ---- */
+/* むずかしさ */
 .sub-level{align-items:center;justify-content:center;gap:5cqmin}
-.lvcard{flex:1;max-width:50cqmin;height:68cqmin;border-radius:5cqmin;background:linear-gradient(#fff,var(--cream));display:flex;flex-direction:column;align-items:center;justify-content:center;gap:1.2cqmin;color:var(--ink)}
-.lvcard .lvpic{display:block;width:26cqmin;height:26cqmin;border-radius:50%;background:var(--cream2);border:.5cqmin solid var(--ink);padding:2.4cqmin}
+.lvcard{flex:1;max-width:48cqmin;height:66cqmin;border-radius:var(--r-l);display:flex;flex-direction:column;align-items:center;justify-content:center;gap:1.4cqmin}
+.lvcard .lvpic{display:block;width:25cqmin;height:25cqmin;border-radius:var(--r-l);background:linear-gradient(180deg,var(--sky-mid),var(--sky-low));padding:2.6cqmin;transform:rotate(-3deg)}
+.lvcard[data-level=normal] .lvpic{background:linear-gradient(180deg,#ffe9c2,var(--orange-tint));transform:rotate(2deg)}
+.lvcard[data-level=hard] .lvpic{background:linear-gradient(180deg,#ffd9e2,#fff0f3)}
 .lvcard .lvpic svg{width:100%;height:100%}
-.lvcard b{font-size:8cqmin;line-height:1.1;font-weight:900}
-.lvcard small{font-size:3.4cqmin;color:var(--mute);font-weight:800}
-.lvcard em{font-style:normal;font-size:3.3cqmin;line-height:1.3;background:#fff;border-radius:3cqmin;padding:.6cqmin 2.4cqmin;margin-top:.6cqmin;color:var(--ink);text-align:center;border:.3cqmin solid #e4d3ad;min-height:9.2cqmin;display:flex;align-items:center}
-.lvcard.on{background:linear-gradient(#fff9c4,var(--yellow));box-shadow:0 0 0 .6cqmin var(--ink),0 0 0 1.5cqmin var(--orange),0 1.4cqmin 0 1.5cqmin rgba(43,33,24,.3)}
+.lvcard b{font-size:7.4cqmin;line-height:1.1;font-weight:800}
+.lvcard small{font-size:var(--fs-s);color:var(--ink-2)}
+.lvcard em{font-style:normal;font-size:var(--fs-min);line-height:1.4;background:var(--cream-2);border-radius:var(--r-s);padding:.8cqmin 2.4cqmin;margin-top:.6cqmin;color:var(--ink-2);text-align:center;min-height:10cqmin;display:flex;align-items:center}
 
-/* ---- せってい ---- */
-.sub-opts{grid-template-columns:1fr 1fr;grid-template-rows:1fr 1fr;gap:4.4cqmin}
-.setcard{border-radius:4.6cqmin;background:linear-gradient(#fff,var(--cream));padding:2.4cqmin 3.4cqmin;display:flex;flex-direction:column;justify-content:space-between;gap:1.2cqmin;min-height:0;color:var(--ink)}
-.setcard.wide{grid-column:1/3;flex-direction:row;align-items:center;gap:3cqmin}
-.setcard.wide .sc-head{flex:none}.setcard.wide .sc-hint{flex:1;font-size:3.6cqmin;white-space:normal;line-height:1.3}
-.setcard.wide .seg{flex:none;width:48cqmin}
-.sc-head{display:flex;align-items:center;gap:2cqmin;font-size:5.2cqmin;line-height:1.1;font-weight:900;white-space:nowrap}
-.sc-ico{display:block;width:8.4cqmin;height:8.4cqmin;flex:none}.sc-ico svg{width:100%;height:100%}
-.seg{display:flex;gap:2cqmin}
-.seg button{flex:1;height:11.6cqmin;border-radius:6cqmin;background:#fff;border:.6cqmin solid #d9c8a0;box-shadow:0 .8cqmin 0 rgba(43,33,24,.2);font-size:4.8cqmin;color:var(--mute);display:flex;align-items:center;justify-content:center;gap:1cqmin}
-.seg button.on{background:linear-gradient(#ffd27a,var(--orange2));border-color:var(--ink);color:#2b1700;box-shadow:0 .8cqmin 0 rgba(43,33,24,.35)}
-.seg button.on::before{content:"";width:2.2cqmin;height:3.8cqmin;border:solid var(--ink);border-width:0 .8cqmin .8cqmin 0;transform:rotate(45deg) translate(-.3cqmin,-.5cqmin);margin-right:.8cqmin}
-.seg button.danger{background:linear-gradient(#ffd0e6,var(--pink));border-color:var(--ink);color:var(--ink)}
-.sc-hint{font-size:3.3cqmin;color:var(--mute);line-height:1.2;min-height:3.6cqmin;white-space:nowrap}
+/* せってい */
+.sub-opts{grid-template-columns:1.1fr 1fr .84fr;grid-template-rows:auto 1fr 1fr;gap:2.4cqmin}
+.setcard{border-radius:var(--r-l);background:rgba(255,250,240,.96);box-shadow:var(--sh-2);padding:1.8cqmin 2.6cqmin;display:flex;flex-direction:column;justify-content:center;gap:1.2cqmin;min-height:0;min-width:0;color:var(--ink)}
+.setcard.wide{grid-column:1/4}
+.setcard[data-card=search]{grid-column:1;grid-row:2/4}
+.setcard[data-card=search] .seg{flex-direction:column;flex:1}
+.setcard[data-card=search] .seg button{height:auto;flex:1;font-size:4.4cqmin;justify-content:flex-start;padding:0 2.6cqmin;gap:2cqmin}
+.setcard[data-card=search] .seg button i{display:block;width:8cqmin;height:8cqmin;flex:none}
+.setcard[data-card=search] .seg button i svg{width:100%;height:100%}
+.setcard[data-card=swipeRev]{grid-column:2;grid-row:2}
+.setcard[data-card=binary]{grid-column:2;grid-row:3}
+.setcard[data-card=record]{grid-column:3;grid-row:2/4;justify-content:space-between}
+.setcard[data-card=record] .sc-head{white-space:normal;align-items:flex-start;word-break:keep-all}
+.setcard[data-card=record] .sc-hint{white-space:normal;font-size:var(--fs-s);line-height:1.4;word-break:keep-all}
+.setcard[data-card=search] .sc-hint{white-space:normal;word-break:keep-all}
+.setcard[data-card=record] .seg button{height:11cqmin}
+.sc-head{display:flex;align-items:center;gap:1.4cqmin;font-size:4.2cqmin;line-height:1.1;font-weight:800;white-space:nowrap}
+.sc-ico{display:block;width:6cqmin;height:6cqmin;flex:none}.sc-ico svg{width:100%;height:100%}
+.seg{display:flex;gap:1.8cqmin}
+.seg button{position:relative;flex:1;height:9cqmin;border-radius:var(--r-m);background:linear-gradient(180deg,#fff,var(--cream));font-size:4.4cqmin;font-weight:800;color:var(--ink-2);
+  display:flex;align-items:center;justify-content:center;gap:1cqmin;white-space:nowrap;
+  box-shadow:inset 0 .4cqmin 0 #fff,0 .8cqmin 0 var(--cream-lip),0 1.4cqmin 2cqmin rgba(43,47,58,.10);transition:transform var(--t-press)}
+.seg button.on{color:#fff;background:linear-gradient(180deg,var(--sky-hi),var(--sky));text-shadow:0 .3cqmin 0 rgba(10,70,110,.4);
+  box-shadow:inset 0 .4cqmin 0 rgba(255,255,255,.35),0 .8cqmin 0 var(--sky-lip),0 1.4cqmin 2cqmin rgba(26,134,189,.3)}
+.seg button.on::before{content:"";flex:none;width:1.8cqmin;height:3.2cqmin;border:solid #fff;border-width:0 .7cqmin .7cqmin 0;transform:rotate(45deg) translate(-.3cqmin,-.4cqmin);margin-right:.6cqmin}
+.setcard[data-card=search] .seg button.on::before{display:none}
+.seg button.down{transform:translateY(.6cqmin)}
+.seg button.danger{color:#b83a5c;background:linear-gradient(180deg,#fff,#fde3e9);box-shadow:inset 0 .4cqmin 0 #fff,0 .8cqmin 0 #efc2cf,0 1.4cqmin 2cqmin rgba(184,58,92,.12)}
+.sc-hint{font-size:var(--fs-min);color:var(--ink-2);line-height:1.25;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;flex:none}
+/* シーカーの いろ：10このプレビュー */
+.swatches{display:grid;grid-template-columns:repeat(10,1fr);gap:1.6cqmin}
+.swatch{position:relative;border-radius:var(--r-m);background:linear-gradient(180deg,#fff,var(--cream));display:flex;flex-direction:column;align-items:center;justify-content:flex-end;gap:.2cqmin;padding:.4cqmin .2cqmin .8cqmin;height:16cqmin;--lip:.8cqmin;
+  box-shadow:inset 0 .4cqmin 0 #fff,0 var(--lip) 0 var(--cream-lip),0 1.6cqmin 2cqmin rgba(43,47,58,.10);transition:transform var(--t-press)}
+.swatch.down{transform:translateY(.6cqmin)}
+.swatch img,.swatch .sk{width:100%;height:10.4cqmin;object-fit:contain;display:block}
+.swatch .sk svg{width:100%;height:100%}
+.swatch span{font-size:var(--fs-min);line-height:1.1;color:var(--ink);white-space:nowrap;letter-spacing:-.04em}
 
-/* ---------- Play ---------- */
+.msgtext,.preview .hint,.who span,.found,.howcard small,.waiting{word-break:keep-all;overflow-wrap:anywhere}
+
+/* ===== C12. プレイ：ソナー・時間とかず・ちずの名前・カメラ ===== */
 #play{pointer-events:none}
 #play>*{pointer-events:auto}
 #swipe{position:absolute;inset:0;background:transparent}
-#sonar,#hud,#maptag,#notice,#pop,#tip{pointer-events:none}
-#sonar{position:absolute;left:max(2cqmin,env(safe-area-inset-left));top:max(2.6cqmin,env(safe-area-inset-top));width:30cqmin;height:30cqmin;filter:drop-shadow(0 .8cqmin 0 rgba(43,33,24,.3))}
+#sonar,#hud,#maptag,#notice,#tip,.onozone,#count,#ann{pointer-events:none}
+/* 配置（cqmin。ステージ 177.78×100）：重ならないことは test/e2e4.js で数値を確かめる
+   ホーム 右上 / カメラ その下 / ソナー 左上 / 時間とかず 上中央 / ちずの名前 ソナーの下
+   擬音 左の帯（ソナーの下）と 右の帯（カメラの下） / カウントダウン 中央の上 / 獲得宣言 中央の下 / 操作ボタン 下 */
+#sonar{position:absolute;left:max(env(safe-area-inset-left),2.5cqmin);top:3cqmin;width:30cqmin;height:30cqmin;border-radius:50%;
+  box-shadow:0 1cqmin 2.4cqmin rgba(20,40,60,.35)}
 #sonar canvas{display:block;width:100%;height:100%}
-#hud{position:absolute;left:50%;top:2cqmin;transform:translateX(-50%);display:none;flex-direction:column;align-items:center;gap:1cqmin}
-body[data-mode=count] #hud{display:flex}
-#timer{display:flex;align-items:center;gap:1.6cqmin;background:var(--cream);border:.6cqmin solid var(--ink);border-radius:6cqmin;padding:.4cqmin 4cqmin .4cqmin 1.8cqmin;box-shadow:0 .8cqmin 0 rgba(43,33,24,.3)}
-#timer i{display:block;width:7cqmin;height:7cqmin}#timer i svg{width:100%;height:100%}
-#timer b{font-size:8.4cqmin;line-height:1.1;font-weight:900;font-variant-numeric:tabular-nums;color:var(--ink)}
-#timer.low b{color:#d8321a}
-#scorebar{display:flex;gap:1.6cqmin}
-.sb{display:flex;align-items:center;gap:1cqmin;font-size:4.2cqmin;line-height:1;background:#fff;border:.5cqmin solid var(--ink);border-radius:5cqmin;padding:.7cqmin 2.4cqmin .7cqmin 1.2cqmin;box-shadow:0 .6cqmin 0 rgba(43,33,24,.25)}
-.sb i{display:block;width:5cqmin;height:5cqmin}.sb i svg{width:100%;height:100%}
-.sb b{font-size:5.4cqmin;font-variant-numeric:tabular-nums}
-.sb.me{background:#ffe3b8}.sb.op{background:#d6f3ff}
-#maptag{position:absolute;bottom:2cqmin;left:50%;transform:translateX(-50%);display:flex;align-items:baseline;gap:1.4cqmin;background:rgba(255,244,214,.88);border-radius:4cqmin;padding:.4cqmin 3cqmin;border:.4cqmin solid var(--ink);white-space:nowrap;transition:opacity .4s}
-#maptag b{font-size:3.8cqmin;color:var(--ink);font-weight:900}#maptag small{font-size:2.4cqmin;color:var(--mute)}
-body.camtop #maptag{opacity:0}
-#notice{position:absolute;top:26cqmin;left:50%;transform:translateX(-50%);display:none;font-size:3.6cqmin;background:#fff5d6;color:#7a3b00;border:.5cqmin solid var(--orange);border-radius:4cqmin;padding:.7cqmin 3cqmin;white-space:nowrap;transition:all .5s}
-#notice.on{display:block;animation:pop3 .35s ease-out}
-#notice.big{top:34cqmin;font-size:6.4cqmin;font-weight:900;padding:2cqmin 5cqmin;border-width:.8cqmin;border-radius:6cqmin;box-shadow:0 1cqmin 0 rgba(122,59,0,.25);text-align:center;line-height:1.35;white-space:normal;width:max-content;max-width:84cqmin}
-@keyframes pop3{0%{opacity:0;margin-top:2cqmin}100%{opacity:1;margin-top:0}}
-#pop{position:absolute;left:50%;top:40cqmin;display:none;font-size:11cqmin;font-weight:900;white-space:nowrap;color:#fff;-webkit-text-stroke:1.4cqmin var(--ink);paint-order:stroke fill;text-shadow:0 1.2cqmin 0 rgba(43,33,24,.4)}
-#pop.mine{color:var(--yellow)}
-#pop.on{display:block;animation:pop4 1.4s ease-out forwards}
-@keyframes pop4{0%{transform:translate(-50%,-50%) scale(.3);opacity:0}15%{transform:translate(-50%,-50%) scale(1.2);opacity:1}30%{transform:translate(-50%,-50%) scale(1)}80%{transform:translate(-50%,-60%) scale(1);opacity:1}100%{transform:translate(-50%,-80%) scale(1);opacity:0}}
-
-/* 操作ボタン：左下に大きい「すすむ」。右下に「ジャンプ」「ドリルアタック」「ドリルジャンプ」 */
-.ctl{position:absolute;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:.4cqmin;color:var(--ink);border:.9cqmin solid #fff;box-shadow:0 0 0 .6cqmin var(--ink),0 1.4cqmin 0 .6cqmin rgba(43,33,24,.4);line-height:1.05}
-.ctl i{display:block;flex:none}.ctl i svg{width:100%;height:100%}
-.ctl span{font-weight:900;text-align:center}
-#fwd{left:max(3cqmin,env(safe-area-inset-left));bottom:3.6cqmin;width:36cqmin;height:36cqmin;border-radius:50%;background:radial-gradient(circle at 35% 28%,#ffd88a,var(--orange2) 45%,var(--orange))}
-#fwd i{width:15cqmin;height:17cqmin}#fwd span{font-size:7.4cqmin;color:#fff;-webkit-text-stroke:1.1cqmin var(--ink);paint-order:stroke fill}
-.ctl.act{width:26cqmin;height:26cqmin;border-radius:5.6cqmin}
-.ctl.act i{width:12.4cqmin;height:12.4cqmin}.ctl.act span{font-size:4cqmin}
-#b-jump{right:max(3cqmin,env(safe-area-inset-right));bottom:3.6cqmin;background:linear-gradient(#fff6a8,var(--yellow))}
-#b-attack{right:calc(max(3cqmin,env(safe-area-inset-right)) + 28.6cqmin);bottom:3.6cqmin;background:linear-gradient(#d7f6ff,var(--cyan))}
-#b-dj{right:calc(max(3cqmin,env(safe-area-inset-right)) + 14.3cqmin);bottom:32.2cqmin;background:linear-gradient(#ffd9ee,var(--pink))}
-.ctl.down{filter:brightness(1.08) saturate(1.1);transform:translateY(.8cqmin) scale(.95);animation:none}
-#fwd.down{background:radial-gradient(circle at 35% 28%,#fff0c0,#ffc067 45%,#f09a2e)}
-#cam{position:absolute;right:max(2.4cqmin,env(safe-area-inset-right));top:calc(max(2cqmin,env(safe-area-inset-top)) + 14.4cqmin);width:15cqmin;height:14cqmin;border-radius:4cqmin;background:rgba(255,255,255,.94);border:0;box-shadow:0 0 0 .5cqmin var(--ink),0 .9cqmin 0 .5cqmin rgba(43,33,24,.3);display:flex;flex-direction:column;align-items:center;justify-content:center;gap:.2cqmin;color:var(--ink)}
-#cam i{display:block;width:8cqmin;height:7.4cqmin;flex:none}
+#hud{position:absolute;left:50%;top:2.5cqmin;transform:translateX(-50%);display:flex;flex-direction:column;align-items:center;gap:1.2cqmin}
+#timer{display:flex;align-items:center;gap:1.4cqmin;background:rgba(255,250,240,.95);border-radius:var(--r-pill);padding:.6cqmin 4cqmin .6cqmin 2cqmin;box-shadow:var(--sh-2)}
+#timer i{display:block;width:6.4cqmin;height:6.4cqmin}#timer i svg{width:100%;height:100%}
+#timer b{font-size:7.4cqmin;line-height:1.1;font-weight:800;font-variant-numeric:tabular-nums;color:var(--ink);min-width:17cqmin;text-align:center}
+#timer.low b{color:#d84315}
+#scorebar{display:none;gap:1.6cqmin}
+body[data-mode=count] #scorebar{display:flex}
+.sb{display:flex;align-items:center;gap:1cqmin;font-size:4.2cqmin;line-height:1;background:rgba(255,250,240,.95);border-radius:var(--r-pill);padding:.8cqmin 2.6cqmin .8cqmin 1.2cqmin;box-shadow:var(--sh-2);white-space:nowrap}
+.sb i{display:block;width:4.8cqmin;height:4.8cqmin}.sb i svg{width:100%;height:100%}
+.sb b{font-size:5.4cqmin;font-variant-numeric:tabular-nums;color:var(--ink)}
+.sb.me{box-shadow:inset 0 0 0 .5cqmin var(--orange),var(--sh-2)}.sb.op{box-shadow:inset 0 0 0 .5cqmin var(--sky),var(--sh-2)}
+#maptag{position:absolute;left:max(env(safe-area-inset-left),2.5cqmin);top:35cqmin;max-width:42cqmin;display:flex;align-items:baseline;gap:1.2cqmin;background:rgba(255,250,240,.86);border-radius:var(--r-pill);padding:.5cqmin 2.6cqmin;box-shadow:var(--sh-1);white-space:nowrap;overflow:hidden;transition:opacity var(--t-mid)}
+#maptag b{font-size:3.8cqmin;color:var(--ink);font-weight:800}#maptag small{font-size:var(--fs-min);color:var(--ink-2)}
+#maptag:empty,#maptag.none{display:none}
+#cam{position:absolute;right:max(env(safe-area-inset-right) + 1.5cqmin,2.5cqmin);top:18cqmin;width:14cqmin;height:13cqmin;border-radius:var(--r-m);
+  background:rgba(255,250,240,.95);box-shadow:0 .7cqmin 0 var(--cream-lip),var(--sh-2);display:flex;flex-direction:column;align-items:center;justify-content:center;gap:.3cqmin;color:var(--ink);transition:transform var(--t-press)}
+#cam.down{transform:translateY(.6cqmin)}
+#cam i{display:block;width:8cqmin;height:6.6cqmin;flex:none}
 #cam i svg{width:100%;height:100%}
-#cam span#cam-label{font-size:3cqmin;line-height:1;font-weight:900;white-space:nowrap}
-#tip{position:absolute;left:50%;top:34cqmin;transform:translateX(-50%);display:none;align-items:center;gap:2cqmin;background:rgba(255,255,255,.94);border:.5cqmin solid var(--ink);border-radius:6cqmin;padding:1cqmin 3.6cqmin 1cqmin 2.4cqmin;font-size:3.6cqmin;line-height:1.25;color:var(--ink);width:max-content;max-width:min(54cqmin,calc(100% - 70cqmin));box-shadow:0 .7cqmin 0 rgba(43,33,24,.28)}
-#tip span{min-width:0}
-#tip.on{display:flex;animation:tipin .4s ease-out}#tip svg{width:9cqmin;height:4.5cqmin}
-@keyframes tipin{from{opacity:0;margin-top:-2cqmin}to{opacity:1;margin-top:0}}
-/* 宝を拾ったあと、結果へ行くまでの間：入力を止めて ボタンをうすく */
-body.endwait #play .ctl,body.endwait #play #cam{opacity:.35;pointer-events:none;transition:opacity .3s}
-body.endwait #play #swipe{pointer-events:none}
+#cam span#cam-label{font-size:var(--fs-min);line-height:1;font-weight:800;white-space:nowrap}
+#notice{position:absolute;left:50%;top:24cqmin;transform:translateX(-50%);display:none;font-size:var(--fs-s);background:rgba(255,250,240,.95);color:var(--ink);border-radius:var(--r-pill);padding:1cqmin 3.4cqmin;white-space:nowrap;box-shadow:var(--sh-2)}
+#notice.on{display:block;animation:fadeUp var(--t-mid) var(--ease)}
+#notice.big{top:60cqmin;font-size:5.6cqmin;font-weight:800;padding:2.4cqmin 5cqmin;border-radius:var(--r-l);text-align:center;line-height:1.4;white-space:normal;width:max-content;max-width:80cqmin;box-shadow:var(--sh-3)}
+@keyframes fadeUp{from{opacity:0;margin-top:2cqmin}to{opacity:1;margin-top:0}}
+#tip{position:absolute;left:50%;top:25cqmin;word-break:keep-all;transform:translateX(-50%);display:none;align-items:center;gap:2cqmin;background:rgba(255,250,240,.95);border-radius:var(--r-pill);
+  padding:1.2cqmin 4cqmin 1.2cqmin 2.6cqmin;font-size:var(--fs-s);line-height:1.3;color:var(--ink);width:max-content;max-width:80cqmin;box-shadow:var(--sh-2)}
+#tip.on{display:flex;animation:fadeUp var(--t-mid) var(--ease)}
+#tip i{display:block;width:7cqmin;height:7cqmin;flex:none}#tip i svg{width:100%;height:100%}
 
-/* ---------- Ending（争いの言葉なし。くらべっこの けっか） ---------- */
-.endleft{position:absolute;left:5cqmin;top:5cqmin;width:78cqmin;display:flex;flex-direction:column;align-items:center;gap:2cqmin;text-align:center}
-.found{font-size:11.6cqmin;font-weight:900;line-height:1.12;color:var(--orange);--e:.5cqmin;
-  -webkit-text-stroke:1.5cqmin var(--ink);paint-order:stroke fill;text-shadow:0 1.2cqmin 0 rgba(43,33,24,.3);animation:bob 2.4s ease-in-out infinite}
-.found{word-break:keep-all;text-wrap:balance}
-.found.long{font-size:8.6cqmin}
-#ending[data-res=opp] .found{color:var(--cyan)}
-#ending[data-res=same] .found{color:var(--pink)}
-.who{display:flex;align-items:center;justify-content:center;gap:1.8cqmin;background:#fff;border:.5cqmin solid var(--ink);padding:1cqmin 4cqmin 1cqmin 2cqmin;border-radius:7cqmin;font-size:4.4cqmin;line-height:1.25;box-shadow:0 .7cqmin 0 rgba(43,33,24,.25);max-width:100%}
-.who .gemi{display:block;width:7cqmin;height:7cqmin;flex:none}.who .gemi svg{width:100%;height:100%}
-.endrec{display:flex;align-items:center;gap:1.4cqmin;background:var(--cream);border:.5cqmin solid var(--ink);box-shadow:0 .7cqmin 0 rgba(43,33,24,.25);border-radius:5cqmin;padding:.8cqmin 3cqmin .8cqmin 1.4cqmin;font-size:3.4cqmin;color:var(--ink);text-align:left;max-width:100%}
-.endrec .rc-ico{width:7cqmin;height:7cqmin}.endrec .rc-col{display:flex;flex-direction:column;align-items:flex-start;gap:.5cqmin}
-.endrec b{font-size:3.3cqmin;font-weight:900;white-space:nowrap}
+/* ===== C13. プレイ：操作ボタン（左下「すすむ」、右下にジャンプ・ドリルアタック、その上にジャンプドリル） ===== */
+.ctl{position:absolute;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:.6cqmin;line-height:1.05;color:var(--ink);
+  transition:transform var(--t-press) var(--ease),box-shadow var(--t-press) var(--ease),opacity var(--t-mid)}
+.ctl i{display:block;flex:none}.ctl i svg{width:100%;height:100%}
+.ctl span{font-weight:800;text-align:center}
+#fwd{left:max(env(safe-area-inset-left),3cqmin);bottom:3cqmin;width:36cqmin;height:36cqmin;border-radius:50%;color:#fff;--lip:1.4cqmin;
+  background:radial-gradient(circle at 38% 26%,var(--orange-hi) 0%,var(--orange) 46%,var(--orange-lo) 100%);
+  box-shadow:inset 0 .6cqmin 0 rgba(255,255,255,.4),inset 0 -1cqmin 1.6cqmin rgba(190,85,0,.35),0 var(--lip) 0 var(--orange-lip),0 calc(var(--lip) + 1.6cqmin) 3cqmin rgba(80,40,0,.35)}
+#fwd i{width:13cqmin;height:15cqmin}
+#fwd span{font-size:6.6cqmin;text-shadow:0 .4cqmin 0 rgba(150,60,0,.5)}
+.ctl.act{width:23cqmin;height:23cqmin;border-radius:var(--r-l);--lip:1.1cqmin;
+  background:linear-gradient(180deg,#fff 0%,var(--cream) 100%);
+  box-shadow:inset 0 .4cqmin 0 #fff,0 var(--lip) 0 var(--cream-lip),0 calc(var(--lip) + 1.4cqmin) 3cqmin rgba(20,30,50,.35)}
+.ctl.act i{width:11cqmin;height:11cqmin}
+.ctl.act span{font-size:3.6cqmin}
+#b-jump{right:max(env(safe-area-inset-right),3cqmin);bottom:3cqmin}
+#b-attack{right:calc(max(env(safe-area-inset-right),3cqmin) + 25.4cqmin);bottom:3cqmin}
+#b-jd{right:max(env(safe-area-inset-right),3cqmin);bottom:28.4cqmin}
+#b-jump{background:linear-gradient(180deg,var(--gold-hi),var(--gold));box-shadow:inset 0 .4cqmin 0 rgba(255,255,255,.6),0 var(--lip) 0 var(--gold-lip),0 calc(var(--lip) + 1.4cqmin) 3cqmin rgba(20,30,50,.35)}
+#b-attack{background:linear-gradient(180deg,#e7f6fd,#bfe6f8);box-shadow:inset 0 .4cqmin 0 rgba(255,255,255,.7),0 var(--lip) 0 #8cc8e6,0 calc(var(--lip) + 1.4cqmin) 3cqmin rgba(20,30,50,.35)}
+#b-jd{background:linear-gradient(180deg,#ffe6ec,#ffc6d4);box-shadow:inset 0 .4cqmin 0 rgba(255,255,255,.7),0 var(--lip) 0 #e89aae,0 calc(var(--lip) + 1.4cqmin) 3cqmin rgba(20,30,50,.35)}
+.ctl.down{transform:translateY(calc(var(--lip) * .8)) scale(.97)}
+#fwd.down{box-shadow:inset 0 .6cqmin 0 rgba(255,255,255,.4),inset 0 -1cqmin 1.6cqmin rgba(190,85,0,.35),0 calc(var(--lip) * .2) 0 var(--orange-lip),0 1cqmin 2cqmin rgba(80,40,0,.3)}
+.ctl.act.down{filter:brightness(.97)}
+/* カウントダウン中・獲得宣言中・結果へ行くまで：ボタンは押せない（うすく） */
+body.frozen #play .ctl,body.frozen #play #cam,body.endwait #play .ctl,body.endwait #play #cam{opacity:.45;pointer-events:none}
+body.frozen #play #swipe,body.endwait #play #swipe{pointer-events:none}
+
+/* ===== C14. 擬音（漫画ふうの立体文字。決まった帯の中だけに出る） ===== */
+.onozone{position:absolute;overflow:visible}
+#ono-l{left:3cqmin;top:42cqmin;width:54cqmin;height:14cqmin}
+#ono-r{right:3cqmin;top:33cqmin;width:54cqmin;height:14.4cqmin}
+.ono{position:absolute;left:50%;top:50%;font-size:8cqmin;line-height:1;font-weight:900;white-space:nowrap;letter-spacing:-.02em;
+  --c:#fff;--d:#d96a00;--tilt:-5deg;color:var(--c);
+  text-shadow:0 .3cqmin 0 var(--d),0 .6cqmin 0 var(--d),0 .9cqmin 0 var(--d),0 1.2cqmin 0 var(--d),0 2cqmin 1.8cqmin rgba(20,30,50,.35);
+  -webkit-text-stroke:.35cqmin rgba(255,255,255,.85);paint-order:stroke fill;
+  animation:onoPop .95s var(--ease) forwards}
+.ono.jump{--c:var(--gold-hi);--d:#c07a00;--tilt:-5deg}
+.ono.drill{--c:#bfe9ff;--d:#1a6baf;--tilt:4deg;font-size:7.6cqmin;letter-spacing:-.06em}
+.ono.bump{--c:#ffb547;--d:#c43c00;--tilt:-6deg;font-size:8.6cqmin}
+.ono.break{--c:#fffaf0;--d:#8a6a45;--tilt:5deg}
+@keyframes onoPop{
+  0%{opacity:0;transform:translate(-50%,-50%) rotate(var(--tilt)) scale(.35) translateY(2cqmin)}
+  22%{opacity:1;transform:translate(-50%,-50%) rotate(var(--tilt)) scale(1.06) translateY(-.3cqmin)}
+  40%{transform:translate(-50%,-50%) rotate(var(--tilt)) scale(1) translateY(0)}
+  78%{opacity:1;transform:translate(-50%,-50%) rotate(var(--tilt)) scale(1) translateY(-.4cqmin)}
+  100%{opacity:0;transform:translate(-50%,-50%) rotate(var(--tilt)) scale(.96) translateY(-.8cqmin)}}
+
+/* ===== C15. カウントダウン（3・2・1・GO! 中央の上。拡大しながら現れる。点滅なし） ===== */
+#count{position:absolute;left:50%;top:23cqmin;width:60cqmin;height:32cqmin;transform:translateX(-50%);display:none;align-items:center;justify-content:center}
+body.counting #count{display:flex}
+#count b{display:block;font-size:28cqmin;line-height:1;font-weight:900;color:#fff;font-variant-numeric:tabular-nums;
+  text-shadow:0 .5cqmin 0 var(--orange-lo),0 1cqmin 0 var(--orange-lo),0 1.5cqmin 0 var(--orange-lip),0 2cqmin 0 var(--orange-lip),0 3.4cqmin 3.4cqmin rgba(20,30,50,.35);
+  -webkit-text-stroke:.5cqmin var(--orange);paint-order:stroke fill}
+#count b.pop{animation:countIn .55s var(--ease-pop) both}
+#count b.go{font-size:24cqmin;color:var(--gold-hi);-webkit-text-stroke-color:var(--orange-lo);letter-spacing:.02em;animation:goIn .8s var(--ease) both}
+@keyframes countIn{0%{opacity:0;transform:scale(.4)}60%{opacity:1}100%{opacity:1;transform:scale(1)}}
+@keyframes goIn{0%{opacity:0;transform:scale(.5)}30%{opacity:1;transform:scale(1.06)}55%{opacity:1;transform:scale(1)}100%{opacity:0;transform:scale(1.18)}}
+
+/* ===== C16. 獲得宣言（3.5秒。中央の下。宝石の色でやわらかく光る） ===== */
+#ann{position:absolute;left:42cqmin;top:57cqmin;width:82cqmin;height:36cqmin;display:none;align-items:center;justify-content:center;--g:#ffd54f;--gc:#ffffff}
+body.announcing #ann{display:flex}
+.ann-card{position:relative;width:100%;display:flex;align-items:center;gap:3cqmin;padding:2.4cqmin 4.4cqmin 2.4cqmin 3cqmin;border-radius:var(--r-xl);background:rgba(255,250,240,.96);
+  box-shadow:0 0 0 .7cqmin var(--g),0 0 6cqmin 1.6cqmin var(--g),var(--sh-3);animation:annIn .6s var(--ease-pop) both}
+.ann-card::before{content:"";position:absolute;inset:-6cqmin;border-radius:var(--r-xl);background:radial-gradient(closest-side,var(--g),transparent);opacity:.45;z-index:-1;animation:glow 2.4s ease-in-out infinite}
+.ann-gem{display:block;width:16cqmin;height:16cqmin;flex:none;animation:gemSpin 3.5s var(--ease) both}
+.ann-gem svg{width:100%;height:100%;overflow:visible}
+.ann-text{display:flex;flex-direction:column;gap:.6cqmin;min-width:0}
+.ann-who{font-size:5.4cqmin;line-height:1.15;font-weight:800;color:var(--ink-2);white-space:nowrap}
+.ann-what{font-size:6.2cqmin;line-height:1.2;font-weight:900;color:var(--ink);word-break:keep-all}
+.ann-what em{font-style:normal;color:var(--gd,var(--ink))}
+@keyframes annIn{0%{opacity:0;transform:scale(.6) translateY(3cqmin)}100%{opacity:1;transform:scale(1) translateY(0)}}
+@keyframes glow{0%,100%{transform:scale(.92);opacity:.35}50%{transform:scale(1.06);opacity:.6}}
+@keyframes gemSpin{0%{transform:rotateY(0) scale(.5)}20%{transform:rotateY(180deg) scale(1.1)}40%{transform:rotateY(360deg) scale(1)}100%{transform:rotateY(720deg) scale(1)}}
+
+/* ===== C17. エンディング ===== */
+.endleft{position:absolute;left:4cqmin;top:4cqmin;width:84cqmin;bottom:27cqmin;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:1.8cqmin;text-align:center}
+.found{font-size:9.6cqmin;font-weight:900;line-height:1.15;color:#fff;word-break:keep-all;
+  text-shadow:0 .4cqmin 0 var(--orange-lo),0 .8cqmin 0 var(--orange-lo),0 1.2cqmin 0 var(--orange-lip),0 2.4cqmin 2.4cqmin rgba(20,30,50,.25);
+  -webkit-text-stroke:.4cqmin var(--orange);paint-order:stroke fill;animation:floatSm 3.6s ease-in-out infinite}
+.found.long{font-size:7cqmin}
+#ending[data-res=opp] .found{text-shadow:0 .4cqmin 0 var(--sky-lo),0 .8cqmin 0 var(--sky-lo),0 1.2cqmin 0 var(--sky-lip),0 2.4cqmin 2.4cqmin rgba(20,30,50,.25);-webkit-text-stroke-color:var(--sky)}
+#ending[data-res=same] .found{color:var(--gold-hi);text-shadow:0 .4cqmin 0 #e0a100,0 .8cqmin 0 #e0a100,0 1.2cqmin 0 #b98200,0 2.4cqmin 2.4cqmin rgba(20,30,50,.25);-webkit-text-stroke-color:#f0b400}
+.team{display:flex;align-items:flex-end;justify-content:center;gap:4cqmin}
+.team figure{margin:0;display:flex;flex-direction:column;align-items:center;gap:.6cqmin;position:relative}
+.team .sk,.team img{width:20cqmin;height:16cqmin;object-fit:contain;display:block}
+.team .sk svg{width:100%;height:100%}
+.team .ped{min-width:20cqmin;padding:0 2cqmin;height:4.4cqmin;border-radius:var(--r-s);background:linear-gradient(180deg,#fff,var(--cream));box-shadow:0 .9cqmin 0 var(--cream-lip),var(--sh-1);font-size:var(--fs-min);line-height:4.4cqmin;color:var(--ink-2);white-space:nowrap}
+.team figure.top .ped{background:linear-gradient(180deg,var(--gold-hi),var(--gold));box-shadow:0 .9cqmin 0 var(--gold-lip),var(--sh-1);color:var(--ink)}
+.team figure.top::before{content:"";position:absolute;top:-1.6cqmin;left:76%;width:6.4cqmin;height:4.6cqmin;transform:rotate(18deg);z-index:2;
+  background:var(--gold);clip-path:polygon(0 100%,0 30%,25% 60%,50% 0,75% 60%,100% 30%,100% 100%);filter:drop-shadow(0 .4cqmin 0 var(--gold-lip))}
+.team figure.top .sk,.team figure.top img{animation:floatSm 2.8s ease-in-out infinite}
+.who{display:flex;align-items:center;justify-content:center;gap:1.6cqmin;background:rgba(255,250,240,.95);padding:1.2cqmin 4cqmin 1.2cqmin 2.2cqmin;border-radius:var(--r-pill);font-size:4.2cqmin;line-height:1.3;box-shadow:var(--sh-2);max-width:100%}
+.who .gemi{display:block;width:6.4cqmin;height:6.4cqmin;flex:none}.who .gemi svg{width:100%;height:100%}
+.endrec{display:flex;align-items:center;gap:1.4cqmin;background:rgba(255,250,240,.88);border-radius:var(--r-l);padding:1cqmin 3cqmin 1cqmin 1.6cqmin;font-size:var(--fs-min);color:var(--ink-2);text-align:left;max-width:100%;box-shadow:var(--sh-1)}
+.endrec .rc-ico{width:6cqmin;height:6cqmin}.endrec .rc-col{display:flex;flex-direction:column;align-items:flex-start;gap:.4cqmin}
+.endrec b{font-size:var(--fs-min);font-weight:800;white-space:nowrap;color:var(--ink)}
 .endrec .rc-n{display:flex;flex-wrap:wrap;gap:0 2.4cqmin}.endrec .rl{white-space:nowrap}
-.endtitle{font-size:9cqmin;font-weight:900;color:var(--ink);line-height:1.1;margin-top:.6cqmin;background:rgba(255,255,255,.9);padding:1cqmin 4cqmin;border-radius:4cqmin;border:.5cqmin solid var(--ink)}
-.endyomi{font-size:3.8cqmin;color:var(--mute);margin-top:-1cqmin}
-.endpic{position:absolute;left:86cqmin;right:6cqmin;top:7cqmin;bottom:25cqmin;display:flex;align-items:center;justify-content:center}
-.endpic img{max-width:100%;max-height:100%;object-fit:contain;box-sizing:border-box;background:#fff;padding:1.6cqmin;border-radius:2cqmin;border:.6cqmin solid var(--ink);box-shadow:0 1.4cqmin 0 rgba(43,33,24,.3);transform:rotate(1.2deg)}
+.endmap{display:flex;align-items:baseline;gap:1.6cqmin}
+.endtitle{font-size:6cqmin;font-weight:800;color:var(--ink);line-height:1.1}
+.endyomi{font-size:var(--fs-s);color:var(--ink-2)}
+/* ちずの絵：ホームボタン（右上 y 3〜15cqmin）にかからないよう 19cqmin より下から */
+.endpic{position:absolute;left:92cqmin;right:5cqmin;top:19cqmin;bottom:27cqmin;display:flex;align-items:center;justify-content:center}
+.endpic img{max-width:100%;max-height:100%;object-fit:contain;box-sizing:border-box;background:#fff;padding:1.6cqmin;border-radius:var(--r-m);box-shadow:var(--sh-3);transform:rotate(1.5deg)}
 .endpic img.pix{image-rendering:crisp-edges;image-rendering:pixelated}
 #confetti{position:absolute;inset:0;overflow:hidden;pointer-events:none}
-#confetti i{position:absolute;top:-6cqmin;width:2cqmin;height:3.2cqmin;opacity:.9;animation:fall linear infinite}
-@keyframes fall{to{transform:translateY(112cqmin) rotate(540deg)}}
+#confetti i{position:absolute;top:-6cqmin;width:2.4cqmin;height:2.4cqmin;border-radius:.5cqmin;opacity:.9;animation:fall linear infinite}
+@keyframes fall{to{transform:translateY(112cqmin) rotate(360deg)}}
+body[data-state=ending] #nav{bottom:5cqmin}
+
+/* ===== C18. Quit ===== */
+.quitbox{position:absolute;inset:0 0 26cqmin;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:4cqmin}
+.quitlogo{width:70cqmin}
+.bye{font-size:9cqmin;font-weight:900;color:var(--ink);letter-spacing:.06em;text-shadow:0 .5cqmin 0 rgba(255,255,255,.9)}
