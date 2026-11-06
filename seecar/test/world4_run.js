@@ -236,7 +236,7 @@ const E = Math.PI / 2; // heading：0=北(-z)、-E=東(+x)、E=西、PI=南
   }
 
   // ---------- 7. 目じるし・色 ----------
-  await ev(() => { window.autoAward = true; const m = MapGen.fromPreset('ie', { treasureCount: 1 }); window.mIe = m; loadMap(m, { cpu: { level: 'normal' }, mode: 'race', players: [{ palette: 3 }, { palette: 3 }] }); World.setCamera(2); });
+  await ev(() => { window.autoAward = true; const m = MapGen.fromPreset('ie', { treasureCount: 1 }); window.mIe = m; loadMap(m, { cpu: { level: 'normal' }, mode: 'race', players: [{ palette: 3 }, { palette: 3 }] }); World.setCamera(3); });
   await step(40);
   d = await dbg();
   ok('そら：自分（三角）とCPU（丸）の目じるしが出る', d.markers.length === 2 && d.markers.every((m) => m.vis), JSON.stringify(d.markers));
@@ -267,7 +267,7 @@ const E = Math.PI / 2; // heading：0=北(-z)、-E=東(+x)、E=西、PI=南
   ok("search:'sonar' では光の柱を出さない", (await dbg()).treasures.every((t) => !t.beam));
 
   // ---------- 9. 通信の相手（状態の再現・色・award・抜けた） ----------
-  await ev(() => { window.autoAward = true; const m = flatMap(30, 20, [{ x: 20, z: 10, gem: 7 }]); m.box(20, 10, 1, 1, 3); loadMap(m, { net: true, isHost: true, mode: 'race', players: [{ palette: 0 }, { palette: 5 }] }); World.setCamera(2); });
+  await ev(() => { window.autoAward = true; const m = flatMap(30, 20, [{ x: 20, z: 10, gem: 7 }]); m.box(20, 10, 1, 1, 3); loadMap(m, { net: true, isHost: true, mode: 'race', players: [{ palette: 0 }, { palette: 5 }] }); World.setCamera(3); });
   await ev(() => World.applyRemoteState(1, { x: 18, z: 10, y: 0, heading: 0, anim: 'jumpDrill', flip: 1, palette: 5 })); await step(30);
   d = await dbg();
   ok('相手の状態を再現（逆さの姿勢・目じるしは白い丸）', d.remotes.length === 1 && d.remotes[0].flip > 0.9 && d.markers.find((m) => m.idx === 1 && !m.me && m.vis), JSON.stringify(d.remotes) + JSON.stringify(d.markers));

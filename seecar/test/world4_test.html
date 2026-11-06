@@ -46,7 +46,7 @@
   };
   window.loadMap = function (m, opts) {
     resetEvents();
-    World.load(m, Object.assign({ myIndex: 0, players: [{ palette: 0 }, { palette: 1 }], net: false, mode: 'solo', search: 'light' }, opts || {}));
+    World.load(m, Object.assign({ myIndex: 0, players: [{ palette: 0 }, { palette: 1 }], net: false, mode: 'solo', search: 'light', speed: 'slow' }, opts || {})); // 第5期：第4期の確認は いままでの速さ（slow）で
     World.setCamera(0); World.setCamera(1); // 開始演出を飛ばす
     World._step(30);
     if (!(opts && opts.stayFrozen)) World.go();

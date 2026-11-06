@@ -2,7 +2,7 @@
 ################################################################################
 ##                                                                            ##
 ##   © 2026 ニルナーリ博士とヤクナーリくんのツールキッチン                     ##
-##   見つけて！PixSee  v9.0                                                    ##
+##   見つけて！PixSee  v10.0                                                   ##
 ##                                                                            ##
 ################################################################################
 -->
@@ -57,13 +57,14 @@
       <button type="button" id="bootbtn" class="btn btn-primary btn-boot" disabled tabindex="-1"><span id="bootbtn-t">じゅんびちゅう...</span></button>
     </section>
 
-    <!-- ===== H04. 画面2 タイトル（ロゴ・浮かぶ島のシーカー・記録・最下段の署名と版） ===== -->
+    <!-- ===== H04. 画面2 タイトル（左上 歯車の「せってい」・大きなロゴ（上の中央〜まん中）・記録・下の中央「はじめる」（#nav）・左右の島のシーカー・最下段の署名と版） ===== -->
     <section id="title" class="screen">
+      <button type="button" id="gear" class="gearbtn" tabindex="-1" aria-label="せってい"><i></i><span>せってい</span></button>
       <div class="titlelogo" data-logo="1"></div>
       <div class="isle-hero l" id="hero-l"></div>
       <div class="isle-hero r" id="hero-r"></div>
       <div id="recchip" class="recchip"></div>
-      <div class="footrow"><span class="copy">© 2026 ニルナーリ博士とヤクナーリくんのツールキッチン</span><span class="ver">v9.0</span></div>
+      <div class="footrow"><span class="copy">© 2026 ニルナーリ博士とヤクナーリくんのツールキッチン</span><span class="ver">v10.0</span></div>
     </section>
 
     <!-- ===== H05. 画面3 設定・選択（あそびかた・だれと・むずかしさ・ちず・つうしん・せってい） ===== -->
@@ -88,30 +89,45 @@
         <button type="button" class="lvcard" data-level="hard" tabindex="-1"><i class="lvpic"></i><b>むずかしい</b><small>とっても はやいよ</small><em></em></button>
       </div>
 
+      <!-- せってい：いちばん上に シーカーの いろ。その下に 2列（さがしかた・スピード・スワイプ／おんがく・しろくろ・きろく） -->
       <div class="pane sub-opts">
         <div class="setcard wide" data-card="palette">
           <div class="sc-head"><i class="sc-ico" data-ico="palette"></i><span>シーカーの いろ</span></div>
           <div class="swatches" id="swatches"></div>
         </div>
-        <div class="setcard" data-card="search">
-          <div class="sc-head"><i class="sc-ico" data-ico="search"></i><span>さがしかた</span></div>
-          <div class="seg"><button type="button" data-set="search" data-val="light" tabindex="-1"><i data-ico="beam"></i>ひかりで さがす</button><button type="button" data-set="search" data-val="sonar" tabindex="-1"><i data-ico="sonar"></i>ソナーだけで さがす</button></div>
-          <div class="sc-hint" id="hint-search"></div>
+        <div class="srow">
+          <div class="setcard" data-card="search">
+            <div class="sc-head"><i class="sc-ico" data-ico="search"></i><span>さがしかた</span></div>
+            <div class="seg"><button type="button" data-set="search" data-val="light" tabindex="-1"><i data-ico="beam"></i><span>ひかりで<br>さがす</span></button><button type="button" data-set="search" data-val="sonar" tabindex="-1"><i data-ico="sonar"></i><span>ソナーだけで<br>さがす</span></button></div>
+            <div class="sc-hint" id="hint-search"></div>
+          </div>
+          <div class="setcard" data-card="speed">
+            <div class="sc-head"><i class="sc-ico" data-ico="speed"></i><span>スピード</span></div>
+            <div class="seg three"><button type="button" data-set="speed" data-val="fast" tabindex="-1">はやい</button><button type="button" data-set="speed" data-val="normal" tabindex="-1">ふつう</button><button type="button" data-set="speed" data-val="slow" tabindex="-1">ゆっくり</button></div>
+            <div class="sc-hint" id="hint-speed"></div>
+          </div>
+          <div class="setcard" data-card="swipeRev">
+            <div class="sc-head"><i class="sc-ico" data-ico="swipe"></i><span>スワイプの むき</span></div>
+            <div class="seg"><button type="button" data-set="swipeRev" data-val="0" tabindex="-1">ふつう</button><button type="button" data-set="swipeRev" data-val="1" tabindex="-1">はんたい</button></div>
+            <div class="sc-hint" id="hint-swipeRev"></div>
+          </div>
         </div>
-        <div class="setcard" data-card="swipeRev">
-          <div class="sc-head"><i class="sc-ico" data-ico="swipe"></i><span>スワイプの むき</span></div>
-          <div class="seg"><button type="button" data-set="swipeRev" data-val="0" tabindex="-1">ふつう</button><button type="button" data-set="swipeRev" data-val="1" tabindex="-1">はんたい</button></div>
-          <div class="sc-hint" id="hint-swipeRev"></div>
-        </div>
-        <div class="setcard" data-card="binary">
-          <div class="sc-head"><i class="sc-ico" data-ico="bw"></i><span>えを しろくろに する</span></div>
-          <div class="seg"><button type="button" data-set="binary" data-val="1" tabindex="-1">する</button><button type="button" data-set="binary" data-val="0" tabindex="-1">しない</button></div>
-          <div class="sc-hint" id="hint-binary"></div>
-        </div>
-        <div class="setcard" data-card="record">
-          <div class="sc-head"><i class="sc-ico" data-ico="trophy"></i><span>くらべっこの きろく</span></div>
-          <div class="seg one"><button type="button" id="reset-rec" class="danger" tabindex="-1">きろくを けす</button></div>
-          <div class="sc-hint" id="hint-record"></div>
+        <div class="srow">
+          <div class="setcard" data-card="bgm">
+            <div class="sc-head"><i class="sc-ico" data-ico="music"></i><span>おんがく</span></div>
+            <div class="seg four" id="seg-bgm"></div>
+            <div class="sc-hint" id="hint-bgm"></div>
+          </div>
+          <div class="setcard" data-card="binary">
+            <div class="sc-head"><i class="sc-ico" data-ico="bw"></i><span>えを しろくろに する</span></div>
+            <div class="seg"><button type="button" data-set="binary" data-val="1" tabindex="-1">する</button><button type="button" data-set="binary" data-val="0" tabindex="-1">しない</button></div>
+            <div class="sc-hint" id="hint-binary"></div>
+          </div>
+          <div class="setcard" data-card="record">
+            <div class="sc-head"><i class="sc-ico" data-ico="trophy"></i><span>くらべっこの きろく</span></div>
+            <div class="seg one"><button type="button" id="reset-rec" class="danger" tabindex="-1">きろくを けす</button></div>
+            <div class="sc-hint" id="hint-record"></div>
+          </div>
         </div>
       </div>
 
@@ -158,7 +174,7 @@
       <button type="button" id="b-jump" class="ctl act" data-act="jump" tabindex="-1"><i data-ico="jump"></i><span>ジャンプ</span></button>
       <button type="button" id="b-attack" class="ctl act" data-act="drillAttack" tabindex="-1"><i data-ico="attack"></i><span>ドリル<br>アタック</span></button>
       <button type="button" id="b-jd" class="ctl act" data-act="jumpDrill" tabindex="-1"><i data-ico="jumpdrill"></i><span>ジャンプ<br>ドリル</span></button>
-      <button type="button" id="cam" tabindex="-1"><i id="cam-ico"></i><span id="cam-label">おいかけ</span></button>
+      <button type="button" id="cam" tabindex="-1"><i id="cam-ico"></i><span id="cam-label">おいかけ</span><span id="cam-dots" aria-hidden="true"></span></button>
       <div id="count" aria-live="assertive"><b id="count-n"></b></div>
       <div id="ann" aria-live="assertive">
         <div class="ann-card">

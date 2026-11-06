@@ -1,0 +1,87 @@
+<!doctype html>
+<html lang="ja"><head><meta charset="utf-8"><title>mapgen5 test</title></head>
+<body>
+<script src="../src/mapgen.js"></script>
+<script>
+function mulberry(a){return function(){a|=0;a=a+0x6D2B79F5|0;var t=Math.imul(a^a>>>15,1|a);t=t+Math.imul(t^t>>>7,61|t)^t;return((t^t>>>14)>>>0)/4294967296;};}
+var D4=[[1,0],[-1,0],[0,1],[0,-1]];
+// 独立した到達判定（mapgen.js とは別に書いた）：登り5段まで・降り自由
+function reachSet(m){
+  var w=m.w,h=m.h,H=m.heights,seen=new Uint8Array(w*h),q=[];
+  m.starts.forEach(function(s){var i=s.z*w+s.x;seen[i]=1;q.push(i);});
+  while(q.length){var c=q.pop(),x=c%w,z=(c-x)/w;
+    D4.forEach(function(d){var nx=x+d[0],nz=z+d[1];if(nx<0||nz<0||nx>=w||nz>=h)return;var j=nz*w+nx;if(!seen[j]&&H[j]<=H[c]+5){seen[j]=1;q.push(j);}});}
+  return seen;
+}
+// 宝石の検査（mapgen4_test と同じ規則）
+function checkGems(m,count){
+  var w=m.w,h=m.h,H=m.heights,seen=reachSet(m),short=Math.min(w,h),bad=[],cells={},inWall=0;
+  m.treasures.forEach(function(t){
+    var i=t.z*w+t.x,reach=!!seen[i];
+    D4.forEach(function(d){var nx=t.x+d[0],nz=t.z+d[1];if(nx>=0&&nz>=0&&nx<w&&nz<h&&seen[nz*w+nx])reach=true;});
+    var dist=Math.min.apply(null,m.starts.map(function(s){return Math.hypot(s.x-t.x,s.z-t.z);}));
+    if(H[i]<2)bad.push('height'+H[i]);
+    if(!reach)bad.push('reach');
+    if(dist<short*0.15-1e-9)bad.push('dist'+dist.toFixed(1));
+    if(cells[i])bad.push('dup');cells[i]=1;
+    if(!(t.gem>=0&&t.gem<10&&t.gem===(t.gem|0)))bad.push('gem');
+    if(H[i]>=10)inWall++;
+  });
+  if(m.treasure!==m.treasures[0])bad.push('treasure!=t0');
+  if(count===10){var g=m.treasures.map(function(t){return t.gem;}).sort();if(g.join()!=='0,1,2,3,4,5,6,7,8,9')bad.push('gems10:'+g.join(''));}
+  if(m.treasures.length!==count)bad.push('count'+m.treasures.length);
+  if(m.placement.dropped)bad.push('dropped:'+m.placement.fallback);
+  return {bad:bad,inWall:inWall,pct:m.placement.pct};
+}
+// スタートの検査：高さ0、2つが12マス以上離れる、向いている方へ7マスまっすぐ進める（段差1以内・壁なし）、同じ広場
+function checkStarts(m){
+  var w=m.w,h=m.h,H=m.heights,bad=[],DXs=[0,1,0,-1],DZs=[-1,0,1,0];
+  m.starts.forEach(function(s,k){
+    if(H[s.z*w+s.x]!==0)bad.push('h'+k);
+    var run=0;for(var f=1;f<=7;f++){var x=s.x+DXs[s.dir]*f,z=s.z+DZs[s.dir]*f;if(x<0||z<0||x>=w||z>=h)break;var v=H[z*w+x];if(v>=10||Math.abs(v-H[s.z*w+s.x])>1)break;run++;}
+    if(run<7)bad.push('run'+k+'='+run);
+  });
+  var sep=Math.hypot(m.starts[0].x-m.starts[1].x,m.starts[0].z-m.starts[1].z);
+  if(sep<12)bad.push('sep'+sep.toFixed(0));
+  var seen=reachSet({w:w,h:h,heights:H,starts:[m.starts[0]]});if(!seen[m.starts[1].z*w+m.starts[1].x])bad.push('apart');
+  return {bad:bad,sep:sep};
+}
+// 部屋の検査：壁（高さ10）に囲まれた床の領域（ふちに触れない）。8マス以上を「部屋」とし、
+// スタートの広場から壁を何マス壊せば入れるか（0-1 BFS）の最大。壁の厚さ（壁のマスから床までの最大の距離）。
+function checkRooms(m){
+  var w=m.w,h=m.h,H=m.heights,n=w*h,lab=new Int32Array(n).fill(-1),regs=[],i;
+  for(i=0;i<n;i++){if(H[i]>=10||lab[i]>=0)continue;var id=regs.length,q=[i],sz=0,edge=false;lab[i]=id;
+    while(q.length){var c=q.pop(),x=c%w,z=(c-x)/w;sz++;if(x===0||z===0||x===w-1||z===h-1)edge=true;
+      D4.forEach(function(d){var nx=x+d[0],nz=z+d[1];if(nx<0||nz<0||nx>=w||nz>=h)return;var j=nz*w+nx;if(lab[j]<0&&H[j]<10){lab[j]=id;q.push(j);}});}
+    regs.push({size:sz,edge:edge});}
+  var startReg=lab[m.starts[0].z*w+m.starts[0].x];
+  var rooms=regs.map(function(r,k){return k;}).filter(function(k){return k!==startReg&&!regs[k].edge&&regs[k].size>=8;});
+  // 0-1 BFS：壁は1、床は0
+  var cost=new Int32Array(n).fill(1e9),dq=[],head=0;
+  for(i=0;i<n;i++)if(lab[i]===startReg){cost[i]=0;dq.push(i);}
+  // 簡単のため段階ごとの BFS
+  var frontier=dq,level=0;
+  while(frontier.length){var next=[];
+    // 同じ cost の床を広げる
+    for(var a=0;a<frontier.length;a++){var c=frontier[a],x=c%w,z=(c-x)/w;
+      for(var e=0;e<4;e++){var nx=x+D4[e][0],nz=z+D4[e][1];if(nx<0||nz<0||nx>=w||nz>=h)continue;var j=nz*w+nx,cc=cost[c]+(H[j]>=10?1:0);
+        if(cc<cost[j]){cost[j]=cc;if(cc===cost[c])frontier.push(j);else next.push(j);}}}
+    frontier=next;level++;}
+  var maxBreak=0,best=1e9;rooms.forEach(function(k){var mn=1e9;for(var j=0;j<n;j++)if(lab[j]===k&&cost[j]<mn)mn=cost[j];maxBreak=Math.max(maxBreak,mn);});
+  // 壁の厚さ：壁マスから床までの4方向距離の最大
+  var dist=new Int32Array(n).fill(-1),q2=[];for(i=0;i<n;i++)if(H[i]<10){dist[i]=0;q2.push(i);}
+  for(var qh=0;qh<q2.length;qh++){var c2=q2[qh],x2=c2%w,z2=(c2-x2)/w;for(var e2=0;e2<4;e2++){var ax=x2+D4[e2][0],az=z2+D4[e2][1];if(ax<0||az<0||ax>=w||az>=h)continue;var j2=az*w+ax;if(dist[j2]<0){dist[j2]=dist[c2]+1;q2.push(j2);}}}
+  var maxD=0,wall=0;for(i=0;i<n;i++){if(H[i]>=10){wall++;if(dist[i]>maxD)maxD=dist[i];}}
+  return {rooms:rooms.length,roomCells:rooms.reduce(function(s,k){return s+regs[k].size;},0),maxBreak:maxBreak,maxD:maxD,wallPct:Math.round(100*wall/n),startRegPct:Math.round(100*regs[startReg].size/n)};
+}
+function roundtrip(m){var d=MapGen.decode(JSON.parse(JSON.stringify(MapGen.encode(m))));
+  return JSON.stringify(d.treasures)===JSON.stringify(m.treasures)&&JSON.stringify(d.starts)===JSON.stringify(m.starts)&&d.w===m.w&&d.h===m.h;}
+function render(m,scale){
+  var c=document.createElement('canvas');c.width=m.w*scale;c.height=m.h*scale;var g=c.getContext('2d');
+  for(var z=0;z<m.h;z++)for(var x=0;x<m.w;x++){var v=Math.round(255*(1-m.heights[z*m.w+x]/10));g.fillStyle='rgb('+v+','+v+','+v+')';g.fillRect(x*scale,z*scale,scale,scale);}
+  function dot(p,col,r){g.fillStyle=col;g.beginPath();g.arc((p.x+.5)*scale,(p.z+.5)*scale,scale*r,0,7);g.fill();g.strokeStyle='#fff';g.stroke();}
+  m.treasures.forEach(function(t){dot(t,MapGen.GEMS[t.gem].color,1.6);});
+  m.starts.forEach(function(s){dot(s,'#05f',1.4);});
+  return c.toDataURL('image/png');
+}
+</script></body></html>

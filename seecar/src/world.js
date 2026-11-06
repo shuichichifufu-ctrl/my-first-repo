@@ -1,5 +1,5 @@
 /* world.js — 3Dの世界（地形・シーカー・操作・カメラ・掘る演出・宝石・CPU）
-   「見つけて！PixSee」v9.0（第4期）。公開するのは window.World だけ。THREE は r128 のグローバルを使う。
+   「見つけて！PixSee」v10.0（第5期）。公開するのは window.World だけ。THREE は r128 のグローバルを使う。
    シーカーの3Dモデルは seeker.js の window.SeekerModel（無いときは箱で代用して止まらない）。
    宝石の種類は mapgen.js の MapGen.GEMS（無いときはこのファイルの GEM_TABLE）。 */
 (function () {
@@ -35,6 +35,9 @@
   // ---- ドリルアタック（押している間ずっと）----
   var DA_WIND = 0.2;      // ドリルを正面へ向けるまで
   var DA_SPEED = 1.4;     // 掘りながら進む速さ（マス/秒）。1マスずつ壊しながらだと 約1.1マス/秒
+  // ---- スピードの設定（第5期 2b）：SPEED・AIR_SPEED・DA_SPEED に掛ける。CPU も同じ倍率。加速（最大+50%）はこの上に掛かる ----
+  //   slow＝第4期までの速さ、normal＝×1.25（既定）、fast＝×1.5（加速して 約6.5マス/秒。moveActor は 0.12マスずつ当たりを見るので壁を抜けない）
+  var SPEED_MUL = { slow: 1, normal: 1.25, fast: 1.5 };
   var DA_BREAK = 0.35;    // 1マス壊すのにかかる時間（秒）。CPU も同じ
   var DA_REACH = 0.55;    // ドリルの先が届く距離（体の中心から）
   var DA_BACK = 0.25;     // 離したあと、ドリルが頭上へ戻る時間
@@ -44,6 +47,8 @@
   var PITCH_MAX = 1;      // 視点の上下（-1〜+1）
   var INTRO_HOLD = 2.0, INTRO_MOVE = 1.8; // 開始演出：真上から2秒見せて、斜め後ろへ寄せる
   var CAM_BLEND = 0.9;
+  // 視点（第5期 4b）：0 め、1 おいかけ、2 みわたし（新しい）、3 そら（真上）。cycleCamera は 0→1→2→3→0
+  var CAM_EYE = 0, CAM_CHASE = 1, CAM_WIDE = 2, CAM_TOP = 3, CAM_N = 4;
   var DEBRIS_MAX = 600, PUFF_MAX = 96;
   // ---- 宝石 ----
   var GEM_R = 0.34;            // 宝石の大きさ
@@ -400,7 +405,7 @@
       wx: (st.x | 0) + 0.5, wz: (st.z | 0) + 0.5, y: 0, vy: 0, lv: 0, air: false,
       heading: dirToHeading(((st.dir | 0) % 4 + 4) % 4),
       act: null, squash: 0, sqRate: 10, flip: 0, hatF: 0, spin: 0.15, lunge: 0, moveV: 0, turnV: 0,
-      blinkT: rand(1.5, 4), hop: 0, bumpCd: 0, speed: SPEED, shakeV: 0,
+      blinkT: rand(1.5, 4), hop: 0, bumpCd: 0, speed: SPEED * S.speedMul, shakeV: 0,
       accT: 0, stage: 0, stageMax: ACCEL_MAX, accHeading: 0, dustAcc: 0
     };
     a.accHeading = a.heading;
@@ -450,7 +455,7 @@
     raf: 0, running: false, paused: false, frozen: false, last: 0, time: 0,
     map: null, w: 0, h: 0, heights: null, colors: null, dug: null, gemAt: null,
     level: null, // 地図ごとに作った物
-    myIndex: 0, players: [], net: false, isHost: true, mode: 'solo', search: 'light',
+    myIndex: 0, players: [], net: false, isHost: true, mode: 'solo', search: 'light', speed: 'normal', speedMul: SPEED_MUL.normal, overTi: -1,
     me: null, cpu: null, remotes: {}, held: {}, tapQ: {},
     camMode: 1, camBlendT: 1, camFrom: null, chaseLift: 0, camY: 0, intro: null, topFlag: null,
     shake: 0, stateAcc: 0, over: false, treasures: [], scores: [0, 0],
@@ -458,7 +463,7 @@
     sideK: 1, orbitK: 0, idleT: 0, faceHold: 0, atkK: 0, atkHold: 0, hints: null, moved: false, gemCam: null, gemCamK: 0,
     ono: { drill: 0, bump: 0, brk: 0 } // 擬音の間隔（自分だけ）
   };
-  var handlers = { found: [], collect: [], terrain: [], state: [], action: [], cam: [], done: [], gemHit: [], onomato: [] };
+  var handlers = { found: [], collect: [], terrain: [], state: [], action: [], cam: [], done: [], gemHit: [], onomato: [], overGem: [] };
   // 1コマの計算（update）の途中で出たイベントは、そのコマの計算が終わってから知らせる。
   // （第3期 r1：宝を拾った瞬間に UI が World.stop() を呼ぶと、同じコマの続きの計算が消えた演出（S.fx=null）を読んで
   //   'World loop error … reading parts' が出ていた。計算を終えてから知らせれば、途中で止められることがない）
@@ -766,6 +771,9 @@
     S.net = !!opts.net;
     S.isHost = opts.isHost == null ? true : !!opts.isHost;
     S.search = opts.search === 'sonar' ? 'sonar' : 'light';
+    S.speed = SPEED_MUL.hasOwnProperty(opts.speed) ? opts.speed : 'normal'; // 第5期：'slow'|'normal'|'fast'（無いときは normal）
+    S.speedMul = SPEED_MUL[S.speed];
+    S.overTi = -1; // 4d：いま真上に立っている（まだだれの物でもない）宝石の番号
     var cpuOpt = opts.cpu && !S.net ? opts.cpu : null;
     S.mode = (opts.mode === 'race' || opts.mode === 'count' || opts.mode === 'solo') ? opts.mode : (list.length > 1 ? 'count' : (cpuOpt || S.net ? 'race' : 'solo'));
     S.over = false; S.held = {}; S.tapQ = {}; S.stateAcc = 0; S.shake = 0; S.mapVer = 0; S.scores = [0, 0];
@@ -805,8 +813,8 @@
     S.camBlendT = 1; S.chaseLift = 0; S.camY = S.me.y;
     S.sideK = 1; S.orbitK = 0; S.idleT = 0; S.faceHold = 0; S.atkK = 0; S.atkHold = 0; S.moved = false; S.gemCam = null; S.gemCamK = 0;
     S.camera.far = overheadHeight() * 1.6 + 60; S.camera.updateProjectionMatrix();
-    S.camMode = 1; S.intro = { t: 0 }; S.topFlag = null; // 開始演出：真上から → おいかけへ
-    var pose = poseFor(2);
+    S.camMode = 1; S.intro = { t: 0 }; S.topFlag = null; // 開始演出：真上（そら）から → おいかけへ
+    var pose = poseFor(CAM_TOP);
     S.camera.position.copy(pose.p); S.camera.quaternion.copy(pose.q);
     fitNear();
     engine('idle', 0);
@@ -1321,7 +1329,7 @@
   function updateAim() {
     var A = S.aim, me = S.me; if (!A || !me) return;
     var f = frontCell(me);
-    var show = S.camMode !== 2 && !S.intro && !S.over && !me.air && inMap(f.x, f.z) && S.heights[idx(f.x, f.z)] > me.lv + 1;
+    var show = S.camMode !== CAM_TOP && !S.intro && !S.over && !me.air && inMap(f.x, f.z) && S.heights[idx(f.x, f.z)] > me.lv + 1;
     A.mesh.visible = show;
     if (!show) return;
     var pulse = 1 + Math.sin(S.time * 6) * 0.05;
@@ -1493,7 +1501,7 @@
           if (a === S.me) S.shake = Math.max(S.shake, 0.1);
         }
       } else { A.cell = -1; A.bore = 0; a.lunge *= Math.exp(-dt * 8); a.shakeV = 0; }
-      moveActor(a, DA_SPEED * dt, true);
+      moveActor(a, DA_SPEED * S.speedMul * dt, true);
     }
     stepVertical(a, dt);
   }
@@ -1584,7 +1592,7 @@
     if (free && inp.fwd > 0 && !S.over) {
       if (Math.abs(wrapAng(a.heading - a.accHeading)) > ACCEL_TURN) accelReset(a); // 向きが変わった
       var mul = 1 + ACCEL_STEP * a.stage;
-      var sp = (a.air ? Math.max(a.speed * mul, AIR_SPEED) : a.speed * mul) * inp.fwd;
+      var sp = (a.air ? Math.max(a.speed * mul, AIR_SPEED * S.speedMul) : a.speed * mul) * inp.fwd;
       if (A && A.phase === 'crouch') sp *= 0.3;
       var want = sp * dt, got = moveActor(a, want, false);
       if (a._blocked && got < want * 0.5) accelReset(a); // 壁にぶつかった
@@ -1644,6 +1652,7 @@
     var before = me.act;
     updateActor(me, dt, inp);
     if (S.tapQ.jump > 0) { if (me.act && me.act !== before && me.act.name === 'jump') S.tapQ.jump = 0; else S.tapQ.jump -= dt; }
+    overGemCheck(me);
     // 走る音（Sfx が変わったときだけ音を変える）
     var st = 'idle', A = me.act;
     if (S.over) st = 'idle';
@@ -1652,6 +1661,18 @@
     else if (Math.abs(me.moveV) > 0.08) st = 'run';
     else if (Math.abs(me.turnV) > 0.3) st = 'turn';
     engine(st, me.stage);
+  }
+
+  // 第5期 4d：自分のシーカーが「まだだれの物でもない宝石のマス」の真上（x,z が同じ）に入った瞬間に 'overGem'(ti) と Sfx 'pinpin'。
+  //   同じマスにいる間は出さない。宝石のないマスへ出ると忘れる（また入れば出す）。空中にいる間は判定しない（着地してから）。
+  //   光の柱・ソナーの どちらのモードでも出す。体の中心のマスで決める。
+  function overGemCheck(a) {
+    if (!a || a.air || S.over) return;
+    var cx = Math.floor(a.wx), cz = Math.floor(a.wz), ti = inMap(cx, cz) ? S.gemAt[idx(cx, cz)] : -1;
+    if (ti >= 0 && (!S.treasures[ti] || S.treasures[ti].owner >= 0)) ti = -1;
+    if (ti === S.overTi) return;
+    S.overTi = ti;
+    if (ti >= 0) { sfx('pinpin'); emit('overGem', ti); }
   }
 
   /* ===== W22. CPU（ソナーで推理して さがす） ===== */
@@ -1665,11 +1686,11 @@
   //   地形（高さ）は人にも見えているので、道さがしに使ってよい。移動・ジャンプ・ドリルは人と同じ updateActor を通る。
   function initCpu(c, level) {
     var lv = CPU_LEVELS[level] ? level : 'normal', cfg = CPU_LEVELS[lv];
-    c.speed = SPEED * cfg.speed;
+    c.speed = SPEED * S.speedMul * cfg.speed;
     c.stageMax = Math.round(cfg.accelMax / ACCEL_STEP);
     c.ai = {
       level: lv, cfg: cfg, wait: cfg.react, senseT: 0, key: -1, ll: null, est: -1, conf: 0, lastRead: null,
-      goal: null, plan: null, planKey: '', ver: -1, stepT: 0, stuck: 0, holdFwd: false, hold: null, detour: null, atGoalT: 0,
+      goal: null, plan: null, planKey: '', ver: -1, stepT: 0, stuck: 0, holdFwd: false, jumpTo: -1, hold: null, detour: null, atGoalT: 0,
       hitTi: -1, time: 0, steps: 0, jumps: 0, attacks: 0, digs: 0, replans: 0, reads: 0, misses: 0, mistakes: 0, hitLog: []
     };
   }
@@ -1862,7 +1883,7 @@
     if (!g) return;
     var key = g.kind + ':' + g.cell;
     if (!ai.plan || ai.planKey !== key || ai.ver !== S.mapVer || ai.stepT > 5) {
-      if (ai.stepT > 5) { ai.stuck++; ai.stepT = 0; if (ai.stuck >= 2) { ai.stuck = 0; inp.turn = rand(-1.2, 1.2) / Math.max(dt, 1e-3); inp.jump = true; ai.holdFwd = true; return; } }
+      if (ai.stepT > 5) { ai.stuck++; ai.stepT = 0; if (ai.stuck >= 2) { ai.stuck = 0; inp.turn = rand(-1.2, 1.2) / Math.max(dt, 1e-3); inp.jump = true; ai.holdFwd = true; ai.jumpTo = -1; return; } }
       ai.plan = planPath(c, g); ai.planKey = key; ai.ver = S.mapVer; ai.replans++;
       if (!ai.plan) { if (g.kind === 'dig' && ai.ll) ai.ll[g.cell] = -Infinity; ai.goal = null; ai.wait = 0.3; return; }
     }
@@ -1896,7 +1917,7 @@
     if (Math.abs(ccx - sx) + Math.abs(ccz - sz) !== 1) { ai.plan = null; return; }
     if (!centerOn(c, cc, dt, inp, 0.15)) return;
     if (!turnTo(c, Math.atan2(-(sx - ccx), -(sz - ccz)), dt, inp)) return;
-    if (st.a === 2) { inp.jump = true; ai.holdFwd = true; st.a = 1; ai.stepT = 0; ai.steps++; return; }
+    if (st.a === 2) { inp.jump = true; ai.holdFwd = true; ai.jumpTo = st.cell; st.a = 1; ai.stepT = 0; ai.steps++; return; }
     ai.hold = { kind: 'through', cell: st.cell, step: st.cell - cc, t: 0 };
     inp.drillAttack = true;
   }
@@ -1908,9 +1929,17 @@
       ai.senseT -= dt;
       if (ai.senseT <= 0 && !c.air && !ai.hold) { ai.senseT = ai.cfg.react; cpuSenseAndDecide(c); }
       if (ai.hold) cpuHold(c, dt, inp);
-      else if (c.act || c.air) { if (ai.holdFwd) inp.fwd = 1; }
-      else {
-        ai.holdFwd = false;
+      else if (c.act || c.air) {
+        if (ai.holdFwd) {
+          inp.fwd = 1;
+          // 第5期：跳んで乗るマスの真ん中を過ぎたら「すすむ」を離す（はやい だと空中で進みすぎて、1マスの段から向こうへ落ちるため）
+          if (ai.jumpTo >= 0) {
+            var jx = ai.jumpTo % S.w + 0.5, jz = ((ai.jumpTo / S.w) | 0) + 0.5;
+            if ((jx - c.wx) * -Math.sin(c.heading) + (jz - c.wz) * -Math.cos(c.heading) < 0.05) inp.fwd = 0;
+          }
+        }
+      } else {
+        ai.holdFwd = false; ai.jumpTo = -1;
         if (ai.wait > 0) ai.wait -= dt;
         else cpuThink(c, dt, inp);
       }
@@ -1972,7 +2001,11 @@
     return centerFrac * 2 * hh * tn * asp;
   }
   // おいかけ視点：シーカーの後ろ上から heading の方向を見る（スワイプで回る）。シーカー（高さ1.7）の全身が画面の下寄りに入る
-  var CHASE_BACK = 3.9, CHASE_UP = 3.2, CHASE_AHEAD = 3.6, CHASE_SIDE = 1.1; // 少し右うしろから：ロールケーキの端（星）も見える
+  // 第5期 4a：真うしろから（CHASE_SIDE=0）。第4期は「少し右うしろ（1.1）から、端の星も見せる」にしていたため、
+  //   カメラの向きが進む向きから 6.5° ずれ、すすむで車体がななめに見えて右ななめ前へ進むように見えていた
+  var CHASE_BACK = 3.9, CHASE_UP = 3.2, CHASE_AHEAD = 3.6, CHASE_SIDE = 0;
+  // みわたし：シーカーのうしろの高めのななめ上から（シーカーを見る仰角 WIDE_ELEV、距離 WIDE_DIST マス）。少し先（WIDE_AHEAD）を見る＝シーカーは画面の下寄り、行く先が広く見える
+  var WIDE_ELEV = 58 * Math.PI / 180, WIDE_DIST = 11, WIDE_AHEAD = 3.2;
   var ATK_SIDE = 1.5, ATK_UP = 1.3, ATK_BACK = 0.6, ATK_HOLD = 0.9;          // ドリルアタック中のずらし
   var ORBIT_YAW = 2.25, ORBIT_DIST = 3.0, ORBIT_UP = 1.75, IDLE_ORBIT = 2.6;  // 顔を見せる回りこみ（止まって2.6秒で）
   var FADE_ON = 0.7;                                                          // 間の壁を透かす量（0.7＝不透明度 0.3 の なめらかな半透明）
@@ -1990,19 +2023,25 @@
       var pv = S.pitchV, up = CHASE_UP + (pv > 0 ? -pv * 1.2 : -pv * 2.6), ah = CHASE_AHEAD + pv * (pv > 0 ? 3 : 2.6);
       var rx = -fz, rz = fx; // 右
       var back = CHASE_BACK, side = CHASE_SIDE * S.sideK, ak = ease(clamp(S.atkK, 0, 1)), ok = ease(clamp(S.orbitK, 0, 1));
+      var sg = S.sideK < 0 ? -1 : 1; // 右どなりに高い壁があれば左側へ（ずらす・回りこむ側）
       // ドリルアタック：少し右・上へずれて、正面の壊れるマスが体のかげにならないように
-      side += ak * ATK_SIDE * (S.sideK < 0 ? -1 : 1); up += ak * ATK_UP; back -= ak * ATK_BACK;
+      side += ak * ATK_SIDE * sg; up += ak * ATK_UP; back -= ak * ATK_BACK;
       // 止まっているとき・拾ったとき：前ななめへ回りこんで、顔（目）と端の星を見せる（向き＝操作は変えない）
       back += (ORBIT_DIST - back) * ok; up += (ORBIT_UP - up) * ok;
-      var rr = Math.hypot(back, side), th = Math.atan2(side, back) + ok * ORBIT_YAW;
-      if (side < 0) th = Math.atan2(side, back) - ok * ORBIT_YAW; // 左うしろにいるときは左へ回りこむ
+      var rr = Math.hypot(back, side), th = Math.atan2(side, back) + sg * ok * ORBIT_YAW;
       var u = -Math.cos(th) * rr, v = Math.sin(th) * rr; // u=前、v=右
       p.set(px + fx * u + rx * v, py + up + S.chaseLift * (1 - ok), pz + fz * u + rz * v);
-      tg.set(px + fx * ah + rx * 0.25, py + 0.35 + pv * (pv > 0 ? 1.1 : 0.4) + S.chaseLift * 0.5, pz + fz * ah + rz * 0.25);
+      tg.set(px + fx * ah, py + 0.35 + pv * (pv > 0 ? 1.1 : 0.4) + S.chaseLift * 0.5, pz + fz * ah);
       if (ak > 0) { tg.x += rx * ak * 0.5; tg.z += rz * ak * 0.5; }
       if (ok > 0) tg.lerp(tmpV.set(px, py + 0.6, pz), ok);
       var gk = ease(clamp(S.gemCamK, 0, 1));
       if (gk > 0.001 && gemCamPose(a, gcP, gcT)) { p.lerp(gcP, gk); tg.lerp(gcT, gk); }
+      poseM.lookAt(p, tg, UP);
+    } else if (mode === CAM_WIDE) {
+      // みわたし：heading のうしろ・高めのななめ上から見下ろす（地図のかなりの範囲とシーカーが見える）
+      var wb = Math.cos(WIDE_ELEV) * WIDE_DIST, wu = Math.sin(WIDE_ELEV) * WIDE_DIST, wp = S.pitchV;
+      p.set(px - fx * wb, py + wu, pz - fz * wb);
+      tg.set(px + fx * (WIDE_AHEAD + wp * 2.5), py, pz + fz * (WIDE_AHEAD + wp * 2.5));
       poseM.lookAt(p, tg, UP);
     } else {
       var hh = overheadHeight(), sx = overheadShift(hh);
@@ -2119,7 +2158,7 @@
     return true;
   }
   function setCamera(mode) {
-    mode = ((mode | 0) % 3 + 3) % 3;
+    mode = ((mode | 0) % CAM_N + CAM_N) % CAM_N;
     if (!S.camera || !S.camFrom) { S.camMode = mode; return; }
     if (mode === S.camMode) return;
     S.intro = null;
@@ -2145,7 +2184,7 @@
       S.idleT = still && S.moved ? S.idleT + dt : 0;
       if (S.faceHold > 0) S.faceHold = Math.max(0, S.faceHold - dt);
       var want = (S.faceHold > 0 || S.idleT > IDLE_ORBIT) ? 1 : 0;
-      var rate = want ? (S.faceHold > 0 ? 2.6 : 1.1) : 6;
+      var rate = want ? (S.faceHold > 0 ? 2.6 : 1.1) : 10; // 第5期 4a：走り出したら すぐ（約0.3秒で）真うしろへ戻る
       S.orbitK += (want - S.orbitK) * (1 - Math.exp(-dt * rate));
       if (!want && S.orbitK < 0.002) S.orbitK = 0;
       var gw = S.camMode === 1 && gemCamOn() ? 1 : 0;
@@ -2158,7 +2197,7 @@
   function updateOccluders(dt) {
     var L = S.level, me = S.me; if (!L || !L.fadeAttr) return;
     var k, want = occWant; for (k in want) delete want[k];
-    if (me && S.camMode === 1 && !S.intro && me.root.visible) {
+    if (me && (S.camMode === CAM_CHASE || S.camMode === CAM_WIDE) && !S.intro && me.root.visible) {
       var cp = S.camera.position, mcx = Math.floor(me.wx), mcz = Math.floor(me.wz);
       var sx = Math.cos(me.heading) * 0.35, sz = -Math.sin(me.heading) * 0.35; // シーカーの左右の幅
       var gcm = S.gemCam && S.gemCamK > 0.3 ? S.gemCam.tr : null; // 獲得の間は、浮き上がった宝石もさえぎらないように
@@ -2207,14 +2246,14 @@
     S.pitchV += (S.pitch - S.pitchV) * (1 - Math.exp(-dt * 10));
     updateCamFactors(dt);
     var target = poseFor(S.camMode);
-    var top = S.camMode === 2 || !!(S.intro && S.intro.t < INTRO_HOLD + 0.5);
-    if (top !== S.topFlag) { S.topFlag = top; emit('cam', top); }
+    var top = S.camMode === CAM_TOP || !!(S.intro && S.intro.t < INTRO_HOLD + 0.5);
+    if (top !== S.topFlag) { S.topFlag = top; emit('cam', top, S.camMode); } // top＝そら（真上）か開始演出の真上
     if (S.intro) {
       if (!S.paused) S.intro.t += dt;
       if (S.intro.t >= INTRO_HOLD + INTRO_MOVE) S.intro = null;
     }
     if (S.intro) {
-      var ov = poseFor(2), ie = ease(clamp((S.intro.t - INTRO_HOLD) / INTRO_MOVE, 0, 1));
+      var ov = poseFor(CAM_TOP), ie = ease(clamp((S.intro.t - INTRO_HOLD) / INTRO_MOVE, 0, 1));
       S.camera.position.lerpVectors(ov.p, target.p, ie);
       S.camera.position.y += Math.sin(ie * Math.PI) * 1.5;
       S.camera.quaternion.slerpQuaternions(ov.q, target.q, ie);
@@ -2231,13 +2270,13 @@
     if (S.shake > 0.001) {
       var a = S.shake;
       shakeV.set(rand(-a, a), rand(-a, a) * 0.7, rand(-a, a));
-      if (S.camMode === 2) shakeV.multiplyScalar(2.5);
+      if (S.camMode === CAM_TOP) shakeV.multiplyScalar(2.5); else if (S.camMode === CAM_WIDE) shakeV.multiplyScalar(1.6);
       S.camera.position.add(shakeV);
       S.shakeOff = shakeV;
       S.shake *= Math.exp(-dt * 6);
     } else { S.shake = 0; S.shakeOff = null; }
     fitNear();
-    if (S.me) S.me.root.visible = !(S.camMode === 0 && S.camBlendT > 0.55);
+    if (S.me) S.me.root.visible = !(S.camMode === CAM_EYE && S.camBlendT > 0.55);
     updateOccluders(dt);
     updateHints();
     var camH = S.camera.position.y;
@@ -2247,7 +2286,8 @@
       if (!a) return;
       var sky = camH - a.y > 10, isMe = a === S.me, s, op;
       if (sky) { s = camH / 30 * 2.0; op = clamp((camH - a.y - 10) / 6, 0.6, 0.95); }
-      else if (isMe) { s = 0.42; op = S.camMode === 0 ? 0 : 0.85 * (1 - clamp(Math.max(S.orbitK, S.gemCamK) * 1.5, 0, 1)); } // 顔を見せる回りこみ・宝石の獲得の間は消す
+      else if (S.camMode === CAM_WIDE) { s = isMe ? 0.75 : 0.9; op = 0.9; } // みわたし：少し大きく
+      else if (isMe) { s = 0.42; op = S.camMode === CAM_EYE ? 0 : 0.85 * (1 - clamp(Math.max(S.orbitK, S.gemCamK) * 1.5, 0, 1)); } // 顔を見せる回りこみ・宝石の獲得の間は消す
       else { s = clamp(Math.hypot(cp.x - a.wx, cp.z - a.wz) * 0.05, 0.45, 1.3); op = 0.9; }
       a.marker.visible = op > 0;
       if (!a.marker.visible) return;
@@ -2372,7 +2412,11 @@
     go: function () { freeze(false); },
     press: press,
     setCamera: setCamera,
-    cycleCamera: function () { setCamera((S.camMode + 1) % 3); return S.camMode; },
+    cycleCamera: function () { setCamera((S.camMode + 1) % CAM_N); return S.camMode; },
+    // 視点の名前（UI のボタン用。番号 = World.camera）
+    CAMERAS: ['め', 'おいかけ', 'みわたし', 'そら'],
+    // スピードの倍率（opts.speed）
+    SPEED_MUL: SPEED_MUL,
     on: function (ev, fn) {
       if (!handlers[ev] || typeof fn !== 'function') return;
       if (handlers[ev].indexOf(fn) < 0) handlers[ev].push(fn);
@@ -2477,6 +2521,16 @@
       return out;
     },
     _cam: function () { return { orbit: S.orbitK, atk: S.atkK, idle: S.idleT, face: S.faceHold, side: S.sideK }; },
+    // 確認用（4a）：自分のシーカーの向き（ラジアン、atan2(x, z) の形で比べられるよう水平の単位ベクトル）
+    //   heading＝ゲームの前、model＝3Dモデルの前（+Z を世界へ）、cam＝カメラの見る向き（水平）
+    _orient: function () {
+      var me = S.me; if (!me || !S.camera) return null;
+      me.root.updateMatrixWorld(true);
+      var mf = new THREE.Vector3(0, 0, 1).transformDirection(me.model.root.matrixWorld);
+      var cf = new THREE.Vector3(0, 0, -1).applyQuaternion(S.camera.quaternion);
+      function hz(v) { var l = Math.hypot(v.x, v.z) || 1; return [v.x / l, v.z / l]; }
+      return { x: me.wx, z: me.wz, heading: [-Math.sin(me.heading), -Math.cos(me.heading)], model: hz(mf), cam: hz(cf), camPos: [S.camera.position.x, S.camera.position.y, S.camera.position.z], orbit: S.orbitK, vis: me.root.visible };
+    },
     // 自分のシーカーのいちばん低い点（ドリルの先）の高さと、いまいるマスの上面
     _meLow: function () {
       var me = S.me; if (!me) return null;

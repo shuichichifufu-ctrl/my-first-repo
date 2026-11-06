@@ -1,10 +1,11 @@
-/* mapgen.js : 画像 -> 地図データ（MapData）、宝石の位置と種類、既定地図。公開する名前は window.MapGen だけ。 */
+/* mapgen.js : 「見つけて！PixSee」v10.0（第5期）。画像 -> 地図データ（MapData）、宝石の位置と種類、既定地図。公開する名前は window.MapGen だけ。 */
 (function () {
   'use strict';
 
   /* ===== M01. 定数・宝石の種類 ===== */
 
-  var MAX_LONG = 64;        // 縮小後の長い辺（画素）
+  var MAX_AREA = 64 * 64;   // v10：（v9 は「長い辺64画素」）縮小後の画素の数の上限（=見本の地図と同じ 128x128 マス = 16384 マス）
+  var MAX_SIDE = 96;        // v10：縮小後の長い辺の上限（細長い絵で地図が長くなりすぎないように）
   var BLOCK = 2;            // 画像1画素 = 2x2マス
   var PIC_LONG = 512;       // みつけた！画面用の元画像の長い辺
   var WALL_H = 10;          // 高さ10（真っ黒）だけが壁。濃い青や赤の塗りは壁にしない
@@ -41,9 +42,17 @@
   }
   // src（canvas か img）を、長い辺が maxLong 以下になるまで縮小。半分ずつ縮めて画質を保ち、大きな写真でも速い。
   // 透明部分は白になる。小さい画像は拡大しない。
-  function shrink(src, sw, sh, maxLong) {
+  // 地図にするときの画素の大きさ：面積が MAX_AREA 以下、長い辺が MAX_SIDE 以下（小さい画像は拡大しない）
+  function mapSize(sw, sh) {
+    var lim = api._limits || { area: MAX_AREA, side: MAX_SIDE }; // _limits：テストで v9 の大きさ（{area:1e9, side:64}）と比べる
+    var k = Math.min(1, lim.side / Math.max(sw, sh), Math.sqrt(lim.area / (sw * sh)));
+    var tw = Math.max(1, Math.floor(sw * k + 1e-6)), th = Math.max(1, Math.floor(sh * k + 1e-6));
+    return { w: tw, h: th };
+  }
+  function shrink(src, sw, sh, maxLong, size) {
     var k = Math.min(1, maxLong / Math.max(sw, sh));
     var tw = Math.max(1, Math.round(sw * k)), th = Math.max(1, Math.round(sh * k));
+    if (size) { tw = size.w; th = size.h; }
     var cur = src, cw = sw, ch = sh;
     while (cw > tw * 2 || ch > th * 2) {
       var nw = Math.max(tw, Math.ceil(cw / 2)), nh = Math.max(th, Math.ceil(ch / 2));
@@ -305,7 +314,7 @@
   function build(src, sw, sh, title, reading, opts) {
     if (!(sw > 0 && sh > 0)) throw new Error(KID_ERROR);
     var pic = shrink(src, sw, sh, PIC_LONG);
-    var small = shrink(pic, pic.width, pic.height, MAX_LONG);
+    var small = shrink(pic, pic.width, pic.height, 0, mapSize(sw, sh));
     var pw = small.width, ph = small.height;
     var rgba = small.getContext('2d').getImageData(0, 0, pw, ph).data;
     var map = analyze(rgba, pw, ph, darkest(src, sw, sh, pw, ph), !!(opts && opts.binary === true), opts);
@@ -395,15 +404,60 @@
     return m;
   }
 
-  /* ===== M09. 見本の地図（四字熟語は白黒だけ。イラストは白地に太い黒線） ===== */
+  /* ===== M09. 見本の地図（字の見本は白黒だけ。イラストは白地に太い黒線） ===== */
+  // kind: 'yoji'（四字熟語）・'kotowaza'（ことわざ）・'eigo'（英単語）・'illust'（イラスト）
+  // lines：地図に描く字の行（無ければ title から作る。四字熟語は 2字x2行）。ことわざは長いので短い形・2〜3行にする。
+  // どれも mapgen5_test で「宝石10個が置ける・スタートから届く・部屋に入れる」を確かめたもの。
   var PRESETS = [
-    // 四字熟語：字の中に閉じた部分（口・日・田など）があり、小さい字でもつぶれにくい熟語
+    // 四字熟語：字の中に閉じた部分（口・日・田・目など）があり、小さい字でもつぶれにくいもの（「鳥」はつぶれるので使わない）
     { id: 'jiyu', kind: 'yoji', title: '自由自在', reading: 'じゆうじざい' },
     { id: 'shiho', kind: 'yoji', title: '四方八方', reading: 'しほうはっぽう' },
     { id: 'hinkou', kind: 'yoji', title: '品行方正', reading: 'ひんこうほうせい' },
     { id: 'mikka', kind: 'yoji', title: '三日坊主', reading: 'みっかぼうず' },
     { id: 'ichinichi', kind: 'yoji', title: '一日千秋', reading: 'いちじつせんしゅう' },
-    // イラスト：閉じた部分（窓・目・花びらなど）が複数ある単純な線画。宝は いちばん小さい閉じた部分に入る
+    { id: 'juunin', kind: 'yoji', title: '十人十色', reading: 'じゅうにんといろ' },
+    { id: 'touzai', kind: 'yoji', title: '東西南北', reading: 'とうざいなんぼく' },
+    { id: 'nisshin', kind: 'yoji', title: '日進月歩', reading: 'にっしんげっぽ' },
+    { id: 'onko', kind: 'yoji', title: '温故知新', reading: 'おんこちしん' },
+    { id: 'taiki', kind: 'yoji', title: '大器晩成', reading: 'たいきばんせい' },
+    { id: 'hyappatsu', kind: 'yoji', title: '百発百中', reading: 'ひゃっぱつひゃくちゅう' },
+    { id: 'ichigo', kind: 'yoji', title: '一期一会', reading: 'いちごいちえ' },
+    { id: 'koumei', kind: 'yoji', title: '公明正大', reading: 'こうめいせいだい' },
+    { id: 'isshin', kind: 'yoji', title: '一心同体', reading: 'いっしんどうたい' },
+    { id: 'tenka', kind: 'yoji', title: '天下一品', reading: 'てんかいっぴん' },
+    { id: 'shiroku', kind: 'yoji', title: '四六時中', reading: 'しろくじちゅう' },
+    { id: 'ishinfu', kind: 'yoji', title: '一心不乱', reading: 'いっしんふらん' },
+    { id: 'meimei', kind: 'yoji', title: '明明白白', reading: 'めいめいはくはく' },
+    { id: 'jucchu', kind: 'yoji', title: '十中八九', reading: 'じっちゅうはっく' },
+    // ことわざ：title は正しい形、lines は地図に描く形（ひらがなと 画数の少ない漢字。1行4〜5字まで）
+    { id: 'isogaba', kind: 'kotowaza', title: 'いそがば まわれ', reading: 'いそがばまわれ', lines: ['いそがば', 'まわれ'] },
+    { id: 'nanakorobi', kind: 'kotowaza', title: '七転び八起き', reading: 'ななころびやおき', lines: ['七ころび', '八おき'] },
+    { id: 'ishinoue', kind: 'kotowaza', title: '石の上にも三年', reading: 'いしのうえにもさんねん', lines: ['石の上にも', '三年'] },
+    { id: 'hayaoki', kind: 'kotowaza', title: '早起きは三文の徳', reading: 'はやおきはさんもんのとく', lines: ['早おきは', '三文のとく'] },
+    { id: 'keizoku', kind: 'kotowaza', title: '継続は力なり', reading: 'けいぞくはちからなり', lines: ['けいぞくは', '力なり'] },
+    { id: 'amefutte', kind: 'kotowaza', title: '雨降って地固まる', reading: 'あめふってじかたまる', lines: ['あめふって', 'じかたまる'] },
+    { id: 'sukikoso', kind: 'kotowaza', title: '好きこそ物の上手なれ', reading: 'すきこそもののじょうずなれ', lines: ['すきこそ', 'ものの', '上手なれ'] },
+    { id: 'chirimo', kind: 'kotowaza', title: 'ちりも積もれば山となる', reading: 'ちりもつもればやまとなる', lines: ['ちりも', 'つもれば', '山となる'] },
+    { id: 'tokiwa', kind: 'kotowaza', title: '時は金なり', reading: 'ときはかねなり', lines: ['時は', '金なり'] },
+    { id: 'naseba', kind: 'kotowaza', title: 'なせば なる', reading: 'なせばなる', lines: ['なせば', 'なる'] },
+    { id: 'narau', kind: 'kotowaza', title: '習うより慣れよ', reading: 'ならうよりなれよ', lines: ['ならうより', 'なれよ'] },
+    { id: 'daiwa', kind: 'kotowaza', title: '大は小をかねる', reading: 'だいはしょうをかねる', lines: ['大は小を', 'かねる'] },
+    { id: 'zenwa', kind: 'kotowaza', title: '善は急げ', reading: 'ぜんはいそげ', lines: ['ぜんは', 'いそげ'] },
+    { id: 'ichiwo', kind: 'kotowaza', title: '一を聞いて十を知る', reading: 'いちをきいてじゅうをしる', lines: ['一をきいて', '十をしる'] },
+    // 英単語：大文字。reading はカタカナ、meaning は ひらがな。閉じた部分のある字（A B D O P Q R）を含む短い単語
+    { id: 'cat', kind: 'eigo', title: 'CAT', reading: 'キャット', meaning: 'ねこ' },
+    { id: 'dog', kind: 'eigo', title: 'DOG', reading: 'ドッグ', meaning: 'いぬ' },
+    { id: 'star', kind: 'eigo', title: 'STAR', reading: 'スター', meaning: 'ほし' },
+    { id: 'apple', kind: 'eigo', title: 'APPLE', reading: 'アップル', meaning: 'りんご' },
+    { id: 'book', kind: 'eigo', title: 'BOOK', reading: 'ブック', meaning: 'ほん' },
+    { id: 'moon', kind: 'eigo', title: 'MOON', reading: 'ムーン', meaning: 'つき' },
+    { id: 'bird', kind: 'eigo', title: 'BIRD', reading: 'バード', meaning: 'とり' },
+    { id: 'frog', kind: 'eigo', title: 'FROG', reading: 'フロッグ', meaning: 'かえる' },
+    { id: 'boat', kind: 'eigo', title: 'BOAT', reading: 'ボート', meaning: 'ふね' },
+    { id: 'happy', kind: 'eigo', title: 'HAPPY', reading: 'ハッピー', meaning: 'しあわせ' },
+    { id: 'dream', kind: 'eigo', title: 'DREAM', reading: 'ドリーム', meaning: 'ゆめ' },
+    { id: 'friend', kind: 'eigo', title: 'FRIEND', reading: 'フレンド', meaning: 'ともだち' },
+    // イラスト：閉じた部分（窓・目・花びらなど）が複数ある単純な線画
     { id: 'ie', kind: 'illust', title: 'いえ', reading: 'いえ' },
     { id: 'sakana', kind: 'illust', title: 'さかな', reading: 'さかな' },
     { id: 'kuruma', kind: 'illust', title: 'くるま', reading: 'くるま' },
@@ -411,30 +465,91 @@
     { id: 'hoshi', kind: 'illust', title: 'ほし', reading: 'ほし' },
     { id: 'roketto', kind: 'illust', title: 'ロケット', reading: 'ろけっと' }
   ];
-  var STROKE = 0;
-  var ERODE = 2;             // 字の線を白で削る量（画素）
-  var THIN = { '鳥': 0, '麗': 0, '龍': 0, '自': 0, '由': 0, '在': 0 }; // 字ごとの太らせる量（線の多い字は細く。0=太らせない）
-  var FONT = "'Hiragino Kaku Gothic ProN','Hiragino Sans','Noto Sans JP','Yu Gothic',sans-serif";
-  var S = 640;               // 見本の絵の大きさ（画素）
+  // 字の形はフォントで描く。この PC（Windows：游ゴシック など）と iPad（ヒラギノ）で形・太さが違うので、
+  // 1) 一般的なフォントの並びを使い、2) 描いたあとに線の太さを測って、決まった太さ（地図の画素で STROKE_PX）にそろえる。
+  var FONT_JA = "'Hiragino Sans','Hiragino Kaku Gothic ProN','Yu Gothic','YuGothic','Meiryo','Noto Sans JP',sans-serif";
+  var FONT_EN = "'Helvetica Neue','Arial','Hiragino Sans','Yu Gothic',sans-serif"; // iPad=Helvetica Neue Bold、Windows=Arial Bold（どちらにもある形に近いもの）
+  var STROKE_PX = 2.6;       // 字の線の太さの目標（地図の画素。1画素=2マス）。字が小さいときは 1em の STROKE_EM 倍まで細く
+  var STROKE_EM = 0.085, STROKE_MIN = 1.8;
+  var STROKE_MAX_ADD = 1.4;  // 太らせる量の上限（地図の画素）。太らせすぎると小さな部屋がつぶれる
+  var STROKE_MAX_CUT = 1.2;  // 細くする量の上限（地図の画素）
+  var TEXT_ASPECT = 2.2;     // 絵の縦横比の上限（細長すぎる地図にしない。足りない所は白い余白）
+  var SCALE = 10;            // 見本の絵：地図の1画素 = 絵の10px
+  var S = 640;               // イラストの絵の大きさ（画素）
   var LW = 18;               // イラストの線の太さ（画像1画素=10px の約2.6画素分。縮小しても途切れない）
 
-  // 四字熟語：白地に太い黒字だけ（色の落書きはしない）
-  function drawYoji(def) {
-    var c = newCanvas(S, S), g = c.getContext('2d');
-    g.fillStyle = '#fff'; g.fillRect(0, 0, S, S);
-    var chars = def.title.split(''), size = 262, cell = S / 2;
-    g.font = '900 ' + size + 'px ' + FONT;
-    g.textAlign = 'center'; g.textBaseline = 'middle';
-    g.fillStyle = '#000'; g.strokeStyle = '#000'; g.lineJoin = 'round';
-    for (var i = 0; i < 4; i++) {
-      var cx = (i % 2) * cell + cell / 2, cz = Math.floor(i / 2) * cell + cell / 2 + 6;
-      g.fillText(chars[i], cx, cz);
-      // 線の多い字（鳥など）は太らせすぎると黒い塊につぶれるので、太らせる量を字ごとに変える
-      var lw = THIN[chars[i]] != null ? THIN[chars[i]] : STROKE;
-      if (lw > 0) { g.lineWidth = lw; g.strokeText(chars[i], cx, cz); }
-      // 逆に、字の線を白でなぞって細くする（フォントによって太さが違っても、壁の厚さを5〜6マス以内に保つため）
-      if (ERODE > 0) { g.save(); g.strokeStyle = '#fff'; g.lineWidth = ERODE; g.strokeText(chars[i], cx, cz); g.restore(); }
+  function charsOf(str) { return Array.from ? Array.from(str) : str.split(''); }
+  function textLines(def) {
+    if (def.lines) return def.lines.slice();
+    var t = def.title.replace(/\s+/g, '');
+    if (def.kind === 'yoji' && t.length === 4) return [t.slice(0, 2), t.slice(2)];
+    return [t];
+  }
+  // 線の太さの目安：黒い画素の数 A と、ふちの画素の数 P から 2A/P（細長い線ならほぼ線の幅）
+  function strokeWidth(g, w, h) {
+    var d = g.getImageData(0, 0, w, h).data, A = 0, P = 0, x, z;
+    function blk(xx, zz) { return xx >= 0 && zz >= 0 && xx < w && zz < h && d[(zz * w + xx) * 4] < 128; }
+    for (z = 0; z < h; z++) for (x = 0; x < w; x++) {
+      if (!blk(x, z)) continue;
+      A++;
+      if (!blk(x - 1, z) || !blk(x + 1, z) || !blk(x, z - 1) || !blk(x, z + 1)) P++;
     }
+    return P ? 2 * A / P : 0;
+  }
+  // 字の見本（四字熟語・ことわざ・英単語）：行の数と字の数に合わせて大きさを決める
+  function textLayout(def) {
+    var lines = textLines(def), en = def.kind === 'eigo', font = (en ? api._fontEn : api._fontJa) || (en ? FONT_EN : FONT_JA); // _font*：テストで別のフォントを試す
+    var meas = newCanvas(8, 8).getContext('2d'), EM = 100, i, k;
+    meas.font = '900 ' + EM + 'px ' + font;
+    var adv = en ? 0.12 : 1.0, lh = en ? 1.15 : 1.0;    // 英字は字幅＋すきま、漢字・かなは 1em のます目（字の大きさは 0.82em）
+    var rows = lines.map(function (ln) {
+      var cs = charsOf(ln), xs = [], wsum = 0;
+      for (k = 0; k < cs.length; k++) {
+        var cw = en ? meas.measureText(cs[k]).width / EM + adv : adv;
+        xs.push(wsum + cw / 2); wsum += cw;
+      }
+      return { chars: cs, xs: xs, w: wsum };
+    });
+    var cw0 = 0; for (i = 0; i < rows.length; i++) cw0 = Math.max(cw0, rows[i].w);
+    var pad = en ? 0.3 : 0.0;                             // 字のまわりの余白（em）。スタートを置く床
+    var W = cw0 + pad * 2, H = rows.length * lh + pad * 2;
+    if (W / H > TEXT_ASPECT) H = W / TEXT_ASPECT;         // 細長すぎるときは上下に余白
+    if (H / W > TEXT_ASPECT) W = H / TEXT_ASPECT;
+    var ms = mapSize(W * 1000, H * 1000);                 // 地図の画素（面積 MAX_AREA 以下）
+    var em = SCALE * ms.w / W;                            // 絵の 1em の px
+    return { rows: rows, font: font, en: en, lh: lh, W: W, H: H, em: em, cw: Math.round(W * em), ch: Math.round(H * em) };
+  }
+  function drawText(def, info) {
+    var L = textLayout(def), c = newCanvas(L.cw, L.ch), g = c.getContext('2d');
+    var size = L.em * (L.en ? 1 : 0.82), top = (L.ch - L.rows.length * L.lh * L.em) / 2;
+    function each(fn) {
+      L.rows.forEach(function (row, r) {
+        var left = (L.cw - row.w * L.em) / 2, cz = top + (r + 0.5) * L.lh * L.em + L.em * 0.02;
+        row.chars.forEach(function (ch, k) { fn(ch, left + row.xs[k] * L.em, cz); });
+      });
+    }
+    function paint(extra) {
+      g.fillStyle = '#fff'; g.fillRect(0, 0, c.width, c.height);
+      g.font = '900 ' + size + 'px ' + L.font;
+      g.textAlign = 'center'; g.textBaseline = 'middle'; g.lineJoin = 'round';
+      g.fillStyle = '#000'; g.strokeStyle = '#000';
+      each(function (ch, x, z) { g.fillText(ch, x, z); if (extra > 0.5) { g.lineWidth = extra; g.strokeText(ch, x, z); } });
+      if (extra < -0.5) { g.strokeStyle = '#fff'; g.lineWidth = -extra; each(function (ch, x, z) { g.strokeText(ch, x, z); }); } // 白でなぞって細くする
+    }
+    paint(0);
+    var sw0 = strokeWidth(g, c.width, c.height), target = Math.max(STROKE_MIN * SCALE, Math.min(STROKE_PX * SCALE, L.em * STROKE_EM));
+    var lo = -STROKE_MAX_CUT * SCALE, hi = STROKE_MAX_ADD * SCALE;
+    var extra = Math.max(lo, Math.min(hi, target - sw0));
+    if (Math.abs(extra) > 0.5) {
+      paint(extra);
+      // もう1回：太さの変わり方（傾き）から直す（フォントによって、なぞった量どおりに変わらないため）
+      var sw1 = strokeWidth(g, c.width, c.height), slope = (sw1 - sw0) / extra;
+      if (Math.abs(sw1 - target) > 0.15 * SCALE && slope > 0.2) {
+        var e2 = Math.max(lo, Math.min(hi, extra + (target - sw1) / slope));
+        if (Math.abs(e2 - extra) > 0.5) { extra = e2; paint(extra); }
+      }
+    }
+    if (info) { info.stroke0 = sw0 / SCALE; info.extra = extra / SCALE; info.stroke = strokeWidth(g, c.width, c.height) / SCALE; info.cw = c.width; info.ch = c.height; info.lines = L.rows.map(function (r) { return r.chars.join(''); }); }
     return c;
   }
 
@@ -510,7 +625,7 @@
   // 見本の元の絵（canvas）。確認用にも使う。
   function presetCanvas(id) {
     var def = findPreset(id);
-    return def.kind === 'illust' ? drawIllust(def) : drawYoji(def);
+    return def.kind === 'illust' ? drawIllust(def) : drawText(def);
   }
   function fromPreset(id, opts) {
     var def = findPreset(id);
@@ -524,7 +639,8 @@
   var api = window.MapGen = {
     GEMS: GEMS,
     _rand: Math.random,   // テスト用：差し替えて種を固定できる
-    presets: PRESETS.map(function (p) { return { id: p.id, title: p.title, reading: p.reading, kind: p.kind }; }),
+    presets: PRESETS.map(function (p) { var o = { id: p.id, title: p.title, reading: p.reading, kind: p.kind }; if (p.meaning) o.meaning = p.meaning; return o; }),
+    _textInfo: function (id) { var info = {}, def = findPreset(id); if (def.kind !== 'illust') drawText(def, info); return info; }, // テスト用：字の線の太さなど
     fromPreset: fromPreset,
     presetCanvas: presetCanvas,
     fromFile: fromFile,

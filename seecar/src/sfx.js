@@ -22,7 +22,7 @@
   var TICK_MS = 50;     // 予約を見回る間隔（ミリ秒）
   // 効果音ごとの音量の調整（1=そのまま）。長くきらきらした音は少し下げ、短い音は上げて、聞こえ方をそろえる
   var SFX_VOL = { fanfare: 0.6, go: 0.65, notice: 0.6, gemRise: 0.65, count: 0.85, found: 0.6, collect: 0.65, 'break': 1.5, drillHit: 1.3, boom: 1.2 };
-  var MIN_GAP = { move: 0.12, step: 0.07, land: 0.08, drillHit: 0.07, 'break': 0.05, bump: 0.15, tap: 0.03, count: 0.05, turn: 0.1 }; // 同じ音を続けて鳴らす最短の間隔（秒）
+  var MIN_GAP = { move: 0.12, step: 0.07, land: 0.08, drillHit: 0.07, 'break': 0.05, bump: 0.15, tap: 0.03, count: 0.05, turn: 0.1, pinpin: 1.0 }; // 同じ音を続けて鳴らす最短の間隔（秒）
 
   var api = { muted: false };
 
@@ -35,6 +35,8 @@
   var paused = false;    // モーダルで一時停止中
   var timer = null;      // BGM の予約を見回るタイマー
   var lastAt = {};       // 効果音ごとの最後に鳴らした時刻
+  var fading = [];       // 切り替えで消えかけている前の曲（すばやく何度も切り替えたら、まとめて早く消す）
+  var pv = null;         // 試し聴き { timer, back: 試し聴きが終わったら戻す曲の名前 }
   var eng = newEng();    // 走る音のループの状態
   function newEng() { return { state: 'idle', stage: 0, applied: false, tread: null, drill: null }; }
 
@@ -346,6 +348,29 @@
   //       'C5' 音（# と b も使える：'F#4' 'Bb3'）、'C4+E4+G4' 和音、'-' 前の音をのばす、'.' 休み、
   //       'A5:0.6' のように :数字 で強さ。drum は k/s/h/t/r を '+' で重ねる（例 'k+h'）。
   //     楽器ごとに小節数がちがってもよい（短い譜面はくり返す）。
+  // 和音の名前の並びから、1小節ずつの譜面を作る（伴奏を書きやすくするため）
+  function byChord(chords, map) { return chords.map(function (c) { return map[c]; }); }
+  // げんき：A(8) B(8) A'(8)
+  var GENKI_CH = ['G', 'G', 'D', 'D', 'C', 'G', 'D', 'G',  'C', 'C', 'G', 'G', 'Am', 'D', 'G', 'D',  'G', 'G', 'D', 'D', 'C', 'G', 'D', 'G'];
+  var GENKI_MEL = [
+    'G5 . G5 A5 B5 . G5 .', 'D6 . B5 . G5 - - .', 'A5 . A5 B5 C6 . A5 .', 'F#5 . A5 . D6 - - .',
+    'E6 . D6 . C6 . E6 .', 'D6 . B5 . G5 . B5 .', 'A5 . B5 . A5 . F#5 .', 'G5 . D5 . G5 - - .',
+    'E5 . G5 . C6 - - .', 'B5 . A5 . G5 . E5 .', 'D5 . G5 . B5 - - .', 'A5 . G5 . F#5 . D5 .',
+    'C5 . E5 . A5 . C6 .', 'B5 . A5 . F#5 . A5 .', 'G5 . B5 . D6 . B5 .', 'A5 - - . D5 . . .',
+    'G5 . G5 A5 B5 . G5 .', 'D6 . B5 . G5 - - .', 'A5 . A5 B5 C6 . A5 .', 'F#5 . A5 . D6 - - .',
+    'E6 . E6 . D6 . C6 .', 'B5 . D6 . G6 - D6 .', 'C6 . B5 . A5 . F#5 .', 'G5 . D6 . G5 . . .'];
+  // ゆかい：A(8) B(8) A'(8)
+  var YUKAI_CH = ['F', 'F', 'C', 'C', 'F', 'Bb', 'C', 'F',  'Bb', 'Bb', 'F', 'F', 'G7', 'G7', 'C', 'C7',  'F', 'F', 'C', 'C', 'F', 'Bb', 'C', 'F'];
+  var YUKAI_A = [
+    'A5 . . A5 G5 . F5 .', 'C5 . F5 . A5 . C6 .', 'Bb5 . . Bb5 A5 . G5 .', 'E5 . G5 . C6 . . .',
+    'A5 . C6 . A5 . F5 .', 'D6 . Bb5 . F5 . D5 .'];
+  var YUKAI_MEL = YUKAI_A.concat([
+    'E5 . G5 . Bb5 . E5 .', 'F5 . C5 . F5 . . .',
+    'D5 . F5 . Bb5 . . .', 'A5 . Bb5 . C6 . D6 .', 'C6 . . A5 C6 . . A5', 'F5 . G5 . A5 . . .',
+    'B5 . . B5 D6 . B5 .', 'G5 . F5 . D5 . B4 .', 'C5 . E5 . G5 . C6 .', 'Bb5 . G5 . E5 . C5 .'],
+    YUKAI_A, ['E5 . G5 . C6 . E6 .', 'F6 . C6 . F5 . . .']);
+  // いやし：A(8) B(8)
+  var IYASHI_CH = ['C', 'Am', 'F', 'G', 'C', 'Em', 'F', 'G',  'Am', 'Em', 'F', 'C', 'Dm', 'Em', 'F', 'G'];
   var TRACKS = [
     { // タイトル：オルゴールとマリンバのやさしいワルツ（ヘ長調・3拍子）
       name: 'title', loop: true, tempo: 100, beatsPerBar: 3, stepsPerBeat: 2, vol: 1.4,
@@ -386,8 +411,8 @@
           '. . F4+A4 . . . F4+A4 .', '. . E4+G4 . . . E4+G4 .', '. . D4+F4 . . . D4+F4 .', '. . D4+G4 . . . D4+G4 .'] },
         { inst: 'drum', vol: 0.5, notes: ['k h:0.4 h h:0.4 k h:0.4 h h:0.4'] }
       ] },
-    { // プレイ2：ゆったりしたローファイの鈴（ニ長調・メジャー7の和音・軽いスイング）
-      name: 'play2', loop: true, tempo: 82, beatsPerBar: 4, stepsPerBeat: 2, swing: 0.1, tone: 3400, vol: 0.7,
+    { // のんびり（第4期の play2 をそのまま使う。play2 の名前でも呼べる）：ゆったりしたオルゴール調の鈴（ニ長調・メジャー7の和音・軽いスイング）
+      name: 'nonbiri', loop: true, tempo: 82, beatsPerBar: 4, stepsPerBeat: 2, swing: 0.1, tone: 3400, vol: 0.7,
       parts: [
         { inst: 'bell', vol: 0.5, pan: 0.15, notes: [
           '. . B5 - A5 - F#5 -', 'E5 - - - . . C#5 -', '. . D5 - E5 - G5 -', 'F#5 - - - E5 - - -',
@@ -423,6 +448,55 @@
           'B2 - - . F#2 - - .', 'G2 - - . D3 - - .', 'D3 - - . A2 - - .', 'A2 - - . E3 - - .',
           'B2 - - . F#2 - - .', 'G2 - - . D3 - - .', 'E3 - - . B2 - - .', 'A2 - - . E3 - - .'] },
         { inst: 'drum', vol: 0.45, notes: ['t . h t . h t h:0.5'] }
+      ] },
+
+    { // げんき（プレイの既定）：運動会・パーティーの明るい行進（ト長調・138・ズン・チャッの伴奏・軽い小太鼓）。A(8) B(8) A'(8)
+      name: 'genki', loop: true, tempo: 138, beatsPerBar: 4, stepsPerBeat: 2, vol: 1.4,
+      parts: [
+        { inst: 'whistle', vol: 0.42, pan: 0.1, notes: GENKI_MEL },
+        { inst: 'glock', vol: 0.16, pan: 0.25, notes: GENKI_MEL },
+        { inst: 'pluck', vol: 0.24, pan: -0.25, notes: byChord(GENKI_CH, {
+          G: '. . D4+G4+B4 . . . D4+G4+B4 .', D: '. . D4+F#4+A4 . . . D4+F#4+C5 .',
+          C: '. . E4+G4+C5 . . . E4+G4+C5 .', Am: '. . E4+A4+C5 . . . E4+A4+C5 .' }) },
+        { inst: 'bass', vol: 0.3, notes: byChord(GENKI_CH, {
+          G: 'G2 . . . D3 . . .', D: 'D3 . . . A2 . . .', C: 'C3 . . . G2 . . .', Am: 'A2 . . . E3 . . .' }) },
+        { inst: 'drum', vol: 0.4, notes: [
+          'k h:0.35 s:0.5 h:0.35 k h:0.35 s:0.5 h:0.35', 'k h:0.35 s:0.5 h:0.35 k h:0.35 s:0.5 h:0.35',
+          'k h:0.35 s:0.5 h:0.35 k h:0.35 s:0.5 h:0.35', 'k h:0.35 s:0.5 h:0.35 k h:0.35 s:0.5 s:0.35',
+          'k h:0.35 s:0.5 h:0.35 k h:0.35 s:0.5 h:0.35', 'k h:0.35 s:0.5 h:0.35 k h:0.35 s:0.5 h:0.35',
+          'k h:0.35 s:0.5 h:0.35 k h:0.35 s:0.5 h:0.35', 'k . s:0.35 s:0.4 s:0.45 s:0.5 s:0.6 .'] }
+      ] },
+    { // ゆかい：ぴょこぴょこ はずむ おどけた曲（ヘ長調・120・スタッカートのマリンバと木のカチカチ）。A(8) B(8) A'(8)
+      name: 'yukai', loop: true, tempo: 120, beatsPerBar: 4, stepsPerBeat: 2, swing: 0.14, vol: 1.6,
+      parts: [
+        { inst: 'marimba', vol: 0.6, pan: 0.15, notes: YUKAI_MEL },
+        { inst: 'pluck', vol: 0.22, pan: -0.3, notes: byChord(YUKAI_CH, {
+          F: '. . A4+C5 . . . A4+C5 .', C: '. . G4+C5 . . . G4+Bb4 .', Bb: '. . F4+Bb4+D5 . . . F4+Bb4 .',
+          G7: '. . F4+B4 . . . F4+B4+D5 .', C7: '. . E4+Bb4 . . . E4+G4+Bb4 .' }) },
+        { inst: 'pluck', vol: 0.4, notes: byChord(YUKAI_CH, {   // ぽこぽこ歩くベース（ピチカート）
+          F: 'F2 . . . C3 . A2 .', C: 'C3 . . . G2 . E2 .', Bb: 'Bb2 . . . F2 . D3 .',
+          G7: 'G2 . . . D3 . B2 .', C7: 'C3 . . . G2 . Bb2 .' }) },
+        { inst: 'drum', vol: 0.42, notes: [
+          'k r:0.7 . r k r:0.7 r:0.5 .', 'k r:0.7 . r k . r:0.6 r:0.8',
+          'k r:0.7 . r k r:0.7 r:0.5 .', 'k r:0.7 . r k r:0.6 r:0.7 r:0.9'] }
+      ] },
+    { // いやし：やわらかいパッドとハープのアルペジオ、ゆっくりした笛（ハ長調・72・打楽器なし）。A(8) B(8)
+      name: 'iyashi', loop: true, tempo: 72, beatsPerBar: 4, stepsPerBeat: 2, tone: 3200, vol: 1.16,
+      parts: [
+        { inst: 'whistle', vol: 0.34, pan: 0.15, notes: [
+          'E5 - - - G5 - - -', 'C6 - - - - - B5 -', 'A5 - - - G5 - E5 -', 'D5 - - - - - . .',
+          'E5 - - - G5 - C6 -', 'B5 - - - - - G5 -', 'A5 - - - C6 - E6 -', 'D6 - - - - - . .',
+          'C6 - - - B5 - A5 -', 'G5 - - - - - E5 -', 'F5 - - - A5 - C6 -', 'B5 - - - - - G5 -',
+          'A5 - - - F5 - A5 -', 'G5 - - - E5 - G5 -', 'A5 - - - G5 - F5 -', 'D5 - - - - - . .'] },
+        { inst: 'harp', vol: 0.4, pan: -0.2, notes: byChord(IYASHI_CH, {
+          C: 'C4 G4 B4 E5 G5 E5 B4 G4', Am: 'A3 E4 G4 C5 E5 C5 G4 E4', F: 'F3 C4 E4 A4 C5 A4 E4 C4',
+          G: 'G3 D4 G4 B4 D5 B4 G4 D4', Em: 'E3 B3 D4 G4 B4 G4 D4 B3', Dm: 'D3 A3 C4 F4 A4 F4 C4 A3' }) },
+        { inst: 'pad', vol: 0.55, notes: byChord(IYASHI_CH, {
+          C: 'E3+G3+B3+C4 - - - - - - -', Am: 'E3+G3+A3+C4 - - - - - - -', F: 'F3+A3+C4+E4 - - - - - - -',
+          G: 'D3+G3+B3+D4 - - - - - - -', Em: 'E3+G3+B3+D4 - - - - - - -', Dm: 'D3+F3+A3+C4 - - - - - - -' }) },
+        { inst: 'bass', vol: 0.22, notes: byChord(IYASHI_CH, {
+          C: 'C3 - - - - - - -', Am: 'A2 - - - - - - -', F: 'F2 - - - - - - -',
+          G: 'G2 - - - - - - -', Em: 'E2 - - - - - - -', Dm: 'D2 - - - - - - -' }) }
       ] },
 
     // ---- ジングル（1回だけ鳴る）----
@@ -461,6 +535,16 @@
         { inst: 'glock', vol: 0.3, notes: ['. . . . . . . .', '. . . . . . . .', '. . . . C6 . F6 .', 'A6 . C7 .'] }
       ] }
   ];
+  // 古い名前 play2 は のんびり と同じ曲（第4期の名前のまま呼べるように、同じ譜面を別の名前でも置く）
+  (function () {
+    var src = null, cp = {}, k;
+    for (var i = 0; i < TRACKS.length; i++) if (TRACKS[i].name === 'nonbiri') src = TRACKS[i];
+    for (k in src) if (Object.prototype.hasOwnProperty.call(src, k)) cp[k] = src[k];
+    cp.name = 'play2';
+    TRACKS.push(cp);
+  })();
+  // 設定画面で選べるプレイ中の曲（先頭が既定）
+  var PLAY_TRACKS = [{ name: 'genki', label: 'げんき' }, { name: 'yukai', label: 'ゆかい' }, { name: 'nonbiri', label: 'のんびり' }, { name: 'iyashi', label: 'いやし' }];
 
   /* ===== S08. 譜面を読んで予約する（BGM はタイマーで少し先まで予約、ジングルは一度に全部予約） ===== */
   var NOTE = { C: 0, D: 2, E: 4, F: 5, G: 7, A: 9, B: 11 };
@@ -515,7 +599,7 @@
       else pg.connect(head);
       return pg;
     });
-    return { tr: tr, c: c, o: o, nodes: nodes, step: 0, next: t0, sd: 60 / tr.tempo / (tr.stepsPerBeat || 2), ended: false };
+    return { tr: tr, c: c, o: o, nodes: nodes, step: 0, t0: t0, next: t0, sd: 60 / tr.tempo / (tr.stepsPerBeat || 2), ended: false };
   }
   function scheduleSong(s, until) {
     var sw = (s.tr.swing || 0) * s.sd;
@@ -652,6 +736,15 @@
       INST.box(o, o.g, 783.99, t, 0.4, 0.85);
       INST.box(o, o.g, 1046.5, t + 0.14, 0.6, 0.85);
     },
+    // ソナーの正解「ピン・ピン・ピン」：明るく高い澄んだ音を3回（約0.6秒）。高すぎる倍音は入れず、耳に痛くしない
+    pinpin: function (o, t) {
+      [1318.51, 1567.98, 2093].forEach(function (f, i) {
+        var tt = t + i * 0.15, tc = i < 2 ? 0.055 : 0.085;
+        var g = vca(o.g), end = strike(g, tt, 0.3, 0.003, tc);
+        fm(o, osc(o, 'sine', f, tt, end, g), 2, f, tt, end, 0.4, 0.02);   // 立ち上がりだけ少し明るい「ピ」
+        var g2 = vca(o.g); osc(o, 'sine', f * 2, tt, strike(g2, tt, 0.04, 0.002, tc * 0.5), g2);
+      });
+    },
     // ---- 前の版の名前（互換）----
     move: function (o, t) { tn(o, 'sine', 230, 170, t, 0.09, 0.08, 0.004, 0.025); },
     turn: function (o, t) { nz(o, 'bandpass', 1300, 600, 1.0, t, 0.12, 0.09, 0.03, 0.04); },
@@ -713,6 +806,7 @@
 
   /* ===== S11. 公開する関数 ===== */
   api.TRACKS = TRACKS;
+  api.PLAY_TRACKS = PLAY_TRACKS;
 
   api.unlock = function () {
     try {
@@ -724,7 +818,7 @@
         var s = G.ctx.createBufferSource(); s.buffer = G.ctx.createBuffer(1, 1, G.ctx.sampleRate); s.connect(G.ctx.destination); s.start(0);
       }
       resume();
-      if (ready() && wantBgm && !song) api.bgm(wantBgm);
+      if (ready() && wantBgm && !song) setBgm(wantBgm);
     } catch (e) { if (!G) broken = true; }
   };
 
@@ -754,24 +848,52 @@
     } catch (e) {}
   };
 
+  // 曲を替える本体。前の曲はやわらかく消す。すばやく何度も替えたときは、消えかけの曲を早く消して、重なるのは2曲までにする
+  function setBgm(name) {
+    wantBgm = name || null;
+    if (!ready()) return;
+    resume(); syncMute();
+    if (name && song && song.tr.name === name) return;          // 同じ曲なら続ける
+    fading = fading.filter(function (o) { return G.owners.indexOf(o) >= 0; });
+    fading.forEach(function (o) { kill(o, 0.12); });
+    fading = [];
+    if (song) {                                                  // 前の曲はゆっくり消す（クロスフェード）。鳴り始めてすぐなら早めに
+      kill(song.o, now() - song.t0 < 1.5 ? 0.3 : 0.9);
+      fading.push(song.o); song = null;
+    }
+    if (!name) { stopTimer(); return; }
+    var tr = findTrack(name); if (!tr || !tr.loop) return;
+    if (jing) { kill(jing, 0.4); jing = null; }
+    song = startSong(tr, G.music, now() + 0.05, 1.0);
+    startTimer(); tick();
+  }
+  function cancelPreview() { if (pv) { clearTimeout(pv.timer); pv = null; } }
+
   api.bgm = function (name) {
+    try { cancelPreview(); setBgm(name); } catch (e) {}
+  };
+
+  // 試し聴き：name の曲を secs 秒（既定4秒）だけ鳴らし、そのあと前に頼まれていた曲へ戻す。
+  // 試し聴き中に bgm / jingle / stopAll が呼ばれたら、そちらを優先して試し聴きは終わる。続けて呼ぶと最後の曲だけが鳴る。
+  api.preview = function (name, secs) {
     try {
-      wantBgm = name || null;
       if (!ready()) return;
-      resume(); syncMute();
-      if (name && song && song.tr.name === name) return;          // 同じ曲なら続ける
-      if (song) { kill(song.o, 0.9); song = null; }                // 前の曲はゆっくり消す（クロスフェード）
-      if (!name) { stopTimer(); return; }
       var tr = findTrack(name); if (!tr || !tr.loop) return;
-      if (jing) { kill(jing, 0.4); jing = null; }
-      song = startSong(tr, G.music, now() + 0.05, 1.0);
-      startTimer(); tick();
+      var back = pv ? pv.back : wantBgm;
+      cancelPreview();
+      setBgm(name);
+      var me = pv = { back: back, timer: 0 };
+      me.timer = setTimeout(function () {
+        if (pv !== me) return;
+        pv = null;
+        try { setBgm(me.back); } catch (e) {}
+      }, Math.max(0.5, +secs || 4) * 1000);
     } catch (e) {}
   };
 
   api.jingle = function (name) {
     try {
-      wantBgm = null;
+      cancelPreview(); wantBgm = null;
       if (!ready()) return;
       resume(); syncMute();
       if (song) { kill(song.o, 0.5); song = null; }               // BGM は止める
@@ -787,7 +909,7 @@
 
   api.stopAll = function () {
     try {
-      wantBgm = null; song = null; jing = null; stopTimer();
+      cancelPreview(); wantBgm = null; song = null; jing = null; fading = []; stopTimer();
       if (ready()) {
         killLoops(0.05);
         G.owners.slice().forEach(function (o) { kill(o, 0.05); });
@@ -821,7 +943,8 @@
   api._debug = function () {
     if (!G) return { ready: false };
     var n = 0; G.owners.forEach(function (o) { n += o.srcs.length; });
-    return { ready: ready(), state: G.ctx.state, song: song ? song.tr.name : null, paused: paused, owners: G.owners.length, sources: n,
+    return { ready: ready(), state: G.ctx.state, song: song ? song.tr.name : null, want: wantBgm, preview: !!pv,
+      fading: fading.filter(function (o) { return G.owners.indexOf(o) >= 0; }).length, paused: paused, owners: G.owners.length, sources: n,
       engine: eng.state + ':' + eng.stage, tread: !!eng.tread, drill: !!eng.drill, timer: !!timer };
   };
   // OfflineAudioContext で1つの音を書き出す（kind: 'sfx'|'bgm'|'jingle'|'engine'|'mix'。engine の name は 'run:3' の形）

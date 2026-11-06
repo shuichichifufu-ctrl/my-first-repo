@@ -1,4 +1,4 @@
-/* 見つけて！PixSee v9.0  style.css
+/* 見つけて！PixSee v10.0  style.css
    デザインの方向：「ブロック世界のジオラマ」。明るく澄んだ空に、ブロックでできた小さな世界が浮かぶ。
    寸法は #stage（16:9）を基準にすべて cqmin。色・角丸・影・余白・動きの速さはデザイントークン（C01）にまとめる。
    例外：ホームボタンと確認モーダル（C06）は §2-1 の固定仕様どおり。 */
@@ -76,7 +76,7 @@ body[data-state=play] #worldbox{visibility:visible}
 #stage{z-index:1}
 
 /* 動きを減らす設定の端末では 漂う動きを止める */
-@media (prefers-reduced-motion: reduce){.isle,.cloud,.isle-hero,.logo .lg-letters,.nbtn.primary,.btn-boot.ready,.found,.team figure.top .sk,.team figure.top img{animation:none !important}}
+@media (prefers-reduced-motion: reduce){.gearbtn i,.isle,.cloud,.isle-hero,.logo .lg-letters,.nbtn.primary,.btn-boot.ready,.found,.team figure.top .sk,.team figure.top img{animation:none !important}}
 
 /* ===== C04. 画面の切り替え ===== */
 .screen{position:absolute;inset:0;display:none}
@@ -109,7 +109,7 @@ body[data-state=play] #play,body[data-state=ending] #ending,body[data-state=quit
 #nav{position:absolute;left:0;right:0;bottom:6cqmin;display:flex;flex-wrap:wrap;justify-content:center;align-items:flex-end;gap:5cqmin;z-index:50;pointer-events:none}
 .brk{flex-basis:100%;height:0}
 .nbtn{width:60cqmin;height:15cqmin;font-size:6.2cqmin;font-weight:800}
-body[data-state=title] #nav{gap:3.4cqmin;bottom:15.6cqmin} /* 「せってい」の下に 記録チップ（C10）が 入るだけ あける */
+body[data-state=title] #nav{bottom:12.4cqmin} /* タイトル：「はじめる」だけ。下の中央（最下段の 署名・版の上） */
 .nbtn.hero{width:80cqmin;height:18cqmin;font-size:8.4cqmin;letter-spacing:.06em;--lip:1.4cqmin}
 .nbtn.hero i{width:8.6cqmin;height:8.6cqmin}
 .nbtn.sub{width:auto;height:11cqmin;padding:0 5cqmin 0 4cqmin;gap:1.8cqmin;font-size:4.6cqmin;--lip:.9cqmin}
@@ -178,13 +178,24 @@ body.paused #play *,body.paused #play{animation-play-state:paused !important}
 .btn-boot.ready:not(.down){animation:breatheX 2.6s ease-in-out infinite}
 @keyframes breatheX{0%,100%{transform:translateX(-50%) scale(1)}50%{transform:translateX(-50%) scale(1.035)}}
 
-/* ===== C10. タイトル ===== */
-.titlelogo{position:absolute;left:0;right:0;top:2.5cqmin;width:104cqmin}
-.isle-hero{position:absolute;width:36cqmin}
-.isle-hero.l{left:5cqmin;top:33cqmin;animation:float 8s ease-in-out infinite}
-.isle-hero.r{right:5cqmin;top:31cqmin;animation:float 9.5s ease-in-out infinite;animation-delay:-3s}
+/* ===== C10. タイトル =====
+   並び（cqmin。ステージ 177.78×100）：左上 歯車「せってい」（x 2.5〜, y 3〜15。右上の ホームと 高さを そろえる）／
+   ロゴ 上の中央〜まん中（y 3.5〜48）／記録チップ ロゴの下の中央／左右の島のシーカー（ロゴの下・「はじめる」の外がわ）／
+   「はじめる」下の中央（#nav）／最下段 署名と版。重ならないことは test/e2e5.js で 16:9 と 4:3 の 数値で確かめる */
+.titlelogo{position:absolute;left:0;right:0;top:3.5cqmin;width:114cqmin}
+.titlelogo .logo{filter:drop-shadow(0 1.4cqmin 1.6cqmin rgba(43,47,58,.10))}
+.gearbtn{position:absolute;z-index:5;left:max(env(safe-area-inset-left) + 1.5cqmin, 2.5cqmin);top:max(env(safe-area-inset-top) + 1.5cqmin, 3cqmin);height:12cqmin;
+  padding:0 2.6cqmin 0 1.9cqmin;display:flex;align-items:center;gap:1cqmin;border-radius:var(--r-pill);font-size:4.2cqmin;font-weight:800;color:var(--ink);white-space:nowrap;line-height:1;
+  background:linear-gradient(180deg,#fff,var(--cream));box-shadow:inset 0 .4cqmin 0 #fff,0 .9cqmin 0 var(--cream-lip),0 1.8cqmin 2.6cqmin rgba(43,47,58,.14);transition:transform var(--t-press)}
+.gearbtn i{display:block;width:6.4cqmin;height:6.4cqmin;flex:none;color:var(--sky);animation:gearTurn 14s linear infinite}
+.gearbtn i svg{width:100%;height:100%;fill:currentColor}
+.gearbtn.down{transform:translateY(.7cqmin);box-shadow:inset 0 .4cqmin 0 #fff,0 .2cqmin 0 var(--cream-lip),0 .6cqmin 1.4cqmin rgba(43,47,58,.12)}
+@keyframes gearTurn{to{transform:rotate(360deg)}}
+.isle-hero{position:absolute;width:27cqmin} /* 島の絵の箱（上の あき を ふくむ）が ロゴ・版に かからない大きさ */
+.isle-hero.l{left:6cqmin;top:50.3cqmin;animation:float 8s ease-in-out infinite}
+.isle-hero.r{right:16cqmin;top:50.3cqmin;animation:float 9.5s ease-in-out infinite;animation-delay:-3s}
 .isle-hero svg{width:100%;height:auto;overflow:visible}
-.recchip{position:absolute;left:var(--edge);bottom:7.4cqmin;display:flex;align-items:center;gap:1.4cqmin;background:rgba(255,250,240,.92);border-radius:var(--r-pill);box-shadow:var(--sh-1);
+.recchip{position:absolute;left:50%;top:52cqmin;transform:translateX(-50%);display:flex;align-items:center;gap:1.4cqmin;background:rgba(255,250,240,.92);border-radius:var(--r-pill);box-shadow:var(--sh-1);
   padding:.9cqmin 3cqmin .9cqmin 1.4cqmin;font-size:var(--fs-min);color:var(--ink);white-space:nowrap}
 .recchip b{font-size:var(--fs-min);font-weight:800;color:var(--orange-lip)}
 .rc-ico{display:block;width:5cqmin;height:5cqmin;flex:none}.rc-ico svg{width:100%;height:100%}
@@ -205,11 +216,11 @@ body.paused #play *,body.paused #play{animation-play-state:paused !important}
 .backbtn.down{transform:translateY(.7cqmin)}
 .pane{position:absolute;left:6cqmin;right:6cqmin;top:19cqmin;bottom:25cqmin;display:none}
 #setting[data-sub=how] .pane,#setting[data-sub=who] .pane,#setting[data-sub=level] .pane,#setting[data-sub=choice] .pane{bottom:6cqmin}
-#setting[data-sub=opts] .pane{top:17.4cqmin;bottom:3cqmin;left:5cqmin;right:5cqmin}
+#setting[data-sub=opts] .pane{top:17.4cqmin;bottom:3cqmin;left:4cqmin;right:4cqmin}
 #setting[data-sub=how] .sub-how,#setting[data-sub=who] .sub-who,#setting[data-sub=level] .sub-level,
 #setting[data-sub=choice] .sub-choice,#setting[data-sub=code] .sub-code,#setting[data-sub=pick] .sub-pick,
 #setting[data-sub=keypad] .sub-keypad,#setting[data-sub=msg] .sub-msg,#setting[data-sub=error] .sub-msg{display:flex}
-#setting[data-sub=opts] .sub-opts{display:grid}
+#setting[data-sub=opts] .sub-opts{display:flex}
 
 /* カード：クリームの面・大きな角丸・下のふち（ブロックの側面）・やわらかい影 */
 .howcard,.lvcard,.bigcard,.card,.key{position:relative;color:var(--ink);background:linear-gradient(180deg,#fff 0%,var(--cream) 100%);
@@ -250,30 +261,71 @@ body.paused #play *,body.paused #play{animation-play-state:paused !important}
 .dots i{font-style:normal;animation:dot 1.6s ease-in-out infinite}.dots i:nth-child(2){animation-delay:.25s}.dots i:nth-child(3){animation-delay:.5s}
 @keyframes dot{0%,100%{opacity:.25}50%{opacity:1}}
 
-/* ちずえらび */
+/* ちずえらび：上に 種類の タブ、まん中に 1列の カード（横に スクロール）、下に ランダム・えを よみこむ。右に えらんだ ちず
+   iPad Safari で 指の横スクロールが きくように：ふだんは 全体 touch-action:none（C02）だが、列と その中だけ pan-x にする */
 .sub-pick{gap:3.4cqmin;align-items:stretch}
-.maps{flex:3.4;display:flex;flex-direction:column;gap:2cqmin;min-width:0}
-.grp{flex:1;display:flex;flex-direction:column;gap:1.2cqmin;min-height:0}
-.gl{display:flex;align-items:center;gap:1.2cqmin;font-size:var(--fs-s);line-height:1;font-weight:800;color:var(--ink);align-self:flex-start;padding:.2cqmin 0}
-.gl::before{content:"";width:2.8cqmin;height:2.8cqmin;border-radius:.8cqmin;background:var(--ink);transform:rotate(45deg) scale(.8)}
-.grp.illust .gl::before{background:var(--orange)}
-.grp .row{flex:1;display:grid;grid-template-columns:repeat(var(--n,4),minmax(0,1fr));gap:2cqmin;min-height:0;padding:0 .4cqmin 1.4cqmin}
-.card{border-radius:var(--r-m);display:flex;flex-direction:column;align-items:center;justify-content:center;gap:.8cqmin;overflow:visible;text-align:center;padding:0 .4cqmin;--lip:.9cqmin}
-.card .kan{font-size:5cqmin;line-height:1.1;font-weight:800;color:var(--ink);white-space:nowrap}
+.maps{flex:3.4;display:flex;flex-direction:column;gap:1.6cqmin;min-width:0}
+.mtabs{flex:none;display:flex;gap:1.2cqmin;height:8.6cqmin;padding:0 .4cqmin}
+.mtab{position:relative;display:flex;align-items:center;gap:.9cqmin;height:100%;padding:0 1.2cqmin 0 1.5cqmin;border-radius:var(--r-pill);font-size:3.9cqmin;font-weight:800;color:var(--ink-2);white-space:nowrap;line-height:1;
+  background:linear-gradient(180deg,#fff,var(--cream));box-shadow:inset 0 .4cqmin 0 #fff,0 .8cqmin 0 var(--cream-lip),0 1.2cqmin 1.8cqmin rgba(43,47,58,.10);transition:transform var(--t-press)}
+.mtab i{display:block;width:2.6cqmin;height:2.6cqmin;border-radius:.7cqmin;background:var(--ink);transform:rotate(45deg) scale(.82);flex:none}
+.mtab.kotowaza i{background:var(--mint)}.mtab.eigo i{background:var(--sky)}.mtab.illust i{background:var(--orange)}
+.mtab b{font-size:var(--fs-min);font-weight:800;min-width:4.6cqmin;height:4.8cqmin;line-height:4.8cqmin;text-align:center;border-radius:var(--r-pill);background:var(--cream-2);color:var(--ink-2);padding:0 .8cqmin}
+.mtab.on{color:#fff;background:linear-gradient(180deg,var(--sky-hi),var(--sky));text-shadow:0 .3cqmin 0 rgba(10,70,110,.4);box-shadow:inset 0 .4cqmin 0 rgba(255,255,255,.35),0 .8cqmin 0 var(--sky-lip),0 1.2cqmin 1.8cqmin rgba(26,134,189,.3)}
+.mtab.on i{background:#fff}.mtab.on b{background:rgba(255,255,255,.92);color:var(--sky-lo);text-shadow:none}
+.mtab.down{transform:translateY(.6cqmin)}
+.mrows{position:relative;flex:1;min-height:0}
+.mrow{position:absolute;inset:0;display:none;gap:2.2cqmin;padding:2.4cqmin 1cqmin 3cqmin;overflow-x:auto;overflow-y:hidden;
+  scroll-snap-type:x mandatory;scroll-padding:0 1cqmin;overscroll-behavior-x:contain;-webkit-overflow-scrolling:touch;scrollbar-width:none;cursor:grab}
+.mrow.on{display:flex}
+.mrow::-webkit-scrollbar{display:none}
+.mrow,.mrow *{touch-action:pan-x}
+.mrow.drag{scroll-snap-type:none;cursor:grabbing}
+.mrow .card{flex:none;width:28cqmin;height:100%;scroll-snap-align:start}
+.mend{flex:none;width:1cqmin;height:1cqmin}
+/* まだ 先が あるときは はしを うすく（つづきが あると わかる）。右はしの カードは 少しだけ 見えている */
+.mrows.more-r .mrow.on{-webkit-mask-image:linear-gradient(90deg,#000 0,#000 calc(100% - 10cqmin),rgba(0,0,0,.25) 100%);mask-image:linear-gradient(90deg,#000 0,#000 calc(100% - 10cqmin),rgba(0,0,0,.25) 100%)}
+.mrows.more-l .mrow.on{-webkit-mask-image:linear-gradient(90deg,rgba(0,0,0,.25) 0,#000 10cqmin,#000 100%);mask-image:linear-gradient(90deg,rgba(0,0,0,.25) 0,#000 10cqmin,#000 100%)}
+.mrows.more-l.more-r .mrow.on{-webkit-mask-image:linear-gradient(90deg,rgba(0,0,0,.25) 0,#000 10cqmin,#000 calc(100% - 10cqmin),rgba(0,0,0,.25) 100%);mask-image:linear-gradient(90deg,rgba(0,0,0,.25) 0,#000 10cqmin,#000 calc(100% - 10cqmin),rgba(0,0,0,.25) 100%)}
+.mnav{position:absolute;top:50%;width:8.6cqmin;height:8.6cqmin;margin-top:-5cqmin;border-radius:50%;display:none;align-items:center;justify-content:center;z-index:3;color:var(--sky-lo);
+  background:rgba(255,255,255,.96);box-shadow:0 .7cqmin 0 var(--cream-lip),var(--sh-2);transition:transform var(--t-press)}
+.mnav svg{width:5cqmin;height:5cqmin}
+.mnav.next{right:-.6cqmin}.mnav.prev{left:-.6cqmin}
+.mrows.more-r .mnav.next,.mrows.more-l .mnav.prev{display:flex}
+.mnav.down{transform:translateY(.5cqmin)}
+.card{border-radius:var(--r-m);display:flex;flex-direction:column;align-items:center;justify-content:center;gap:.9cqmin;overflow:visible;text-align:center;padding:0 .4cqmin;--lip:.9cqmin}
+.card .kan{font-size:5.6cqmin;line-height:1.1;font-weight:800;color:var(--ink);white-space:nowrap}
 .card .yomi{font-size:var(--fs-min);line-height:1.1;white-space:nowrap;color:var(--ink-2)}
 .card .yomi.two{line-height:1.05}
-.card .ic{display:block;width:9cqmin;height:9cqmin}.card .ic svg,.card .ic img{width:100%;height:100%;object-fit:contain;display:block}
+.card .yomi:empty{display:none}
+.card .ic{display:block;width:12cqmin;height:12cqmin}.card .ic svg,.card .ic img{width:100%;height:100%;object-fit:contain;display:block}
+.card.kotowaza .kan{font-size:4.2cqmin;line-height:1.14}
+.card.kotowaza .kan.three{font-size:4cqmin}
+.card.kotowaza .yomi{letter-spacing:-.03em}
+.card.eigo .kan{font-family:"Arial Rounded MT Bold","Hiragino Maru Gothic ProN",var(--font);font-size:6.4cqmin;letter-spacing:.04em;color:var(--sky-lo)}
+.card.eigo .kan.long{font-size:5cqmin;letter-spacing:.01em}
+.card .mean{font-size:3.6cqmin;line-height:1;font-weight:800;color:var(--orange-lip);background:var(--orange-tint);border-radius:var(--r-pill);padding:.6cqmin 2cqmin;white-space:nowrap}
+.card .mean:empty{display:none}
 .card.illust .kan{font-size:4.6cqmin}
-.maps.dense .card.yoji .kan{font-size:4.4cqmin}.maps.dense .card.illust .kan{font-size:3.8cqmin}.maps.dense .card .ic{width:7.6cqmin;height:7.6cqmin}
-.card.file{flex:none;height:11cqmin;flex-direction:row;gap:1.8cqmin;border-radius:var(--r-pill);padding:0 3cqmin;margin:0 .4cqmin;background:linear-gradient(180deg,#fff,var(--sky-tint))}
-.card.file .ic{width:6.4cqmin;height:6.4cqmin}
-.card.file .kan{font-size:4.6cqmin}
+.card.yoji{background:linear-gradient(180deg,#fff 0%,var(--cream) 100%)}
+.card.kotowaza{background:linear-gradient(180deg,#fff 0%,#eefaf3 100%)}
+.card.eigo{background:linear-gradient(180deg,#fff 0%,var(--sky-tint) 100%)}
+.mtools{flex:none;display:flex;gap:2.4cqmin;height:10.6cqmin;padding:0 .4cqmin;align-items:stretch}
+.card.tool{flex:none;height:100%;flex-direction:row;gap:1.6cqmin;border-radius:var(--r-pill);padding:0 3.2cqmin 0 2.4cqmin;margin:0}
+.card.tool .ic{width:6.4cqmin;height:6.4cqmin}
+.card.tool .kan{font-size:4.4cqmin}
+.card.random{background:linear-gradient(180deg,var(--gold-hi),var(--gold));box-shadow:inset 0 .4cqmin 0 rgba(255,255,255,.6),0 var(--lip) 0 var(--gold-lip),0 calc(var(--lip) + 1.2cqmin) 3cqmin rgba(211,158,0,.25)}
+.card.random .ic.dice{transform:rotate(-10deg)}
+.card.random.down .ic.dice{transform:rotate(20deg)}
+.card.file{background:linear-gradient(180deg,#fff,var(--sky-tint))}
 .card.file .bw{font-size:var(--fs-min);background:var(--ink);color:#fff;border-radius:var(--r-pill);padding:.4cqmin 1.8cqmin}
 .card input[type=file]{position:absolute;inset:0;width:100%;height:100%;opacity:0;cursor:pointer;font-size:0}
 .preview{flex:1;border-radius:var(--r-l);background:rgba(255,250,240,.94);box-shadow:var(--sh-2);display:flex;flex-direction:column;align-items:center;justify-content:center;gap:1cqmin;padding:1.6cqmin;min-width:0;overflow:hidden}
 .preview img.mapimg{max-width:100%;max-height:22cqmin;object-fit:contain;border-radius:var(--r-s);background:#fff;box-shadow:var(--sh-1)}
-.preview .pt{font-size:5.6cqmin;line-height:1.1;color:var(--ink);font-weight:800}
-.preview .py{font-size:var(--fs-s);color:var(--ink-2)}
+.preview .pt{font-size:5.6cqmin;line-height:1.1;color:var(--ink);font-weight:800;text-align:center}
+.preview .pt.long{font-size:4.4cqmin;line-height:1.15}
+.preview .py{font-size:var(--fs-s);color:var(--ink-2);text-align:center;line-height:1.25;max-width:100%;overflow-wrap:anywhere}
+.preview .pm{font-size:4.2cqmin;font-weight:800;color:var(--orange-lip);background:var(--orange-tint);border-radius:var(--r-pill);padding:.6cqmin 2.6cqmin}
 .preview .hint{font-size:4.6cqmin;color:var(--ink-2);text-align:center;line-height:1.45}
 .preview .crew{display:flex;gap:2.4cqmin;margin-top:.2cqmin;padding-top:1cqmin;border-top:.3cqmin dashed var(--cream-lip)}
 .crew figure{margin:0;display:flex;flex-direction:column;align-items:center;gap:.4cqmin}
@@ -304,26 +356,23 @@ body.paused #play *,body.paused #play{animation-play-state:paused !important}
 .lvcard small{font-size:var(--fs-s);color:var(--ink-2)}
 .lvcard em{font-style:normal;font-size:var(--fs-min);line-height:1.4;background:var(--cream-2);border-radius:var(--r-s);padding:.8cqmin 2.4cqmin;margin-top:.6cqmin;color:var(--ink-2);text-align:center;min-height:10cqmin;display:flex;align-items:center;word-break:keep-all} /* 長い行は ことばの切れ目（空白）で 折る */
 
-/* せってい */
-.sub-opts{grid-template-columns:1.1fr 1fr .84fr;grid-template-rows:auto 1fr 1fr;gap:2.4cqmin}
-.setcard{border-radius:var(--r-l);background:rgba(255,250,240,.96);box-shadow:var(--sh-2);padding:1.8cqmin 2.6cqmin;display:flex;flex-direction:column;justify-content:center;gap:1.2cqmin;min-height:0;min-width:0;color:var(--ink)}
-.setcard.wide{grid-column:1/4}
-.setcard[data-card=search]{grid-column:1;grid-row:2/4}
-.setcard[data-card=search] .seg{flex-direction:column;flex:1}
-.setcard[data-card=search] .seg button{height:auto;flex:1;font-size:4.4cqmin;justify-content:flex-start;padding:0 2.6cqmin;gap:2cqmin}
-.setcard[data-card=search] .seg button i{display:block;width:8cqmin;height:8cqmin;flex:none}
+/* せってい：いちばん上に シーカーの いろ（横いっぱい）、その下に 2列。カードの はばは 中身に あわせて のびちぢみ（字が はみ出さないことは e2e5 で確かめる） */
+.sub-opts{flex-direction:column;gap:2.2cqmin}
+.srow{display:flex;gap:2.2cqmin;flex:1;min-height:0}
+.setcard{border-radius:var(--r-l);background:rgba(255,250,240,.96);box-shadow:var(--sh-2);padding:1.6cqmin 2.4cqmin;display:flex;flex-direction:column;justify-content:center;gap:1cqmin;min-height:0;min-width:0;color:var(--ink)}
+.setcard.wide{flex:none}
+.srow .setcard{flex:1 1 auto} /* はばは 中身（見出し・ボタン・説明）の 長さから。あまりは 同じだけ のばす */
+.setcard[data-card=search] .seg button{flex:1 1 auto;height:10.6cqmin;font-size:3.7cqmin;line-height:1.12;justify-content:flex-start;padding:0 1.2cqmin;gap:1cqmin;text-align:left;white-space:nowrap}
+.setcard[data-card=search] .seg button i{display:block;width:5.4cqmin;height:5.4cqmin;flex:none}
 .setcard[data-card=search] .seg button i svg{width:100%;height:100%}
-.setcard[data-card=swipeRev]{grid-column:2;grid-row:2}
-.setcard[data-card=binary]{grid-column:2;grid-row:3}
-.setcard[data-card=record]{grid-column:3;grid-row:2/4;justify-content:space-between}
-.setcard[data-card=record] .sc-head{white-space:normal;align-items:flex-start;word-break:keep-all}
-.setcard[data-card=record] .sc-hint{white-space:normal;font-size:var(--fs-s);line-height:1.4;word-break:keep-all}
-.setcard[data-card=search] .sc-hint{white-space:normal;word-break:keep-all}
+.setcard[data-card=search] .seg button.on::before{display:none}
+.setcard[data-card=record] .seg button{height:9cqmin}
+.sc-head{white-space:normal;align-items:flex-start;word-break:keep-all}
 .setcard[data-card=record] .seg button{height:11cqmin}
-.sc-head{display:flex;align-items:center;gap:1.4cqmin;font-size:4.2cqmin;line-height:1.1;font-weight:800;white-space:nowrap}
+.sc-head{display:flex;align-items:center;gap:1.2cqmin;font-size:4cqmin;line-height:1.1;font-weight:800;white-space:nowrap}
 .sc-ico{display:block;width:6cqmin;height:6cqmin;flex:none}.sc-ico svg{width:100%;height:100%}
 .seg{display:flex;gap:1.8cqmin}
-.seg button{position:relative;flex:1;height:9cqmin;border-radius:var(--r-m);background:linear-gradient(180deg,#fff,var(--cream));font-size:4.4cqmin;font-weight:800;color:var(--ink-2);
+.seg button{position:relative;flex:1;height:9cqmin;border-radius:var(--r-m);background:linear-gradient(180deg,#fff,var(--cream));font-size:4.2cqmin;font-weight:800;color:var(--ink-2);
   display:flex;align-items:center;justify-content:center;gap:1cqmin;white-space:nowrap;
   box-shadow:inset 0 .4cqmin 0 #fff,0 .8cqmin 0 var(--cream-lip),0 1.4cqmin 2cqmin rgba(43,47,58,.10);transition:transform var(--t-press)}
 .seg button.on{color:#fff;background:linear-gradient(180deg,var(--sky-hi),var(--sky));text-shadow:0 .3cqmin 0 rgba(10,70,110,.4);
@@ -331,8 +380,13 @@ body.paused #play *,body.paused #play{animation-play-state:paused !important}
 .seg button.on::before{content:"";flex:none;width:1.8cqmin;height:3.2cqmin;border:solid #fff;border-width:0 .7cqmin .7cqmin 0;transform:rotate(45deg) translate(-.3cqmin,-.4cqmin);margin-right:.6cqmin}
 .setcard[data-card=search] .seg button.on::before{display:none}
 .seg button.down{transform:translateY(.6cqmin)}
+/* 3つ・4つの えらびは 字を少し小さく、✓ の かわりに 色だけで しめす（はばを とらない） */
+.seg.three button,.seg.four button{font-size:4cqmin;padding:0 .6cqmin;flex:1 1 auto}
+.seg.three,.seg.four{gap:1.4cqmin}
+.seg.three button.on::before,.seg.four button.on::before{display:none}
 .seg button.danger{color:#b83a5c;background:linear-gradient(180deg,#fff,#fde3e9);box-shadow:inset 0 .4cqmin 0 #fff,0 .8cqmin 0 #efc2cf,0 1.4cqmin 2cqmin rgba(184,58,92,.12)}
 .sc-hint{font-size:var(--fs-min);color:var(--ink-2);line-height:1.25;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;flex:none}
+.setcard[data-card=record] .sc-hint{white-space:nowrap}
 /* シーカーの いろ：10このプレビュー */
 .swatches{display:grid;grid-template-columns:repeat(10,1fr);gap:1.6cqmin}
 .swatch{position:relative;border-radius:var(--r-m);background:linear-gradient(180deg,#fff,var(--cream));display:flex;flex-direction:column;align-items:center;justify-content:flex-end;gap:.2cqmin;padding:.4cqmin .2cqmin .8cqmin;height:16cqmin;--lip:.8cqmin;
@@ -354,7 +408,9 @@ body.paused #play *,body.paused #play{animation-play-state:paused !important}
    擬音 左の帯（ソナーの下）と 右の帯（カメラの下） / カウントダウン 中央の上 / 獲得宣言 画面中央 / 操作ボタン 下
    カウントダウン・擬音・説明・ちずの名前 と 獲得宣言 は 同じ時に出ないので 場所が かさなってよい（test/e2e4.js で明記して確かめる） */
 #sonar{position:absolute;left:max(env(safe-area-inset-left),2.5cqmin);top:3cqmin;width:30cqmin;height:30cqmin;border-radius:50%;
-  box-shadow:0 1cqmin 2.4cqmin rgba(20,40,60,.35)}
+  box-shadow:0 0 0 0 rgba(255,213,79,0),0 0 0 0 rgba(255,213,79,0),0 1cqmin 2.4cqmin rgba(20,40,60,.35);transition:box-shadow 1.2s ease-in-out}
+/* 宝石の真上（'overGem'）：まわりが ふわっと 金色に 光って ゆっくり もどる（1回だけ。点滅しない） */
+#sonar.glow{box-shadow:0 0 0 .9cqmin rgba(255,213,79,.9),0 0 6cqmin 2cqmin rgba(255,213,79,.65),0 1cqmin 2.4cqmin rgba(20,40,60,.35);transition:box-shadow .35s ease-out}
 #sonar canvas{display:block;width:100%;height:100%}
 #hud{position:absolute;left:50%;top:2.5cqmin;transform:translateX(-50%);display:flex;flex-direction:column;align-items:center;gap:1.2cqmin}
 #timer{display:flex;align-items:center;gap:1.4cqmin;background:rgba(255,250,240,.95);border-radius:var(--r-pill);padding:.6cqmin 4cqmin .6cqmin 2cqmin;box-shadow:var(--sh-2)}
@@ -368,16 +424,21 @@ body[data-mode=count] #scorebar{display:flex}
 .sb b{font-size:5.4cqmin;font-variant-numeric:tabular-nums;color:var(--ink)}
 .sb.me{box-shadow:inset 0 0 0 .5cqmin var(--orange),var(--sh-2)}.sb.op{box-shadow:inset 0 0 0 .5cqmin var(--sky),var(--sh-2)}
 /* ちずの名前：かんじ（上）と よみ（下）の 2行。いちばん長い「いちじつせんしゅう」でも 切れない（はばは中身に合わせる） */
-#maptag{position:absolute;left:max(env(safe-area-inset-left),2.5cqmin);top:34.6cqmin;width:max-content;max-width:52cqmin;display:flex;flex-direction:column;align-items:flex-start;gap:.1cqmin;background:rgba(255,250,240,.9);border-radius:var(--r-m);padding:.6cqmin 2.4cqmin .7cqmin;box-shadow:var(--sh-1);white-space:nowrap;transition:opacity var(--t-mid)}
+#maptag{position:absolute;left:max(env(safe-area-inset-left),2.5cqmin);top:34.6cqmin;width:max-content;max-width:55cqmin;display:flex;flex-direction:column;align-items:flex-start;gap:.1cqmin;background:rgba(255,250,240,.9);border-radius:var(--r-m);padding:.6cqmin 2.4cqmin .7cqmin;box-shadow:var(--sh-1);white-space:nowrap;transition:opacity var(--t-mid)}
 #maptag b{font-size:3.8cqmin;line-height:1.15;color:var(--ink);font-weight:800}#maptag small{font-size:var(--fs-min);line-height:1.15;color:var(--ink-2)}
 #maptag small:empty{display:none}
+#maptag b.long{font-size:var(--fs-min)}#maptag small.long{letter-spacing:-.03em}
 #maptag:empty,#maptag.none{display:none}
-#cam{position:absolute;right:max(env(safe-area-inset-right) + 1.5cqmin,2.5cqmin);top:18cqmin;width:14cqmin;height:13cqmin;border-radius:var(--r-m);
+#cam{position:absolute;right:max(env(safe-area-inset-right) + 1.5cqmin,2.5cqmin);top:18cqmin;width:18cqmin;height:14cqmin;border-radius:var(--r-m);padding:.8cqmin .8cqmin .9cqmin;
   background:rgba(255,250,240,.95);box-shadow:0 .7cqmin 0 var(--cream-lip),var(--sh-2);display:flex;flex-direction:column;align-items:center;justify-content:center;gap:.3cqmin;color:var(--ink);transition:transform var(--t-press)}
 #cam.down{transform:translateY(.6cqmin)}
-#cam i{display:block;width:8cqmin;height:6.6cqmin;flex:none}
+#cam i{display:block;width:8cqmin;height:6.2cqmin;flex:none}
 #cam i svg{width:100%;height:100%}
-#cam span#cam-label{font-size:var(--fs-min);line-height:1;font-weight:800;white-space:nowrap}
+/* 視点の名前（いまの視点）。いちばん長い「おいかけ」「みわたし」でも ボタンの内がわに おさまる（e2e5 で scrollWidth ≤ clientWidth を確かめる） */
+#cam span#cam-label{display:block;max-width:100%;font-size:var(--fs-min);line-height:1.1;font-weight:800;white-space:nowrap;text-align:center;overflow:hidden}
+#cam-dots{display:flex;gap:.9cqmin;height:1.3cqmin;align-items:center}
+#cam-dots b{display:block;width:1.3cqmin;height:1.3cqmin;border-radius:50%;background:var(--cream-lip)}
+#cam-dots b.on{background:var(--orange);transform:scale(1.15)}
 #notice{position:absolute;left:50%;top:24cqmin;transform:translateX(-50%);display:none;font-size:var(--fs-s);background:rgba(255,250,240,.95);color:var(--ink);border-radius:var(--r-pill);padding:1cqmin 3.4cqmin;white-space:nowrap;box-shadow:var(--sh-2)}
 #notice.on{display:block;animation:fadeUp var(--t-mid) var(--ease)}
 /* 大きいお知らせ：「すすむ」（x 39 まで）と ドリルアタック（x 126.4 から）の あいだ、獲得宣言（y 58.5 まで）の下。文は ui.js で 2行に わける */

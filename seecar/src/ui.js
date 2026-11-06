@@ -1,15 +1,17 @@
-// ui.js : 「見つけて！PixSee v9.0」の画面と操作。6ステート、ボタン、モーダル、カウントダウン、獲得宣言、擬音、ソナー、スワイプ、全体の配線。
+// ui.js : 「見つけて！PixSee v10.0」の画面と操作。6ステート、ボタン、モーダル、カウントダウン、獲得宣言、擬音、ソナー、スワイプ、全体の配線。
 // 公開するのは window.App だけ。World / MapGen / Net / Sfx / SeekerModel が無くても落ちないよう、すべて call() 経由で呼ぶ。
 (function () {
   'use strict';
 
   /* ===== U01. 定数と小さな道具 ===== */
-  var VERSION = 'v9.0';
+  var VERSION = 'v10.0';
   var INK = '#2b2f3a';
-  var CAM_LABEL = ['め', 'おいかけ', 'そら'];      // 視点の名前
-  var CAM_GO = ['めへ', 'おいかけへ', 'そらへ'];   // カメラボタンの文字：おすと つぎに なる視点
+  var CAM_N = 4;                                        // 視点の数（0 め／1 おいかけ／2 みわたし／3 そら）
+  var CAM_LABEL = ['め', 'おいかけ', 'みわたし', 'そら']; // 視点の名前（ボタンには いまの視点の名前を出す）
   var LEVELS = ['easy', 'normal', 'hard'];
   var LEVEL_NAME = { easy: 'やさしい', normal: 'ふつう', hard: 'むずかしい' };
+  var SPEEDS = ['fast', 'normal', 'slow'];               // はやい（×1.5）／ふつう（×1.25）／ゆっくり（×1.0 ＝ v9 の速さ）
+  var SPEED_NAME = { fast: 'はやい', normal: 'ふつう', slow: 'ゆっくり' };
   var KIND_NAME = { race: 'どっちが はやい？', count: 'どっちが おおい？', solo: 'ひとりで れんしゅう' };
   var OPP_NAME = { cpu: 'コンピューター', net: 'ともだち' };
   var DEFAULT_ERR = 'つながらなかったよ。ばんごうを たしかめてね';
@@ -21,7 +23,14 @@
   var ANN_SEC = 3.5;          // 獲得宣言の ながさ（秒）
   var ANN_FAILSAFE = 6.0;     // クライアント：ホストの resume が来なくても ここで解く（秒）
   var READY_FAILSAFE = 10000; // ホスト：クライアントの ready が来なくても カウントダウンを始める（ミリ秒）
-  var PLAY_TRACKS = ['play1', 'play2', 'play3'];
+  // プレイの曲（Sfx.PLAY_TRACKS が無いときの控え）。既定は げんき
+  var TRACKS_FALLBACK = [{ name: 'genki', label: 'げんき' }, { name: 'yukai', label: 'ゆかい' }, { name: 'nonbiri', label: 'のんびり' }, { name: 'iyashi', label: 'いやし' }];
+  // スワイプの感度：ステージの横幅の 1/3 を なぞると 90度（＝ 横幅いっぱいで 270度）。
+  // World.swipeTurn(dx) は「dx × SWIPE_GAIN（ラジアン）」回すので、UI で倍率を掛ける（SWIPE_GAIN は world.js では π）
+  var SWIPE_TURN_PER_WIDTH = Math.PI * 1.5;
+  var SWIPE_START = 1.2;      // なぞり始めの しきい値（cqmin）。これより小さい ゆれは 無視
+  var MAP_KINDS = [            // ちずの種類（見出し・タブの順）
+    { kind: 'yoji', name: 'よじじゅくご' }, { kind: 'kotowaza', name: 'ことわざ' }, { kind: 'eigo', name: 'えいご' }, { kind: 'illust', name: 'イラスト' }];
   var ONO_TEXT = { jump: 'ビョーン！', drill: 'ゴゴゴゴゴ', bump: 'ガン！', 'break': 'ガラッ' };
   var doc = document;
 
@@ -50,19 +59,30 @@
   var uid = 0; function nid(p) { return p + (++uid); }
 
   /* ===== U02. 設定と記録（localStorage。読めなくても既定値で動く） ===== */
-  var KEY_SET = 'pixsee.settings', KEY_REC = 'pixsee.record';
+  // 保存は 'pixsee.settings'。v10 から 版の番号 v を入れる。v の無い（v9 までの）保存を読んだときは、
+  // swipeRev と search だけ 新しい既定（はんたい・ソナーだけ）にする（いろ・むずかしさ などは そのまま引きつぐ）
+  var KEY_SET = 'pixsee.settings', KEY_REC = 'pixsee.record', SET_VER = 10;
   function lsGet(k) { try { return window.localStorage.getItem(k); } catch (e) { return null; } }
   function lsSet(k, v) { try { window.localStorage.setItem(k, v); } catch (e) {} }
   function readJSON(k) { try { var t = lsGet(k); return t ? JSON.parse(t) : null; } catch (e) { return null; } }
-  function defaultSettings() { return { swipeRev: false, binary: false, level: 'normal', palette: 0, search: 'light' }; }
+  function defaultSettings() { return { swipeRev: true, binary: false, level: 'normal', palette: 0, search: 'sonar', speed: 'normal', bgm: 'genki' }; }
+  function playTracks() {
+    var t = prop('Sfx', 'PLAY_TRACKS');
+    if (t && t.length) { var ok = t.filter(function (x) { return x && typeof x.name === 'string'; }); if (ok.length) return ok.map(function (x) { return { name: x.name, label: x.label || x.name }; }); }
+    return TRACKS_FALLBACK;
+  }
+  function trackOk(n) { return typeof n === 'string' && playTracks().some(function (t) { return t.name === n; }); }
   function loadSettings() {
     var d = defaultSettings(), o = readJSON(KEY_SET);
     if (o && typeof o === 'object') {
-      if (typeof o.swipeRev === 'boolean') d.swipeRev = o.swipeRev;
+      var cur = o.v === SET_VER;                       // v10 の保存か
+      if (cur && typeof o.swipeRev === 'boolean') d.swipeRev = o.swipeRev;
       if (typeof o.binary === 'boolean') d.binary = o.binary;
       if (LEVELS.indexOf(o.level) >= 0) d.level = o.level;
       if (typeof o.palette === 'number' && o.palette >= 0 && o.palette <= 9) d.palette = Math.floor(o.palette);
-      if (o.search === 'light' || o.search === 'sonar') d.search = o.search;
+      if (cur && (o.search === 'light' || o.search === 'sonar')) d.search = o.search;
+      if (SPEEDS.indexOf(o.speed) >= 0) d.speed = o.speed;
+      if (trackOk(o.bgm)) d.bgm = o.bgm;
     }
     return d;
   }
@@ -86,7 +106,7 @@
     return d;
   }
   var settings = defaultSettings(), record = defaultRecord();
-  function saveSettings() { lsSet(KEY_SET, JSON.stringify(settings)); }
+  function saveSettings() { var o = JSON.parse(JSON.stringify(settings)); o.v = SET_VER; lsSet(KEY_SET, JSON.stringify(o)); }
   function saveRecord() { lsSet(KEY_REC, JSON.stringify(record)); }
   function recOf(kind, o, level) {
     if (kind === 'solo') return record.solo;
@@ -247,10 +267,21 @@
       '<rect x="34" y="82" width="56" height="11" rx="5.500" fill="#6b7480"/></svg>';
   }
   // よみ：7文字以上は まん中で 2行に わける（小さい「ゃゅょっ」の前では わけない）。横に つぶさない
-  function setYomi(el, t) {
+  // ことわざ（particle=true）は 助詞（は・も・ば・て…）の あとで わける
+  function setYomi(el, t, particle) {
     el.textContent = '';
     if (t.length < 7) { el.textContent = t; el.classList.remove('two'); return; }
     var k = Math.floor(t.length / 2);
+    if (particle) {
+      // 助詞の つよさの 順（は・も・ば・て・を・が・の・に・ど）に、両がわが 8字までの ところを さがす
+      var P = 'はもばてをがのにど', best = -1, bs = 1e9;
+      for (var i = 3; i <= t.length - 3; i++) {
+        var r = P.indexOf(t.charAt(i - 1)); if (r < 0 || Math.max(i, t.length - i) > 8) continue;
+        var sc = r * 10 + Math.abs(i - t.length / 2) + (Math.max(i, t.length - i) > 7 ? 30 : 0);
+        if (sc < bs) { bs = sc; best = i; }
+      }
+      if (best > 0) k = best;
+    }
     while (k < t.length - 1 && /[ゃゅょっぁぃぅぇぉャュョッァィゥェォー]/.test(t.charAt(k))) k++;
     el.appendChild(doc.createTextNode(t.slice(0, k))); el.appendChild(doc.createElement('br')); el.appendChild(doc.createTextNode(t.slice(k)));
     el.classList.add('two');
@@ -318,6 +349,7 @@
     home: '<svg viewBox="0 0 24 24"><path d="M12 3.200c.4 0 .7.100 1 .4l8.400 7.600c.6.600.2 1.600-.6 1.600H19v7c0 .7-.6 1.200-1.200 1.200h-3.600v-5.500h-4.400V21H6.200C5.600 21 5 20.500 5 19.800v-7H3.200c-.8 0-1.200-1-.6-1.600L11 3.600c.3-.3.600-.4 1-.4z"/></svg>',
     link: '<svg viewBox="0 0 24 24"><circle cx="5.500" cy="12" r="4"/><circle cx="18.500" cy="12" r="4"/><rect x="8" y="10.500" width="8" height="3" rx="1.500"/></svg>',
     pic: '<svg viewBox="0 0 24 24"><rect x="2" y="4" width="20" height="16" rx="3.500" fill="#ffd54f"/><circle cx="8" cy="10" r="2.400" fill="#ef6c8f"/><path d="M4 19l5.500-5.500 4 4 3-3L21 19z" fill="#2a9fd4"/></svg>',
+    dice: '<svg viewBox="0 0 24 24"><rect x="3" y="3" width="18" height="18" rx="4.500" fill="#fff"/><circle cx="8" cy="8" r="1.900" fill="#ef6c8f"/><circle cx="16" cy="8" r="1.900" fill="#2a9fd4"/><circle cx="12" cy="12" r="1.900" fill="#ff9800"/><circle cx="8" cy="16" r="1.900" fill="#3dbb85"/><circle cx="16" cy="16" r="1.900" fill="#9b6fd6"/></svg>',
     gear: '<svg viewBox="0 0 24 24"><path d="M19.400 13a7.500 7.500 0 0 0 0-2l2.100-1.600-2-3.500-2.500 1a7.500 7.500 0 0 0-1.700-1L14.900 3h-4l-.4 2.900a7.500 7.500 0 0 0-1.700 1l-2.500-1-2 3.500L6.400 11a7.500 7.500 0 0 0 0 2l-2.100 1.600 2 3.500 2.500-1a7.500 7.500 0 0 0 1.700 1l.4 2.900h4l.4-2.900a7.500 7.500 0 0 0 1.700-1l2.500 1 2-3.500zM12.900 15.500a3.500 3.500 0 1 1 0-7 3.500 3.500 0 0 1 0 7z"/></svg>'
   };
   // 部品の絵（操作ボタン・設定）：塗りの面と明暗だけ。線の太いふちは使わない
@@ -341,7 +373,9 @@
     search: '<svg viewBox="0 0 48 48"><circle cx="20" cy="20" r="13" fill="#e3f4fc"/><circle cx="20" cy="20" r="13" fill="none" stroke="#2a9fd4" stroke-width="5"/><path d="M30 30l11 11" stroke="#ff9800" stroke-width="7" stroke-linecap="round"/><path d="M14 16a7 7 0 0 1 6-4" stroke="#fff" stroke-width="3" stroke-linecap="round" fill="none"/></svg>',
     beam: '<svg viewBox="0 0 48 48"><defs><linearGradient id="bmg" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#fff3b0" stop-opacity="0"/><stop offset="1" stop-color="#ffd54f"/></linearGradient></defs><path d="M17 2h14l4 38H13z" fill="url(#bmg)"/><path d="M9 38l15-7 15 7-15 7z" fill="#e2a96c"/><path d="M24 31l15 7-15 7z" fill="#c98e52"/>' + inner(gemSvg('#2a9fd4')).replace('<defs>', '<g transform="translate(15 20) scale(.75)"><defs>') + '</g></svg>',
     sonar: '<svg viewBox="0 0 48 48"><circle cx="24" cy="24" r="21" fill="#1d4e63"/><circle cx="24" cy="24" r="13" fill="none" stroke="#7fd6f5" stroke-width="2" stroke-dasharray="3 4"/><path d="M24 24 24 3A21 21 0 0 1 43 15z" fill="#7fd6f5" opacity=".35"/><circle cx="33" cy="15" r="4" fill="#ffd54f"/><path d="M24 17l5 11-5-3-5 3z" fill="#ff9800"/></svg>',
-    gem: gemSvg('#2a9fd4')
+    gem: gemSvg('#2a9fd4'),
+    speed: '<svg viewBox="0 0 48 48"><path d="M6 34a18 18 0 0 1 36 0" fill="none" stroke="#e3f4fc" stroke-width="8" stroke-linecap="round"/><path d="M6 34a18 18 0 0 1 9-15.600" fill="none" stroke="#3dbb85" stroke-width="8" stroke-linecap="round"/><path d="M15 18.400a18 18 0 0 1 18 0" fill="none" stroke="#ffd54f" stroke-width="8"/><path d="M33 18.400A18 18 0 0 1 42 34" fill="none" stroke="#ff9800" stroke-width="8" stroke-linecap="round"/><path d="M24 34 33.500 21" stroke="' + INK + '" stroke-width="4" stroke-linecap="round"/><circle cx="24" cy="34" r="4.500" fill="' + INK + '"/></svg>',
+    music: '<svg viewBox="0 0 48 48"><path d="M18 9l22-5v27" fill="none" stroke="#2a9fd4" stroke-width="5" stroke-linejoin="round"/><path d="M18 9v27" stroke="#2a9fd4" stroke-width="5"/><ellipse cx="12.500" cy="37" rx="7.500" ry="6" fill="#ff9800"/><ellipse cx="34.500" cy="32" rx="7.500" ry="6" fill="#ef6c8f"/><path d="M18 15l22-5" stroke="#2a9fd4" stroke-width="5"/></svg>'
   };
   // むずかしさの絵：かめ・うさぎ・ロケット（面の明暗だけ）
   var LVPIC = {
@@ -389,9 +423,11 @@
     }
   };
   // カメラの絵
+  // カメラの絵：0 め（目）／1 おいかけ（シーカー）／2 みわたし（ななめ上から見た 地図）／3 そら（真上から見た 地図）
   function camIcon(m, p) {
     if (m === 0) return '<svg viewBox="0 0 48 48"><path d="M3 24C10 12 38 12 45 24 38 36 10 36 3 24z" fill="#fff"/><path d="M3 24C10 12 38 12 45 24" fill="none" stroke="#c9d6e0" stroke-width="2"/><circle cx="24" cy="24" r="9" fill="#3be8a0"/><circle cx="24" cy="24" r="4.500" fill="' + INK + '"/><circle cx="21" cy="21" r="2.400" fill="#fff"/></svg>';
     if (m === 1) return mascot(p);
+    if (m === 2) return '<svg viewBox="0 0 48 48"><path d="M10 17h28l8 23H2z" fill="#e3f4fc"/><path d="M6 28.500h36M24 17v23M17 17l-4.500 23M31 17l4.500 23" stroke="#8cc8e6" stroke-width="2.500" fill="none"/><path d="M14 30h9l-.5 8h-10z" fill="' + p.body + '"/><path d="M31.500 19.500h5l1.500 6h-5.500z" fill="#ffd54f"/><path d="M24 3v8m-4-4 4 4 4-4" stroke="#ff9800" stroke-width="3" fill="none" stroke-linecap="round" stroke-linejoin="round"/></svg>';
     return '<svg viewBox="0 0 48 48"><rect x="4" y="6" width="40" height="36" rx="7" fill="#e3f4fc"/><path d="M4 19h22v10h18M17 6v13M31 29v13" stroke="#8cc8e6" stroke-width="3.500" fill="none"/><rect x="9" y="30" width="9" height="9" rx="2.500" fill="' + p.body + '"/><circle cx="37" cy="14" r="4" fill="#ffd54f"/></svg>';
   }
   var SAD = '<svg viewBox="0 0 64 64"><circle cx="32" cy="32" r="28" fill="#ffd54f"/><circle cx="22" cy="27" r="3.500" fill="' + INK + '"/><circle cx="42" cy="27" r="3.500" fill="' + INK + '"/><path d="M21 45q11-9 22 0" stroke="' + INK + '" stroke-width="4" fill="none" stroke-linecap="round"/></svg>';
@@ -434,7 +470,7 @@
   var navKey = '', noticeTimer = 0;
   var remotePaused = false, sentPause = false; // 通信：ともだちが ホームのモーダルを開いている／自分が止めたことを 知らせたか
   var timeLeft = COUNT_SEC, shownSec = -1, scores = [0, 0], totalTreasure = 1;
-  var lastT = 0, rafId = 0, curLevel = 'normal';
+  var lastT = 0, rafId = 0, curLevel = 'normal', curSpeed = 'normal', gemGlowT = -1;
   // プレイの段階：'wait'（通信のそろい待ち）| 'count'（3・2・1・GO!）| 'run' | 'announce'（獲得宣言）| 'end'
   var phase = 'idle', cdT = 0, cdStep = -1, counting = false;
   var elapsed = 0, raceTime = null, winner = -1;
@@ -496,10 +532,8 @@
 
   /* ===== U07. 進行ボタン #nav ===== */
   function navItems() {
-    if (state === 'title') return [
-      { label: 'はじめる', icon: 'play', kind: 'primary hero', fn: startHow },
-      { brk: true },
-      { label: 'せってい', icon: 'gear', kind: 'secondary sub', fn: openSettings }];
+    // タイトル：「はじめる」だけ（下の中央）。「せってい」は 左上の 歯車のボタン（#gear）
+    if (state === 'title') return [{ label: 'はじめる', icon: 'play', kind: 'primary hero', fn: startHow }];
     if (state === 'setting') {
       if (sub === 'pick' && sel && !loading) return [{ label: 'しゅっぱつ！', icon: 'go', kind: 'primary', fn: depart }];
       if (sub === 'keypad' && code.length === 4) return [{ label: 'つなぐ！', icon: 'link', kind: 'primary', fn: doJoin }];
@@ -552,6 +586,7 @@
   function leavePlayFx() {
     counting = false; phase = 'idle'; ann = null; annQueue = [];
     doc.body.classList.remove('counting', 'announcing', 'frozen', 'camtop');
+    gemGlowT = -1; clearTimeout(glowTimer); if (els.sonar) els.sonar.classList.remove('glow');
     call('Sfx', 'engine', 'idle', 0);
     clearOno();
   }
@@ -576,7 +611,7 @@
     opp = o; sel = null; loading = false;
     if (o === 'cpu') { renderLevels(); setSub('level'); } else { netRole = ''; setSub('choice'); }
   }
-  function goPick(head) { sel = null; loading = false; renderCards(); renderPreview(); setSub('pick', head); }
+  function goPick(head) { sel = null; loading = false; renderCards(); renderPreview(); setSub('pick', head); rowEdges(); } // 列が 見えてから はしの ぼかし・矢印を きめる
   function openSettings() { renderSettings(); enterSetting('opts'); }
   function backFromSetting() {
     var s = sub;
@@ -635,7 +670,7 @@
     var segs = doc.querySelectorAll('.seg button[data-set]');
     for (var i = 0; i < segs.length; i++) {
       var k = segs[i].getAttribute('data-set'), raw = segs[i].getAttribute('data-val');
-      var v = (k === 'search') ? raw : (raw === '1');
+      var v = optVal(k, raw);
       var on = (settings[k] === v);
       segs[i].classList.toggle('on', on);
       segs[i].setAttribute('aria-pressed', on ? 'true' : 'false');
@@ -643,13 +678,35 @@
     var sw2 = doc.querySelectorAll('.swatch');
     for (var j = 0; j < sw2.length; j++) sw2[j].classList.toggle('on', +sw2[j].getAttribute('data-pal') === settings.palette);
     var h = function (id, t) { var e = $(id); if (e) e.textContent = t; };
-    h('hint-swipeRev', settings.swipeRev ? 'みぎへ なぞると ひだりを むくよ' : 'みぎへ なぞると みぎを むくよ');
+    h('hint-swipeRev', settings.swipeRev ? 'みぎに なぞると ひだりを むく' : 'みぎに なぞると みぎを むく');
     h('hint-binary', settings.binary ? 'しろと くろの 2いろに するよ' : 'いろの こさで ちずに するよ');
     h('hint-search', settings.search === 'sonar' ? 'ひかりの はしらは でないよ' : 'たからの ばしょから ひかりが でるよ');
+    h('hint-speed', { fast: 'シーカーも コンピューターも はやいよ', normal: 'ちょうど いい はやさだよ', slow: 'ゆっくり すすむよ' }[settings.speed] || '');
+    h('hint-bgm', 'えらぶと すこし ながれるよ');
     var t = recTotals();
     h('hint-record', 'ぜんぶで ' + t.all + 'かい あそんだよ');
   }
-  function setOpt(k, v) { settings[k] = v; saveSettings(); renderSettings(); }
+  // ボタンの data-val を 設定の値に：さがしかた・スピード・おんがく は 文字のまま、ほかは 1/0 → true/false
+  function optVal(k, raw) { return (k === 'search' || k === 'speed' || k === 'bgm') ? raw : (raw === '1'); }
+  function setOpt(k, v) {
+    settings[k] = v; saveSettings(); renderSettings();
+    if (k === 'bgm' && state === 'setting') previewTrack(v); // えらんだ曲を すこし 試しに鳴らす（設定を出ると タイトルの曲へ もどる）
+  }
+  function previewTrack(name) {
+    if (hasFn('Sfx', 'preview')) call('Sfx', 'preview', name, 6);
+    else call('Sfx', 'bgm', name);
+  }
+  // おんがくの ボタン（Sfx.PLAY_TRACKS の順。無ければ 控えの4曲）
+  function buildTrackSeg() {
+    var box = $('seg-bgm'); if (!box) return;
+    box.innerHTML = '';
+    playTracks().forEach(function (t) {
+      var b = doc.createElement('button');
+      b.type = 'button'; b.tabIndex = -1; b.setAttribute('data-set', 'bgm'); b.setAttribute('data-val', t.name);
+      b.textContent = t.label;
+      box.appendChild(b);
+    });
+  }
   function renderRecChip() {
     var t = recTotals();
     els.recchip.innerHTML = '<span class="rc-ico">' + SETICO.trophy + '</span><b>くらべっこ</b><span class="rc-n"></span>';
@@ -673,36 +730,96 @@
     } catch (e) { u = ''; }
     thumbs[id] = u; return u;
   }
-  function renderCards() {
-    var presets = prop('MapGen', 'presets') || [];
-    var grid = els.cards;
-    grid.innerHTML = '';
-    var yoji = [], illust = [];
-    presets.forEach(function (p) { (p.kind === 'illust' ? illust : yoji).push(p); });
-    var n = Math.min(6, Math.max(3, yoji.length, illust.length));
-    grid.style.setProperty('--n', n);
-    grid.className = 'maps' + (n >= 5 ? ' dense' : '');
-    function group(title, cls, list) {
-      var g = doc.createElement('div'); g.className = 'grp ' + cls;
-      var l = doc.createElement('div'); l.className = 'gl'; l.textContent = title; g.appendChild(l);
-      var row = doc.createElement('div'); row.className = 'row'; g.appendChild(row);
-      row.style.setProperty('--n', Math.max(list.length, 4));
-      list.forEach(function (p) {
-        var c = doc.createElement('button');
-        c.type = 'button'; c.tabIndex = -1; c.className = 'card ' + cls; c.setAttribute('data-id', p.id);
-        var th = cls === 'illust' ? thumb(p.id) : '';
-        c.innerHTML = (th ? '<i class="ic"><img alt="" src="' + th + '"></i>' : (cls === 'illust' && ILLUST[p.title] ? '<i class="ic">' + ILLUST[p.title] + '</i>' : '')) + '<span class="kan"></span><span class="yomi"></span>';
-        c.querySelector('.kan').textContent = p.title;
-        setYomi(c.querySelector('.yomi'), cls === 'illust' ? '' : (p.reading || ''));
-        tap(c, function () { choosePreset(p); });
-        row.appendChild(c);
-      });
-      grid.appendChild(g);
+  // ちずえらび：上に 種類の タブ（よじじゅくご・ことわざ・えいご・イラスト）、その下に 1列の カードが 横に ならび、指で 横に なぞって 次々に 見られる
+  // （ブラウザの横スクロール：慣性・scroll-snap。iPad Safari でも うごくよう 列とその中は touch-action:pan-x。列では touchmove を止めない）。
+  // 右はしの カードは 少しだけ 見えて「まだ つづく」ことが わかる。下に「ランダム」と「えを よみこむ」
+  var mapTab = 'yoji', rowDragAt = 0;
+  function kindOf(p) { var k = p && p.kind; return (k === 'kotowaza' || k === 'eigo' || k === 'illust') ? k : 'yoji'; }
+  function allPresets() { var l = prop('MapGen', 'presets'); return (l && l.length) ? l.filter(function (p) { return p && p.id; }) : []; }
+  // ことわざの 字を 行に わける（1行 6字まで。空白、または ひらがな→漢字 の かわりめで わける。それが無ければ 6字で）
+  //   例：石の上にも／三年、ちりも／積もれば／山となる、好きこそ物の／上手なれ
+  function splitLines(t, max) {
+    max = max || 6;
+    var words = String(t || '').split(/\s+/).filter(Boolean), src = words.join(''), cuts = {}, pos = 0;
+    words.forEach(function (w, i) { pos += w.length; if (i < words.length - 1) cuts[pos] = 2; });
+    var hira = /[ぁ-んー]/, kanji = /[一-龥々]/;
+    for (var i = 1; i < src.length; i++) if (!cuts[i] && hira.test(src.charAt(i - 1)) && kanji.test(src.charAt(i))) cuts[i] = 1;
+    if (src.length <= max) return [src];
+    var out = [], st = 0;
+    while (src.length - st > max) {
+      var best = -1;
+      for (var k = st + max; k > st + 1; k--) if (cuts[k]) { best = k; break; }
+      if (best < 0) best = st + max;
+      out.push(src.slice(st, best)); st = best;
     }
-    group('よじじゅくご', 'yoji', yoji);
-    group('イラスト', 'illust', illust);
+    out.push(src.slice(st));
+    return out;
+  }
+  function twoLines(t) { return splitLines(t, 6); }
+  function cardFor(p) {
+    var k = kindOf(p), c = doc.createElement('button');
+    c.type = 'button'; c.tabIndex = -1; c.className = 'card ' + k; c.setAttribute('data-id', p.id); c.setAttribute('data-kind', k);
+    var th = k === 'illust' ? thumb(p.id) : '';
+    var pic = th ? '<i class="ic"><img alt="" src="' + th + '"></i>' : (k === 'illust' && ILLUST[p.title] ? '<i class="ic">' + ILLUST[p.title] + '</i>' : '');
+    c.innerHTML = pic + '<span class="kan"></span><span class="yomi"></span>' + (k === 'eigo' ? '<span class="mean"></span>' : '');
+    var kan = c.querySelector('.kan');
+    if (k === 'kotowaza') {
+      var ls = twoLines(p.title);
+      ls.forEach(function (ln, i) { if (i) kan.appendChild(doc.createElement('br')); kan.appendChild(doc.createTextNode(ln)); });
+      kan.classList.toggle('two', ls.length === 2); kan.classList.toggle('three', ls.length > 2);
+    } else { kan.textContent = p.title; if (k === 'eigo') kan.classList.toggle('long', String(p.title || '').length >= 6); }
+    var yo = k === 'illust' ? '' : (p.reading || '');
+    if (yo && yo.replace(/\s/g, '') === String(p.title || '').replace(/\s/g, '')) yo = '';
+    setYomi(c.querySelector('.yomi'), yo, k === 'kotowaza');
+    if (k === 'eigo') c.querySelector('.mean').textContent = p.meaning || '';
+    tap(c, function () { if (Date.now() - rowDragAt < 300) return; choosePreset(p); });
+    return c;
+  }
+  function renderCards() {
+    var presets = allPresets(), grid = els.cards;
+    grid.innerHTML = ''; grid.className = 'maps';
+    var by = {}; MAP_KINDS.forEach(function (m) { by[m.kind] = []; });
+    presets.forEach(function (p) { by[kindOf(p)].push(p); });
+    if (!by[mapTab] || !by[mapTab].length) { var f0 = MAP_KINDS.filter(function (m) { return by[m.kind].length; })[0]; mapTab = f0 ? f0.kind : 'yoji'; }
+    // タブ（見出し）
+    var tabs = doc.createElement('div'); tabs.className = 'mtabs'; tabs.setAttribute('role', 'tablist');
+    MAP_KINDS.forEach(function (m) {
+      if (!by[m.kind].length) return;
+      var t = doc.createElement('button');
+      t.type = 'button'; t.tabIndex = -1; t.className = 'mtab ' + m.kind; t.setAttribute('data-tab', m.kind); t.setAttribute('role', 'tab');
+      t.innerHTML = '<i></i><span></span><b></b>';
+      t.querySelector('span').textContent = m.name; t.querySelector('b').textContent = by[m.kind].length;
+      tap(t, function () { showTab(m.kind, true); });
+      tabs.appendChild(t);
+    });
+    grid.appendChild(tabs);
+    // カードの列（種類ごとに 1列。見えるのは えらんだ タブの 列だけ）
+    var wrap = doc.createElement('div'); wrap.className = 'mrows';
+    MAP_KINDS.forEach(function (m) {
+      if (!by[m.kind].length) return;
+      var row = doc.createElement('div'); row.className = 'mrow ' + m.kind; row.setAttribute('data-kind', m.kind); row.setAttribute('aria-label', m.name);
+      by[m.kind].forEach(function (p) { row.appendChild(cardFor(p)); });
+      var end = doc.createElement('i'); end.className = 'mend'; row.appendChild(end); // 右はしの あき（さいごの カードの ✓ が 切れない）
+      bindRow(row);
+      wrap.appendChild(row);
+    });
+    ['prev', 'next'].forEach(function (d) {
+      var b = doc.createElement('button');
+      b.type = 'button'; b.tabIndex = -1; b.className = 'mnav ' + d; b.setAttribute('aria-label', d === 'next' ? 'つぎ' : 'まえ');
+      b.innerHTML = '<svg viewBox="0 0 24 24"><path d="' + (d === 'next' ? 'M9 5l7 7-7 7' : 'M15 5l-7 7 7 7') + '" fill="none" stroke="currentColor" stroke-width="3.400" stroke-linecap="round" stroke-linejoin="round"/></svg>';
+      tap(b, function () { var r = curRow(); if (r) r.scrollBy({ left: (d === 'next' ? 1 : -1) * r.clientWidth * 0.75, behavior: 'smooth' }); });
+      wrap.appendChild(b);
+    });
+    grid.appendChild(wrap);
+    // ランダム と えを よみこむ
+    var tools = doc.createElement('div'); tools.className = 'mtools';
+    var rnd = doc.createElement('button');
+    rnd.type = 'button'; rnd.tabIndex = -1; rnd.className = 'card tool random'; rnd.id = 'm-random';
+    rnd.innerHTML = '<i class="ic dice">' + ICON.dice + '</i><span class="kan">ランダム</span>';
+    tap(rnd, pickRandom);
+    tools.appendChild(rnd);
     var f = doc.createElement('div');
-    f.className = 'card file'; f.setAttribute('data-id', 'file');
+    f.className = 'card tool file'; f.setAttribute('data-id', 'file');
     f.innerHTML = '<i class="ic">' + ICON.pic + '</i><span class="kan">えを よみこむ</span>' + (settings.binary ? '<span class="bw">しろくろ</span>' : '') + '<input type="file" accept="image/*" aria-label="えを よみこむ">';
     var inp = f.querySelector('input');
     // ファイル選択欄だけは既定動作を止めない（止めると選択画面が開かない）。他へ伝わらないよう伝播だけ止める
@@ -712,8 +829,63 @@
       inp.value = '';
       if (file) chooseFile(file);
     });
-    grid.appendChild(f);
+    tools.appendChild(f);
+    grid.appendChild(tools);
+    showTab(mapTab, false);
     markCards();
+  }
+  function curRow() { return els.cards.querySelector('.mrow.on'); }
+  function showTab(kind, user) {
+    mapTab = kind;
+    var tabs = els.cards.querySelectorAll('.mtab'), rows = els.cards.querySelectorAll('.mrow');
+    for (var i = 0; i < tabs.length; i++) { var on = tabs[i].getAttribute('data-tab') === kind; tabs[i].classList.toggle('on', on); tabs[i].setAttribute('aria-selected', on ? 'true' : 'false'); }
+    for (var j = 0; j < rows.length; j++) rows[j].classList.toggle('on', rows[j].getAttribute('data-kind') === kind);
+    if (user) { var r = curRow(); if (r) r.scrollLeft = 0; }
+    rowEdges();
+  }
+  // 列の はし：まだ 先が あるときは 右（左）を うすく ぼかし、矢印を出す
+  function rowEdges() {
+    var r = curRow(), w = els.cards.querySelector('.mrows'); if (!w) return;
+    var max = r ? r.scrollWidth - r.clientWidth : 0, x = r ? r.scrollLeft : 0;
+    w.classList.toggle('more-r', max > 2 && x < max - 2);
+    w.classList.toggle('more-l', x > 2);
+  }
+  // 列の うごき：指（touch）は ブラウザの 横スクロールに まかせる（ここでは 止めない）。
+  // マウスは つかんで 横に うごかせる（うごかしたら カードの タップは しない）。ホイールの たて回しは 横へ
+  function bindRow(row) {
+    var dr = null;
+    row.addEventListener('scroll', rowEdges, { passive: true });
+    row.addEventListener('pointerdown', function (e) {
+      if (e.pointerType !== 'mouse' || e.button !== 0) return;
+      dr = { x: e.clientX, sl: row.scrollLeft, moved: false, id: e.pointerId };
+    }, true);
+    function mv(e) {
+      if (!dr || e.pointerId !== dr.id) return;
+      var dx = e.clientX - dr.x;
+      if (!dr.moved && Math.abs(dx) > 6) { dr.moved = true; row.classList.add('drag'); }
+      if (dr.moved) { row.scrollLeft = dr.sl - dx; rowDragAt = Date.now(); }
+    }
+    function up(e) { if (!dr || (e && e.pointerId !== dr.id)) return; if (dr.moved) rowDragAt = Date.now(); dr = null; row.classList.remove('drag'); }
+    window.addEventListener('pointermove', mv);
+    window.addEventListener('pointerup', up, true);
+    window.addEventListener('pointercancel', up, true);
+    row.addEventListener('wheel', function (e) {
+      if (Math.abs(e.deltaY) > Math.abs(e.deltaX)) { row.scrollLeft += e.deltaY; e.preventDefault(); }
+    }, { passive: false });
+  }
+  // ランダム：見本の中から 1つ えらび、カードを おしたときと おなじように すすむ（その種類の タブへ うつり、カードを 見えるところへ）
+  function pickRandom() {
+    var list = allPresets(); if (!list.length || loading) return;
+    var cur = sel && sel.id, pool = list.filter(function (p) { return p.id !== cur; });
+    if (!pool.length) pool = list;
+    var p = pool[Math.floor(Math.random() * pool.length)];
+    showTab(kindOf(p), false);
+    var r = curRow(), c = r && r.querySelector('.card[data-id="' + p.id + '"]');
+    if (r && c) {
+      var x = Math.max(0, c.offsetLeft - (r.clientWidth - c.offsetWidth) / 2);
+      try { r.scrollTo({ left: x, behavior: 'smooth' }); } catch (e) { r.scrollLeft = x; }
+    }
+    choosePreset(p);
   }
   function markCards() {
     var list = els.cards.querySelectorAll('.card');
@@ -728,14 +900,25 @@
     var p = els.preview, h = '';
     if (loading) h = '<div class="spin"></div><div class="hint">つくっているよ…</div>';
     else if (msg) h = '<div class="hint">' + msg + '</div>';
-    else if (sel && sel.map) h = (sel.map.picture ? '<img class="mapimg" alt="">' : '') + '<div class="pt"></div><div class="py"></div>';
+    else if (sel && sel.map) h = (sel.map.picture ? '<img class="mapimg" alt="">' : '') + '<div class="pt"></div><div class="py"></div><div class="pm"></div>';
     else h = '<div class="hint">すきな ちずを<br>えらんでね</div>';
     p.innerHTML = h + crewHTML();
     if (!loading && sel && sel.map && !msg) {
       var img = p.querySelector('img.mapimg'); if (img) img.src = sel.map.picture;
-      p.querySelector('.pt').textContent = sel.map.title || '';
+      var pt = p.querySelector('.pt'), ttl = sel.map.title || '';
+      if (ttl.replace(/\s/g, '').length > 6) { pt.innerHTML = ''; splitLines(ttl, 7).forEach(function (ln, i) { if (i) pt.appendChild(doc.createElement('br')); pt.appendChild(doc.createTextNode(ln)); }); pt.classList.add('long'); }
+      else { pt.textContent = ttl; pt.classList.remove('long'); }
       p.querySelector('.py').textContent = (sel.map.reading && sel.map.reading !== sel.map.title) ? sel.map.reading : '';
+      var mean = mapMeaning(sel), pm = p.querySelector('.pm'); if (mean) pm.textContent = mean; else pm.parentNode.removeChild(pm);
     }
+  }
+  // えいごの ちずの 意味（ねこ など）。地図に無ければ 見本の一覧から
+  function mapMeaning(sl) {
+    if (!sl) return '';
+    if (sl.map && sl.map.meaning) return sl.map.meaning;
+    var id = sl.id; if (!id || id === 'file') return '';
+    var p = allPresets().filter(function (q) { return q.id === id; })[0];
+    return (p && p.meaning) || '';
   }
   function treasureCount() { return gameMode === 'count' ? 10 : 1; }
   function choosePreset(p) {
@@ -768,10 +951,11 @@
       if (!netConnected) return;
       var enc = call('MapGen', 'encode', sel.map);
       var pals = [settings.palette, remotePal == null ? cpuPalette(settings.palette) : remotePal];
-      call('Net', 'send', { t: 'map', map: enc, mode: gameMode, pals: pals, search: settings.search });
-      startGame(sel.map, 0, true, null, pals, settings.search);
-    } else if (opp === 'cpu') startGame(sel.map, 0, false, { level: settings.level }, [settings.palette, cpuPalette(settings.palette)], settings.search);
-    else startGame(sel.map, 0, false, null, [settings.palette, cpuPalette(settings.palette)], settings.search);
+      // スピードは ホストの設定を 地図と いっしょに送り、両方が 同じ速さで あそぶ（曲は それぞれの設定）
+      call('Net', 'send', { t: 'map', map: enc, mode: gameMode, pals: pals, search: settings.search, speed: settings.speed });
+      startGame(sel.map, 0, true, null, pals, settings.search, settings.speed);
+    } else if (opp === 'cpu') startGame(sel.map, 0, false, { level: settings.level }, [settings.palette, cpuPalette(settings.palette)], settings.search, settings.speed);
+    else startGame(sel.map, 0, false, null, [settings.palette, cpuPalette(settings.palette)], settings.search, settings.speed);
   }
 
   /* ===== U13. 通信：へや（つくる・はいる） ===== */
@@ -881,7 +1065,7 @@
         if (m) {
           netTok++; setMode(d.mode === 'count' ? 'count' : 'race'); opp = 'net';
           var pals = (d.pals && d.pals.length === 2) ? [clamp(d.pals[0] | 0, 0, 9), settings.palette] : [remotePal == null ? 0 : remotePal, settings.palette];
-          startGame(m, 1, true, null, pals, d.search === 'sonar' ? 'sonar' : 'light');
+          startGame(m, 1, true, null, pals, d.search === 'sonar' ? 'sonar' : 'light', SPEEDS.indexOf(d.speed) >= 0 ? d.speed : 'normal');
         } else failNet('ちずが うけとれなかったよ');
       }
       return;
@@ -918,7 +1102,7 @@
   }
 
   /* ===== U15. プレイ開始とカウントダウン（3・2・1・GO!） ===== */
-  function startGame(m, idx, net, cpu, pals, search) {
+  function startGame(m, idx, net, cpu, pals, search, speed) {
     map = m; myIndex = idx; netOn = !!net; recorded = false; ended = false; sw = null;
     clearTimeout(endTimer); clearTimeout(readyTimer); doc.body.classList.remove('endwait');
     doc.body.setAttribute('data-mode', gameMode);
@@ -931,11 +1115,15 @@
     renderHud(); updateTimer(true);
     hideNotice(); clearOno();
     var players = pals.map(function (n) { return { palette: n, color: pal(n).body }; });
-    call('World', 'load', m, { myIndex: idx, players: players, net: netOn, isHost: !netOn || idx === 0, cpu: cpu || null, mode: gameMode, search: search || 'light' });
+    curSpeed = SPEEDS.indexOf(speed) >= 0 ? speed : 'normal';
+    call('World', 'load', m, { myIndex: idx, players: players, net: netOn, isHost: !netOn || idx === 0, cpu: cpu || null, mode: gameMode, search: search || 'light', speed: curSpeed });
     call('World', 'resetPitch');
     var tinfo = call('World', 'treasureInfo'); if (tinfo && tinfo.total) totalTreasure = tinfo.total;
     els.ptTitle.textContent = m.title || '';
-    els.ptYomi.textContent = (m.reading && m.reading !== m.title) ? m.reading : '';
+    var mm = mapMeaning(sel && sel.map === m ? sel : { map: m, id: m.presetId || m.id });
+    els.ptYomi.textContent = ((m.reading && m.reading !== m.title) ? m.reading : '') + (mm ? '（' + mm + '）' : '');
+    els.ptTitle.classList.toggle('long', (m.title || '').length > 9);
+    els.ptYomi.classList.toggle('long', els.ptYomi.textContent.length > 12);
     els.maptag.classList.toggle('none', !m.title);
     if (els.sOpName) els.sOpName.textContent = opp === 'cpu' ? 'コンピューター' : 'あいて'; // 宣言・結果と おなじ よびかた
     camMode = 1; updateCam();
@@ -980,20 +1168,24 @@
     phase = 'run';
     doc.body.classList.remove('frozen');
     call('World', 'go');
-    call('Sfx', 'bgm', PLAY_TRACKS[Math.floor(Math.random() * PLAY_TRACKS.length)]);
+    call('Sfx', 'bgm', trackOk(settings.bgm) ? settings.bgm : playTracks()[0].name); // 設定で えらんだ曲（通信でも それぞれの設定）
   }
   function stopGame() {
     if (running) { running = false; call('World', 'stop'); }
   }
+  // カメラの ボタン：いまの視点の 絵と 名前（め／おいかけ／みわたし／そら）と、4つの うちの どれかを しめす 点。おすと つぎの視点へ
   function updateCam() {
-    var nx = (camMode + 1) % 3;
-    els.camIco.innerHTML = camIcon(nx, pal(myPal));
-    els.camLabel.textContent = CAM_GO[nx];
-    els.cam.setAttribute('aria-label', 'おすと ' + CAM_LABEL[nx] + 'に なる');
+    var m = ((camMode | 0) % CAM_N + CAM_N) % CAM_N, nx = (m + 1) % CAM_N;
+    els.camIco.innerHTML = camIcon(m, pal(myPal));
+    els.camLabel.textContent = CAM_LABEL[m];
+    var dots = ''; for (var i = 0; i < CAM_N; i++) dots += '<b class="' + (i === m ? 'on' : '') + '"></b>';
+    if (els.camDots) els.camDots.innerHTML = dots;
+    els.cam.setAttribute('data-cam', m);
+    els.cam.setAttribute('aria-label', 'いまは ' + CAM_LABEL[m] + '。おすと ' + CAM_LABEL[nx] + 'に なる');
   }
   function cycleCam() {
     var m = call('World', 'cycleCamera');
-    camMode = (typeof m === 'number') ? m : (camMode + 1) % 3;
+    camMode = (typeof m === 'number' && m >= 0 && m < CAM_N) ? m : (camMode + 1) % CAM_N;
     updateCam();
   }
   function showNotice(t, big) {
@@ -1245,6 +1437,15 @@
       }
     }
     g.restore();
+    // 宝石の真上に来た（World の 'overGem'）：盤が ふわっと 金色に 明るくなって もどる（1回だけ。点滅しない）
+    var gk = gemGlowK(T);
+    if (gk > 0) {
+      g.save(); g.beginPath(); g.arc(c, c, R, 0, Math.PI * 2); g.clip();
+      var hg = g.createRadialGradient(c, c, R * 0.15, c, c, R);
+      hg.addColorStop(0, 'rgba(255,236,150,' + (0.42 * gk).toFixed(3) + ')'); hg.addColorStop(0.7, 'rgba(255,213,79,' + (0.22 * gk).toFixed(3) + ')'); hg.addColorStop(1, 'rgba(255,213,79,' + (0.5 * gk).toFixed(3) + ')');
+      g.fillStyle = hg; g.fillRect(0, 0, W, W); g.restore();
+      g.beginPath(); g.arc(c, c, R + 5.5, 0, Math.PI * 2); g.lineWidth = 9; g.strokeStyle = 'rgba(255,213,79,' + (0.85 * gk).toFixed(3) + ')'; g.stroke();
+    }
     g.beginPath(); g.moveTo(c, c - R + 3); g.lineTo(c - 9, c - R - 8); g.lineTo(c + 9, c - R - 8); g.closePath(); g.fillStyle = '#ff9800'; g.fill();
     if (far) {
       var fsx = (far.dx * -fz + far.dz * fx), fsy = -(far.dx * fx + far.dz * fz);
@@ -1259,6 +1460,29 @@
       g.lineWidth = 3; g.lineJoin = 'round'; g.strokeStyle = '#fffaf0'; g.stroke();
       g.restore();
     }
+  }
+
+  // 光の強さ（0〜1）：0.35秒で ふわっと上がり、0.6秒 そのまま、1.2秒で ゆっくり もどる
+  var GLOW_IN = 350, GLOW_HOLD = 600, GLOW_OUT = 1200;
+  function gemGlowK(T) {
+    if (gemGlowT < 0) return 0;
+    var t = (T || 0) - gemGlowT; if (t < 0) return 0;
+    var sm = function (x) { x = clamp(x, 0, 1); return x * x * (3 - 2 * x); };
+    if (t < GLOW_IN) return sm(t / GLOW_IN);
+    if (t < GLOW_IN + GLOW_HOLD) return 1;
+    var k = 1 - sm((t - GLOW_IN - GLOW_HOLD) / GLOW_OUT);
+    if (k <= 0) gemGlowT = -1;
+    return Math.max(0, k);
+  }
+  // World の 'overGem'(ti)：自分が 宝石の真上の マスに 入った。音は World が鳴らすので ここでは 鳴らさない
+  var glowTimer = 0;
+  function onOverGem() {
+    if (state !== 'play' || phase !== 'run' || isPaused) return;
+    gemGlowT = (window.performance && performance.now) ? performance.now() : Date.now();
+    var el = els.sonar; if (!el) return;
+    clearTimeout(glowTimer);
+    el.classList.add('glow');
+    glowTimer = setTimeout(function () { el.classList.remove('glow'); }, GLOW_IN + GLOW_HOLD);
   }
 
   /* ===== U19. エンディング（争いの言葉なし。同数は「へいわの しょうり」） ===== */
@@ -1355,13 +1579,23 @@
     }
   }
 
-  /* ===== U20. スワイプ（プレイ中の画面なぞり） ===== */
+  /* ===== U20. スワイプ（プレイ中の画面なぞり） =====
+     第5期（4e）の見直し：
+     ・なぞりの面：#swipe（16:9 のステージ）に くわえて、4:3 の iPad で ステージの上下に出る 3D の帯（#worldbox）でも 受ける
+       （前は 帯の上で なぞっても 何も起きなかった）。
+     ・向きの判定：前は 動き出しの 1.6cqmin で「たて」と決まると、その指は 最後まで 回らなかった。
+       いまは 横を優先（たてと決めるのは はっきり たての時だけ）。たてと決めたあとでも 横に動けば 回る。
+     ・2本目の指：「すすむ」を押した指とは 別の pointerId で 受ける。前の指の「はなした」が 届かず 残っていても、新しい指に うつる
+       （前は 残ったままだと そのあとの なぞりを 全部 無視していた）。どこで はなしても document で 受けて 終わらせる。
+     ・感度：ステージの横幅の 1/3 で 90度（SWIPE_TURN_PER_WIDTH）。 */
   function unitPx() { var r = els.stage.getBoundingClientRect(); return Math.max(1, Math.min(r.width, r.height) / 100); }
+  function swipeK() { var g = +prop('World', 'SWIPE_GAIN'); return SWIPE_TURN_PER_WIDTH / (g > 0 ? g : Math.PI); }
   function swipeDown(e) {
+    if (state !== 'play') return;
     e.stopPropagation(); e.preventDefault(); unlock();
-    if (state !== 'play' || inputLocked() || sw) return;
-    sw = { id: e.pointerId, x: e.clientX, y: e.clientY, lx: e.clientX, ly: e.clientY, axis: '' };
-    try { els.swipe.setPointerCapture(e.pointerId); } catch (_) {}
+    if (inputLocked()) return;
+    sw = { id: e.pointerId, x: e.clientX, y: e.clientY, lx: e.clientX, ly: e.clientY, axis: '', el: e.currentTarget };
+    try { e.currentTarget.setPointerCapture(e.pointerId); } catch (_) {}
   }
   function swipeMove(e) {
     if (!sw || e.pointerId !== sw.id) return;
@@ -1369,21 +1603,36 @@
     if (inputLocked()) { sw = null; return; }
     var u = unitPx(), dx = e.clientX - sw.x, dy = e.clientY - sw.y;
     if (!sw.axis) {
-      if (Math.hypot(dx, dy) < 1.6 * u) return;
-      sw.axis = Math.abs(dx) >= Math.abs(dy) ? 'h' : 'v'; sw.lx = sw.x; sw.ly = sw.y;
+      if (Math.hypot(dx, dy) < SWIPE_START * u) return;
+      sw.axis = Math.abs(dy) > Math.abs(dx) * 1.8 ? 'v' : 'h'; // 横を優先
+      sw.lx = sw.x; sw.ly = sw.y;                              // 動き出しの分も 回す
     }
+    if (sw.axis === 'v' && Math.abs(dx) > 4 * u && Math.abs(dx) > Math.abs(dy) * 0.7) { sw.axis = 'h'; sw.lx = e.clientX; }
     if (sw.axis === 'h') {
       var mx = e.clientX - sw.lx; sw.lx = e.clientX;
       if (!mx) return;
       hideTip();
       var rw = els.stage.getBoundingClientRect().width || 1;
-      call('World', 'swipeTurn', mx / rw * (settings.swipeRev ? -1 : 1));
+      call('World', 'swipeTurn', mx / rw * swipeK() * (settings.swipeRev ? -1 : 1));
     } else {
       var dd = e.clientY - sw.ly; sw.ly = e.clientY;
       if (dd) { hideTip(); call('World', 'nudgePitch', clamp(-dd / (30 * u), -1, 1)); }
     }
   }
   function swipeUp(e) { if (!sw || e.pointerId !== sw.id) return; e.stopPropagation(); e.preventDefault(); sw = null; }
+  // どこで指を はなしても（とらえそこねて ほかの部品の上で はなしても）なぞりを 終わらせる
+  function swipeEndAny(e) { if (sw && e.pointerId === sw.id) sw = null; }
+  function bindSwipe(el) {
+    if (!el) return;
+    el.addEventListener('pointerdown', swipeDown);
+    el.addEventListener('pointermove', swipeMove);
+    el.addEventListener('pointerup', swipeUp);
+    el.addEventListener('pointercancel', swipeUp);
+    el.addEventListener('lostpointercapture', function (e) { if (sw && e.pointerId === sw.id && sw.el === el) sw = null; });
+    el.addEventListener('click', stopEv);
+    el.addEventListener('contextmenu', stopEv);
+    ['touchstart', 'touchmove'].forEach(function (n) { el.addEventListener(n, function (e) { if (state === 'play') e.preventDefault(); }, { passive: false }); });
+  }
   function showTip() { clearTimeout(tipTimer); els.tip.classList.add('on'); tipTimer = setTimeout(hideTip, 6500); }
   function hideTip() { clearTimeout(tipTimer); if (els.tip) els.tip.classList.remove('on'); }
 
@@ -1510,10 +1759,10 @@
   /* ===== U24. 初期化と window.App ===== */
   function init() {
     ['stage', 'nav', 'home', 'modal', 'setting', 'sethead', 'cards', 'preview', 'keypad', 'codein', 'codeshow', 'msgface', 'msgtext',
-      'cam', 'notice', 'confetti', 'swipe', 'tip', 'recchip', 'ending', 'timer', 'maptag', 'swatches', 'ann', 'waitnote'].forEach(function (id) { els[id] = $(id); });
+      'cam', 'notice', 'confetti', 'swipe', 'tip', 'recchip', 'ending', 'timer', 'maptag', 'swatches', 'ann', 'waitnote', 'sonar', 'worldbox', 'gear'].forEach(function (id) { els[id] = $(id); });
     els.endFound = $('end-found'); els.endRec = $('end-rec'); els.endTeam = $('end-team');
     els.ptTitle = $('pt-title'); els.ptYomi = $('pt-yomi');
-    els.camIco = $('cam-ico'); els.camLabel = $('cam-label');
+    els.camIco = $('cam-ico'); els.camLabel = $('cam-label'); els.camDots = $('cam-dots');
     els.endWho = $('end-who'); els.endTitle = $('end-title'); els.endYomi = $('end-yomi'); els.endPic = $('end-pic');
     els.sonarCv = $('sonar-cv'); els.tVal = $('t-val'); els.sMe = $('s-me'); els.sOp = $('s-op');
     els.countN = $('count-n'); els.annGem = $('ann-gem'); els.annWho = $('ann-who'); els.annWhat = $('ann-what');
@@ -1524,6 +1773,7 @@
     doc.addEventListener('keydown', onKeyDown);
     doc.addEventListener('keyup', onKeyUp);
     window.addEventListener('blur', releaseAll);
+    window.addEventListener('resize', function () { if (state === 'setting' && sub === 'pick') rowEdges(); });
     if (window.matchMedia) {
       var mq = window.matchMedia('(orientation: portrait)');
       if (mq.addEventListener) mq.addEventListener('change', applyPause); else if (mq.addListener) mq.addListener(applyPause);
@@ -1535,7 +1785,7 @@
     var icos = doc.querySelectorAll('[data-ico]');
     for (var ii = 0; ii < icos.length; ii++) icos[ii].innerHTML = SETICO[icos[ii].getAttribute('data-ico')] || '';
     renderArts();
-    buildSwatches();
+    buildSwatches(); buildTrackSeg();
     renderCards(); renderPreview();
     renderLevels(); renderSettings(); renderRecChip();
     updateCam();
@@ -1557,10 +1807,11 @@
     tap($('c-host'), startHost);
     tap($('c-join'), startJoin);
     tap(els.cam, cycleCam);
+    if (els.gear) { els.gear.querySelector('i').innerHTML = ICON.gear; tap(els.gear, openSettings); } // タイトルの 左上の 歯車「せってい」
     tap($('reset-rec'), function () { openModal('reset'); });
     var segs = doc.querySelectorAll('.seg button[data-set]');
     for (var j = 0; j < segs.length; j++) (function (b) {
-      tap(b, function () { var k = b.getAttribute('data-set'), v = b.getAttribute('data-val'); setOpt(k, k === 'search' ? v : v === '1'); });
+      tap(b, function () { var k = b.getAttribute('data-set'); setOpt(k, optVal(k, b.getAttribute('data-val'))); });
     })(segs[j]);
     var lvs = doc.querySelectorAll('.lvcard');
     for (var q = 0; q < lvs.length; q++) (function (b) { tap(b, function () { chooseLevel(b.getAttribute('data-level')); }); })(lvs[q]);
@@ -1568,14 +1819,10 @@
     for (var hh = 0; hh < hows.length; hh++) (function (b) { tap(b, function () { chooseKind(b.getAttribute('data-kind')); }); })(hows[hh]);
     var whos = doc.querySelectorAll('[data-who]');
     for (var ww = 0; ww < whos.length; ww++) (function (b) { tap(b, function () { chooseWho(b.getAttribute('data-who')); }); })(whos[ww]);
-    els.swipe.addEventListener('pointerdown', swipeDown);
-    els.swipe.addEventListener('pointermove', swipeMove);
-    els.swipe.addEventListener('pointerup', swipeUp);
-    els.swipe.addEventListener('pointercancel', swipeUp);
-    els.swipe.addEventListener('lostpointercapture', function (e) { if (sw && e.pointerId === sw.id) sw = null; });
-    els.swipe.addEventListener('click', stopEv);
-    els.swipe.addEventListener('contextmenu', stopEv);
-    ['touchstart', 'touchmove'].forEach(function (n) { els.swipe.addEventListener(n, function (e) { e.preventDefault(); }, { passive: false }); });
+    bindSwipe(els.swipe);
+    bindSwipe(els.worldbox); // 4:3 で ステージの上下に出る 3D の帯でも なぞれる
+    doc.addEventListener('pointerup', swipeEndAny, true);
+    doc.addEventListener('pointercancel', swipeEndAny, true);
     var ctls = doc.querySelectorAll('.ctl[data-act]');
     for (var i = 0; i < ctls.length; i++) hold(ctls[i], ctls[i].getAttribute('data-act'));
 
@@ -1583,6 +1830,7 @@
     call('World', 'on', 'gemHit', onGemHit);
     call('World', 'on', 'collect', onCollect);
     call('World', 'on', 'onomato', onOnomato);
+    call('World', 'on', 'overGem', onOverGem);
     call('World', 'on', 'terrain', onTerrain);
     call('World', 'on', 'action', onAction);
     call('World', 'on', 'cam', function (top) { doc.body.classList.toggle('camtop', !!top); });
@@ -1605,7 +1853,7 @@
     resetGame: function () { resetGame(); },
     get state() { return state; },
     // 確認用の手がかり（ゲームの進行には使わない）
-    _info: function () { return { mode: gameMode, opp: opp, level: curLevel, phase: phase, left: timeLeft, elapsed: elapsed, raceTime: raceTime, scores: scores.slice(), total: totalTreasure, ended: ended, paused: isPaused, remotePaused: remotePaused, cdT: cdT, ann: ann ? { idx: ann.idx, ti: ann.ti, t: ann.t } : null, owners: JSON.parse(JSON.stringify(owners)), myPal: myPal, oppPal: oppPal, netRole: netRole, netOn: netOn }; },
+    _info: function () { return { mode: gameMode, opp: opp, level: curLevel, phase: phase, left: timeLeft, elapsed: elapsed, raceTime: raceTime, scores: scores.slice(), total: totalTreasure, ended: ended, paused: isPaused, remotePaused: remotePaused, cdT: cdT, ann: ann ? { idx: ann.idx, ti: ann.ti, t: ann.t } : null, owners: JSON.parse(JSON.stringify(owners)), myPal: myPal, oppPal: oppPal, netRole: netRole, netOn: netOn, settings: JSON.parse(JSON.stringify(settings)), camMode: camMode, speed: curSpeed, sw: sw ? { id: sw.id, axis: sw.axis } : null, glow: gemGlowK(window.performance ? performance.now() : 0) }; },
     _setTime: function (sec) { timeLeft = Math.max(0, +sec || 0); shownSec = -1; updateTimer(true); },
     _gemHit: function (idx, ti) { onGemHit(idx, ti); },
     _onomato: function (k) { onOnomato(k); },

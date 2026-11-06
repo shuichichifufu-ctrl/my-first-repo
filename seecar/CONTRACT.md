@@ -269,3 +269,10 @@ Net.isHost; Net.connected
 - 同数は「みんな なかよし！ へいわの しょうり！」＋ 'peace' ジングル。
 - 通信メッセージ（追加）：`{t:'hello', palette}`、`{t:'ready'}`（クライアントが地図を読み終えた）、`{t:'count'}`（ホストがカウントダウン開始）、`{t:'claim', ti}`、`{t:'award', idx, ti}`、`{t:'resume'}`。
 - `resetGame()`：ゲームループ・タイマー・スコア・選択状態・終了フラグ・入力状態・通信・BGM・効果音・加速状態・カウントダウン・獲得宣言をすべて初期化してタイトルへ。
+
+## 第5期の追加（v10.0、SPEC5.md）
+
+- **Sfx**：`bgm()` の曲に `genki`（既定）`yukai` `nonbiri`（旧 play2 のオルゴール調）`iyashi` を追加。`play1〜3` も鳴る。`Sfx.PLAY_TRACKS=[{name,label}]×4`。`Sfx.preview(name, secs=4)` は試しに鳴らして、もとの bgm に戻す。`Sfx.play('pinpin')`（宝石の真上の知らせ、MIN_GAP 1.0秒）。曲の切りかえはクロスフェードで、重ならない。
+- **World**：`load(map, {..., speed:'slow'|'normal'|'fast'})`（既定 normal）。`World.SPEED_MUL={slow:1,normal:1.25,fast:1.5}` を SPEED・AIR_SPEED・DA_SPEED に掛ける（CPU も）。カメラは `World.CAMERAS=['め','おいかけ','みわたし','そら']`（0〜3）、`cycleCamera` は 0→1→2→3→0。`'cam'` イベントは `(top, camMode)`、top は そら(3) と開始演出だけ true。`'overGem'(ti)`：自分が地上で、まだ誰も取っていない宝石の真上のマスに入るたびに1回。world が pinpin を鳴らす。おいかけのカメラは真後ろ（CHASE_SIDE=0）。
+- **MapGen**：`presets` の要素は `{id,title,reading,kind,meaning?}`。kind は `yoji|kotowaza|eigo|illust`（19/14/12/6）。meaning は eigo だけ。見本の地図は正方形とは限らない（例 188×86、マス数は 16384 以下）。絵の読み込みは「画素数 64×64 以下・長い辺 96 以下」。
+- **UI**：設定 `{swipeRev:true, binary:false, level:'normal', palette:0, search:'sonar', speed:'normal', bgm:'genki', v:10}`。v のない古い保存は swipeRev・search を新しい既定にする。ホストの speed は `map` の通信に入れて、両方が同じ速さ。曲はそれぞれの端末の設定。スワイプは 4:3 の上下の帯（#worldbox）でも効き、画面の横幅の 1/3 で 90 度。
